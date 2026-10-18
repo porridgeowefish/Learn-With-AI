@@ -6,6 +6,8 @@
 
 [简体中文](./README.md) · English
 
+<sub>Formerly LLL_life_long_learn. Existing repository links redirect here; the current project name is Learn-With-AI.</sub>
+
 **A local-first AI tutor for learning from your own materials.**
 
 Build a subject knowledge map, explore concepts with formulas and interactive diagrams, and check your understanding with notes, quizzes and teach-back practice.
