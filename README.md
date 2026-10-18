@@ -4,11 +4,13 @@
 
 # Learn-With-AI
 
+[简体中文](./README.md) · [English](./README.en.md)
+
 **从“看过了”，到“能讲清楚”。**
 
 用学科地图看清知识体系，用文字、公式、图解与交互演示理解概念，再通过笔记、复习、练习和「讲给教师听」检验掌握。可以带上自己的教材，也可以从一个问题开始。
 
-*Map the subject. Explore the idea. Explain it in your own words.*
+**A local-first AI tutor for learning from your own materials.** Build a subject knowledge map, explore concepts with interactive diagrams, and check your understanding with notes, quizzes and teach-back practice. Connect your own OpenAI- or Anthropic-compatible API.
 
 [![Release](https://img.shields.io/github/v/release/porridgeowefish/Learn-With-AI?label=release&color=477fa8)](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)
 [![CI](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml)
@@ -16,6 +18,8 @@
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-163957)
 
 **[下载安装](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)** · [看一次完整学习过程](#功能演示) · [从源码构建](#从源码构建)
+
+<sub>下载安装后可先打开「体验示例」，无需 API Key。自己的教师对话与内容生成需要可用的模型连接，费用取决于所选服务。</sub>
 
 <img src="docs/images/learn-with-ai-poster.png" width="900" alt="淡蓝色软件宣传海报：学科地图、结构化讲解与学习闭环" />
 
@@ -250,5 +254,7 @@ Windows 关闭窗口会隐藏到托盘，点击托盘图标恢复，右键选择
 ## 参与贡献
 
 欢迎通过 [Issues](https://github.com/porridgeowefish/Learn-With-AI/issues) 报告问题或提出建议。贡献流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+如果这个学习工作台对你有用，欢迎 Star 收藏，也欢迎分享一次具体的学习体验或改进建议。
 
 [MIT](./LICENSE) © 2026 Xiong Minzhe
