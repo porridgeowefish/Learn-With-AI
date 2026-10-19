@@ -17,7 +17,7 @@ Learn-With-AI 是适用于 Windows、macOS 和 Linux 的本地优先 AI 学习�
 [![License: MIT](https://img.shields.io/badge/license-MIT-9ecdf3)](./LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-163957)
 
-**[下载安装](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)** · [看一次完整学习过程](#功能演示) · [从源码构建](#从源码构建)
+**[下载安装](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)** · [产品介绍](https://porridgeowefish.github.io/Learn-With-AI/) · [看一次完整学习过程](#功能演示) · [从源码构建](#从源码构建)
 
 <sub>下载安装后可先打开「体验示例」，无需 API Key。自己的教师对话与内容生成需要可用的模型连接，费用取决于所选服务。</sub>
 

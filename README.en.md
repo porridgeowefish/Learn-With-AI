@@ -14,7 +14,7 @@ Build a subject knowledge map, explore concepts with formulas and interactive di
 [![CI](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-**[Download for Windows, macOS and Linux](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)** · [Quick start](#quick-start) · [Screenshots](#the-learning-workflow) · [Build from source](#build-from-source)
+**[Download for Windows, macOS and Linux](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)** · [Product website](https://porridgeowefish.github.io/Learn-With-AI/en/) · [Quick start](#quick-start) · [Screenshots](#the-learning-workflow) · [Build from source](#build-from-source)
 
 The bundled example needs no API key. New conversations and generated content require a configured model connection; provider charges may apply.
 
