@@ -2,17 +2,15 @@
 
 <img src="frontend/public/app-icon.png" width="80" alt="Learn-With-AI 应用图标" />
 
-# Learn-With-AI
+# Learn-With-AI — 本地优先 AI 学习应用
 
 [简体中文](./README.md) · [English](./README.en.md)
 
-<sub>原仓库名：LLL_life_long_learn。旧仓库链接会跳转到这里；当前名称为 Learn-With-AI。</sub>
-
 **从“看过了”，到“能讲清楚”。**
 
-用学科地图看清知识体系，用文字、公式、图解与交互演示理解概念，再通过笔记、复习、练习和「讲给教师听」检验掌握。可以带上自己的教材，也可以从一个问题开始。
+Learn-With-AI 是适用于 Windows、macOS 和 Linux 的本地优先 AI 学习应用。用学科地图看清知识体系，用文字、公式、图解与交互演示理解概念，再通过笔记、复习、练习和「讲给教师听」检验掌握。可以带上自己的教材，也可以从一个问题开始。
 
-**A local-first AI tutor for learning from your own materials.** Build a subject knowledge map, explore concepts with interactive diagrams, and check your understanding with notes, quizzes and teach-back practice. Connect your own OpenAI- or Anthropic-compatible API.
+**Learn-With-AI is an open-source, local-first AI learning app.** Study your own materials with subject maps, an AI tutor, interactive diagrams, notes, quizzes and teach-back practice. Connect your own OpenAI- or Anthropic-compatible API.
 
 [![Release](https://img.shields.io/github/v/release/porridgeowefish/Learn-With-AI?label=release&color=477fa8)](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)
 [![CI](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml)
@@ -224,6 +222,13 @@ flowchart LR
 </details>
 
 ## 常见问题
+
+<details>
+<summary><b>原来的 LLL_life_long_learn 链接还能用吗？</b></summary>
+
+可以。Learn-With-AI 原仓库名为 LLL_life_long_learn，旧仓库链接继续跳转到当前项目。用户名和现有仓库地址保持不变。
+
+</details>
 
 <details>
 <summary><b>没有 API Key，能先体验吗？</b></summary>

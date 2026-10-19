@@ -1,0 +1,47 @@
+name: Product website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+      - 'docs/images/discipline-map.png'
+      - 'docs/images/teacher.png'
+      - 'docs/images/feynman.png'
+      - 'docs/images/learn-with-ai-poster.png'
+      - 'frontend/public/app-icon.png'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy public product images
+        shell: bash
+        run: |
+          mkdir -p website/assets
+          cp frontend/public/app-icon.png website/assets/
+          cp docs/images/discipline-map.png docs/images/teacher.png docs/images/feynman.png docs/images/learn-with-ai-poster.png website/assets/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: website
+      - name: Deploy product website
+        id: deployment
+        uses: actions/deploy-pages@v4

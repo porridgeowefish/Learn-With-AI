@@ -2,13 +2,11 @@
 
 <img src="frontend/public/app-icon.png" width="80" alt="Learn-With-AI app icon" />
 
-# Learn-With-AI
+# Learn-With-AI — Local-first AI Learning App
 
 [简体中文](./README.md) · English
 
-<sub>Formerly LLL_life_long_learn. Existing repository links redirect here; the current project name is Learn-With-AI.</sub>
-
-**A local-first AI tutor for learning from your own materials.**
+**Learn-With-AI is an open-source, local-first AI learning app for Windows, macOS and Linux.**
 
 Build a subject knowledge map, explore concepts with formulas and interactive diagrams, and check your understanding with notes, quizzes and teach-back practice.
 
@@ -111,6 +109,8 @@ npm run start
 The source server opens `http://127.0.0.1:8787/`. Development data defaults to the ignored `workspace/` directory; set `--workspace` or `LLL_WORKSPACE_ROOT` to choose another location. The backend uses Go; the frontend uses React 18, TypeScript and Vite. See the [Chinese guide](./README.md#从源码构建) for development commands.
 
 ## Feedback and contributions
+
+The repository was formerly named LLL_life_long_learn. Existing repository links redirect to Learn-With-AI; the username and current repository URL remain unchanged.
 
 [Report a bug or suggest an improvement](https://github.com/porridgeowefish/Learn-With-AI/issues). Include the app version, operating system and steps to reproduce the problem; remove keys and private learning content. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution workflow.
 
