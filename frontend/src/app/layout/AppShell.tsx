@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useAppearance } from '@/features/settings/appearance';
 import { useSSE } from '@/app/hooks/useSSE';
 import { useActivityRefresh } from '@/app/hooks/useActivityRefresh';
+import { ScreenGuide } from './ScreenGuide';
 import { Sidebar } from './Sidebar';
 import s from './AppShell.module.css';
 export function AppShell() {
@@ -20,5 +21,5 @@ export function AppShell() {
    if (event.key === 'Tab') {const nodes = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select')].filter(el=>el.offsetParent!==null);const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey && document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}}
   }}><button className={s.closeMenu} onClick={close} aria-label="关闭导航">×</button><Sidebar/></div>
   <main className={s.main}><Outlet/></main>
- </div></div>;
+ </div><ScreenGuide/></div>;
 }

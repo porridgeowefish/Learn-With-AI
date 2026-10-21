@@ -34,7 +34,10 @@
 .markdown :global(th) { color: var(--fg); background: var(--surface-sunken); font-weight: 700; }
 .markdown :global(tr:nth-child(even) td) { background: color-mix(in srgb, var(--surface-sunken) 44%, transparent); }
 .reasoning { margin: 2px 0 12px; padding-left: 12px; border-left: 2px solid var(--border); color: var(--muted); font-size: 12px; }
-.reasoning summary { cursor: pointer; user-select: none; margin-bottom: 6px; }
+.reasoningToggle { display: flex; align-items: center; gap: 5px; padding: 3px 0; color: inherit; background: transparent; border: 0; font: inherit; cursor: pointer; }
+.reasoningToggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.reasoningText { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; padding-top: 6px; }
+.reasoningText[hidden] { display: none; }
 .thinking { color: var(--muted); animation: pulse 1.3s ease-in-out infinite; }
 .taskCard { margin-top: 15px; padding: 13px 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); box-shadow: var(--shadow-sm); }
 .taskCard > div { display: flex; align-items: center; gap: 6px; }
@@ -57,9 +60,9 @@
 .taskNotice a, .taskNotice button { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); background: var(--card); font-size: 10px; text-decoration: none; }
 .attachment { display: inline-flex; margin: 7px 6px 0 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface-raised); font-size: 11px; }
 .error { max-width: 760px; margin: 0 auto 20px; font-size: 12px; }
-.composerDock { position: relative; z-index: 3; flex: 0 0 auto; width: min(820px, calc(100% - 40px)); margin: 0 auto; padding: 10px 0 14px; }
-.composer { position: relative; width: 100%; padding: 12px 14px 9px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface-translucent); box-shadow: 0 5px 22px rgb(var(--shadow-color) / .08); backdrop-filter: blur(16px); }
-.composer textarea { width: 100%; max-height: 150px; min-height: 38px; resize: none; padding: 7px 4px; border: 0; outline: 0; background: transparent; line-height: 1.45; }
+.composerDock { position: relative; z-index: 3; flex: 0 0 auto; width: min(820px, calc(100% - 40px)); margin: 0 auto; padding: 4px 0 6px; }
+.composer { position: relative; width: 100%; padding: 6px 12px; display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-translucent); box-shadow: 0 5px 22px rgb(var(--shadow-color) / .08); backdrop-filter: blur(16px); }
+.composer textarea { width: 100%; max-height: 150px; min-height: 28px; resize: none; padding: 3px 3px; border: 0; outline: 0; background: transparent; line-height: 1.45; }
 .composer .send, .composer .stop { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 36px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--fg); color: var(--card); cursor: pointer; }
 .composer button:disabled { opacity: .4; cursor: default; }
 .composer button:focus-visible, .composer select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -87,7 +90,7 @@
 .dataRail > p { margin-top: 14px; color: var(--muted); font-size: 9px; line-height: 1.6; }
 @keyframes pulse { 50% { opacity: .45; } }
 @media (max-width: 1050px) { .teacher { grid-template-columns: minmax(0, 1fr); } .dataRail { display: none; } }
-@media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 24px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composerDock { width: calc(100% - 20px); padding-bottom: 50px; } .composerMeta .keyboardHint { display: none; } }
+@media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 24px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composerDock { padding-bottom: 8px; margin-left: 58px; width: calc(100% - 68px); } .composerMeta .keyboardHint { display: none; } }
 
 /* ---- hover-revealed icon actions (iteration 17) ---- */
 

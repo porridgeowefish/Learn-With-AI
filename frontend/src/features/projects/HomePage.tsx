@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useHealth } from '@/app/api/health';
 import { useProjects } from '@/features/projects/api/projects';
+import { useOnboardingStore } from '@/shared/store/slices/onboarding';
 import { useUiStore } from '@/shared/store/slices/ui';
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
@@ -16,6 +17,7 @@ import s from './HomePage.module.css';
 
 export function HomePage() {
   const navigate = useNavigate();
+  const tour = useOnboardingStore();
   const modalOpen = useUiStore((s) => s.createProjectModalOpen);
   const openModal = useUiStore((s) => s.openCreateProjectModal);
   const closeModal = useUiStore((s) => s.closeCreateProjectModal);
@@ -23,14 +25,9 @@ export function HomePage() {
   const demoOpener = useRef<HTMLButtonElement | null>(null);
   const replayButton = useRef<HTMLButtonElement>(null);
   const openDemo = (button: HTMLButtonElement) => { demoOpener.current = button; setDemoOpen(true); };
-  const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem('lll.onboarding.v1.dismissed') === '1'; }
-    catch { return false; }
-  });
   const dismissGuide = () => {
     try { localStorage.setItem('lll.onboarding.v1.dismissed', '1'); }
     catch { /* The current visit still respects dismissal without browser storage. */ }
-    setDismissed(true);
     setDemoOpen(false);
   };
   const closeDemo = () => {
@@ -46,7 +43,7 @@ export function HomePage() {
   return (
     <div className={s.host}>
       <div className={s.scroll}>
-        <header className={s.header}>
+        <header className={s.header} data-tour="welcome">
           <div>
             <h1 className={s.title}>学习主页</h1>
             <p className={s.subtitle}>
@@ -54,20 +51,17 @@ export function HomePage() {
             </p>
           </div>
           <div className={s.headerActions}>
+          <Button onClick={() => tour.step > 0 ? tour.resume() : tour.start()}>{tour.step > 0 ? '继续屏幕向导' : '屏幕向导'}</Button>
           <Button ref={replayButton} onClick={event => openDemo(event.currentTarget)}>体验示例</Button>
-          <Button variant="primary" iconLeft={<Icon name="plus" size={14} />} onClick={openModal}>
+          <Button data-tour="create-project" variant="primary" iconLeft={<Icon name="plus" size={14} />} onClick={openModal}>
             新建项目
           </Button>
           </div>
         </header>
 
-        {!dismissed && <section className={s.onboarding} aria-label="新用户引导">
-          <div className={s.onboardingHead}>
-            <span className={s.onboardingIcon}><img src="/img/lychee-teacher.png" alt="" aria-hidden="true" /></span>
-            <div><h2>先跟着一个好问题，学一次</h2><p>用梯度下降体验提问、复习、练习和笔记。示例已经准备好，无需配置 API。</p></div>
-          </div>
-          <div className={s.onboardingExample}><strong>为什么沿负梯度更新？</strong><p>梯度指向局部增长最快的方向，反向走一小步就有下降的趋势；但走多远，还要看学习率。</p></div>
-          <div className={s.onboardingActions}><Button variant="primary" onClick={event => openDemo(event.currentTarget)}>跟着示例开始</Button><Button variant="ghost" onClick={closeDemo}>跳过引导</Button></div>
+        {!tour.dismissed && <section className={s.onboarding} aria-label="新用户引导">
+          <div><h2>从第一次配置，到第一次学会</h2><p>让屏幕向导带你找到每一步的实际入口：连接模型、写偏好、创建项目，再到提问、复习和附件。</p></div>
+          <div className={s.onboardingActions}><Button variant="primary" onClick={tour.start}>开始屏幕向导</Button><Button variant="ghost" onClick={tour.pause}>稍后再说</Button></div>
         </section>}
 
         <LearningRhythm projects={projects} />

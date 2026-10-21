@@ -113,7 +113,7 @@ export function CreateProjectModal({
         </>
       )}
     >
-      <form id={formId} className={s.form} onSubmit={onSubmit}>
+      <form data-tour="create-project-form" id={formId} className={s.form} onSubmit={onSubmit}>
         {!fixedProjectType && (
           <div className={s.field}>
             <div className={s.typeHeader}>

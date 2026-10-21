@@ -1,7 +1,7 @@
 .root { width: 100%; min-width: 0; }
 .controls, .attachments { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .controls { color: var(--muted); font-size: 12px; flex-wrap: nowrap; justify-content: space-between; }
-.controls .upload, .controls .microphone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 34px; height: 36px; padding: 0 6px; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
+.controls .upload, .controls .microphone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 34px; height: 32px; padding: 0 6px; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
 .controls .upload:hover, .controls .microphone:hover { background: var(--surface-sunken); }
 .controls .microphone[data-recording] { color: var(--pink); border-radius: 9px; gap: 4px; }
 .controls select { min-width: 0; max-width: 76px; border: 0; color: inherit; font: inherit; background: transparent; cursor: pointer; }

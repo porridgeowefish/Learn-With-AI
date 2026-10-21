@@ -23,7 +23,7 @@ export function PreferencesPage() {
   };
 
   return (
-    <main className={s.page}>
+    <main className={s.page} data-tour="preferences">
       <header className={s.header}>
         <div>
           <span className={s.eyebrow}>LEARNER-OWNED CONTEXT</span>

@@ -1,0 +1,25 @@
+.root { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+.shade { position: fixed; background: rgb(13 24 31 / .48); pointer-events: auto; }
+.highlight { position: fixed; border: 2px solid var(--accent); border-radius: 10px; box-shadow: 0 0 0 3px rgb(255 255 255 / .25); pointer-events: none; }
+.card { position: fixed; pointer-events: auto; overflow-y: auto; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--fg); box-shadow: 0 18px 60px rgb(0 0 0 / .22); outline: none; }
+.progress { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 11px; }
+.progress > span:first-child { flex: 1; color: var(--accent-ink); font-weight: 700; }
+.progress button { padding: 0 3px; border: 0; background: transparent; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+.track { display: flex; gap: 4px; margin: 10px 0 16px; }
+.track i { height: 3px; flex: 1; border-radius: 3px; background: var(--border); }
+.track i[data-complete] { background: var(--accent); }
+.card h2 { margin: 0 0 9px; font-size: 17px; line-height: 1.4; }
+.card p { margin: 0 0 16px; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.actions button { padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--fg); font: inherit; font-size: 12px; cursor: pointer; }
+.actions .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.actions button:disabled { opacity: .45; cursor: default; }
+.secondary { display: flex; justify-content: space-between; margin-top: 12px; gap: 8px; }
+.secondary button { padding: 0; background: transparent; border: 0; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
+.card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.card .wait { font-size: 11px; color: var(--accent-ink); }
+.modalHint { flex: 0 0 auto; order: -1; padding: 10px 18px; margin: 0; background: var(--accent-soft); color: var(--fg); font-size: 12px; line-height: 1.6; border-bottom: 1px solid var(--border); }
+@media (prefers-reduced-motion: no-preference) { .card { animation: appear .15s ease-out; } @keyframes appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } } }
+
+.projectPicker { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 11px; }
+.projectPicker select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); background: var(--card); font: inherit; }

@@ -36,7 +36,7 @@ export function AssetsView({slug}:{slug:string}) {
  useEffect(()=>setRoundId(null),[asset.data?.meta.currentVersionId]);
  const commit=()=>{if(!asset.data)return;save.mutate({baseEditRevision:asset.data.meta.editRevision,content:draft},{onSuccess:()=>setEditing(false)});};
  return <section className={s.assets}>
-  <div className={s.assetTabs}>
+  <div className={s.assetTabs} data-tour="notes-tabs">
    {(assets.data??[]).map(meta=><button key={meta.key} className={view===meta.key?s.active:''} onClick={()=>{setView(meta.key);setEditing(false);}}>{meta.title}</button>)}
    <button className={view==='notes'?s.active:''} onClick={()=>{setView('notes');setEditing(false);}}>笔记</button>
    <button className={view==='feynman'?s.active:''} onClick={()=>{setView('feynman');setEditing(false);}}>讲给教师听</button>

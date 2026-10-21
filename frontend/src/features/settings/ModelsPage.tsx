@@ -113,7 +113,7 @@ export function ModelsPage() {
   const modelIds = [...new Set([...(preset?.models.map(m => m.id) ?? []), ...discovered, ...(editor?.provider.model ? [editor.provider.model] : [])])];
   const options = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
   return <section className={s.section} aria-labelledby="api-connections-title">
-    <header className={s.header}><h2 id="api-connections-title">API 模型</h2><div className={s.actions}>
+    <header className={s.header} data-tour="model-connections"><h2 id="api-connections-title">API 模型</h2><div className={s.actions}>
       <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加连接</Button>
       <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>

@@ -47,7 +47,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
   const saved = results.length - failed;
   const summary = [saved ? `已保存 ${saved} 份` : '', failed ? `${failed} 份导入失败` : ''].filter(Boolean).join(' · ');
 
-  return <div className={`${s.control} ${compact ? s.compact : ''}`}>
+  return <div data-tour="source-upload" className={`${s.control} ${compact ? s.compact : ''}`}>
     <button type="button" className={s.importButton} disabled={busy} onClick={() => input.current?.click()} title="本地自动解析 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV；每份不超过 100 MiB。旧版 DOC 请另存为 DOCX。">
       {busy ? '正在导入…' : '上传附件'}
     </button>
