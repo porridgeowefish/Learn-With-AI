@@ -1,6 +1,6 @@
-.teacher { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 14px 14px; background: var(--bg); }
-.conversationPane { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.transcript { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overflow-anchor: none; scrollbar-gutter: stable; contain: layout paint style; padding: 28px 22px 96px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); box-shadow: 0 8px 28px rgb(var(--shadow-color) / .045); }
+.teacher { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0; background: var(--card); }
+.conversationPane { position: relative; background: var(--card); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.transcript { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overflow-anchor: none; scrollbar-gutter: stable; contain: layout paint style; padding: 28px 28px 24px; background: transparent; }
 /* contain:paint makes the transcript the containing block for position:fixed
    children, which trapped and clipped fullscreen diagrams inside the chat. */
 .transcript:has(:global(.media-fullscreen)) { contain: none; overflow: visible; }
@@ -57,16 +57,16 @@
 .taskNotice a, .taskNotice button { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); background: var(--card); font-size: 10px; text-decoration: none; }
 .attachment { display: inline-flex; margin: 7px 6px 0 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface-raised); font-size: 11px; }
 .error { max-width: 760px; margin: 0 auto 20px; font-size: 12px; }
-.composerDock { position: relative; z-index: 3; flex: 0 0 auto; width: min(820px, calc(100% - 36px)); margin: 10px auto 0; }
-.composer { position: relative; width: 100%; padding: 9px 10px 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: 8px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border)); border-radius: 15px; background: var(--surface-translucent); box-shadow: 0 12px 32px rgb(var(--shadow-color) / .15); backdrop-filter: blur(16px); }
-.composer textarea { flex: 1; max-height: 150px; min-height: 34px; resize: none; padding: 7px 4px; border: 0; outline: 0; background: transparent; line-height: 1.45; }
-.composer button { flex: 0 0 auto; min-width: 52px; height: 32px; border: 0; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 650; }
-.composer button:disabled { opacity: .45; cursor: default; }
-.composer .stop { background: var(--fg); }
-.composerMeta { position: absolute; left: 13px; right: 13px; bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
-.modelSelect { min-width: 0; display: inline-flex; align-items: center; gap: 5px; }
-.modelSelect select { min-width: 0; max-width: 190px; border: 0; color: var(--muted); background: transparent; font: inherit; outline: none; }
-.materialStatus { flex-shrink: 0; white-space: nowrap; }
+.composerDock { position: relative; z-index: 3; flex: 0 0 auto; width: min(820px, calc(100% - 40px)); margin: 0 auto; padding: 10px 0 14px; }
+.composer { position: relative; width: 100%; padding: 12px 14px 9px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: 22px; background: var(--surface-translucent); box-shadow: 0 5px 22px rgb(var(--shadow-color) / .08); backdrop-filter: blur(16px); }
+.composer textarea { width: 100%; max-height: 150px; min-height: 38px; resize: none; padding: 7px 4px; border: 0; outline: 0; background: transparent; line-height: 1.45; }
+.composer .send, .composer .stop { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 36px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--fg); color: var(--card); cursor: pointer; }
+.composer button:disabled { opacity: .4; cursor: default; }
+.composer button:focus-visible, .composer select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.composerMeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
+.composerMeta > :last-child { margin-left: auto; }
+.composer .modelSelect { min-width: 0; max-width: 240px; border: 0; color: var(--fg); background: transparent; font: inherit; font-size: 12px; text-overflow: ellipsis; }
+.materialStatus { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dataRail { min-height: 0; overflow-y: auto; padding: 18px 16px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--card) 82%, var(--surface-tint)); }
 .dataRail header { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .dataRail header span, .dataRail section > span { color: var(--accent-ink); font-size: 9px; font-weight: 800; letter-spacing: .12em; }

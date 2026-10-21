@@ -1,10 +1,14 @@
-.root { grid-column: 1 / -1; min-width: 0; }
+.root { width: 100%; min-width: 0; }
 .controls, .attachments { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.controls { color: var(--muted); font-size: 12px; }
-.controls button, .controls select, .chip button { color: inherit; font: inherit; border: 1px solid var(--border); border-radius: 6px; background: transparent; padding: 4px 8px; cursor: pointer; }
-.controls button { height: auto; min-width: 0; font-weight: 500; }
-.controls button:disabled { opacity: .5; cursor: default; }
-.controls label { display: flex; align-items: center; gap: 4px; }
+.controls { color: var(--muted); font-size: 12px; flex-wrap: nowrap; justify-content: space-between; }
+.controls .upload, .controls .microphone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 34px; height: 36px; padding: 0 6px; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
+.controls .upload:hover, .controls .microphone:hover { background: var(--surface-sunken); }
+.controls .microphone[data-recording] { color: var(--pink); border-radius: 9px; gap: 4px; }
+.controls select { min-width: 0; max-width: 76px; border: 0; color: inherit; font: inherit; background: transparent; cursor: pointer; }
+.actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
+.status { font-size: 11px; }
+.chip button { color: inherit; border: 0; background: transparent; cursor: pointer; }
+@media (max-width: 600px) { .actions { gap: 3px; } .controls select { max-width: 56px; font-size: 11px; } .status { position: absolute; top: -18px; } }
 .chip { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; border: 1px solid var(--border, #dedbd3); border-radius: 8px; font-size: 12px; margin-bottom: 8px; }
 .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip button { border: 0; }

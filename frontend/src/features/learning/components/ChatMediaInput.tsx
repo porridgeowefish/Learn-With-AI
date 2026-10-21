@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { learningWorkspaceKeys, MAX_SOURCE_FILE_BYTES } from '../api/learningWorkspace';
+import { UploadIcon, MicrophoneIcon, StopIcon } from '@/shared/primitive/Icons';
+import type { ReactNode } from 'react';
 import { http } from '@/shared/client';
 import { audioFileToWave, encodeWave } from './chatAudio';
 import s from './ChatMediaInput.module.css';
 
 export interface ChatAttachment {
   attachmentId: string;
-  kind: 'image' | 'audio';
+  kind: 'image' | 'audio' | 'source';
   name: string;
   status: 'ready' | 'empty';
   text: string;
@@ -13,6 +17,7 @@ export interface ChatAttachment {
 export const chatAttachmentURL = (slug: string, id: string) => `/api/projects/${encodeURIComponent(slug)}/conversation/attachments/${encodeURIComponent(id)}/file`;
 
 export function useChatMedia(slug: string) {
+  const queryClient = useQueryClient();
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [language, setLanguage] = useState('zh-CN');
   const [pending, setPending] = useState(false);
@@ -48,6 +53,19 @@ export function useChatMedia(slug: string) {
     setPending(true); setError('');
     try {
       for (const original of files) {
+        const isDocument = /\.(pdf|md|markdown|txt|pptx|docx|xlsx|csv)$/i.test(original.name);
+        if (isDocument) {
+          if (original.size > MAX_SOURCE_FILE_BYTES) throw new Error('文档不得超过100MiB');
+          const body = new FormData(); body.set('operationId', crypto.randomUUID()); body.set('displayName', original.name); body.set('file', original);
+          const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/sources`, { method: 'POST', body, signal: controller.signal });
+          const data = await response.json();
+          if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : '附件上传失败，请重试');
+          if (token !== generation.current) return;
+          count.current++; nextFile++;
+          setAttachments(current => [...current, { attachmentId: data.source.sourceId, kind: 'source', name: original.name, status: 'ready', text: '' }]);
+          void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(slug) });
+          continue;
+        }
         if (original.size > 20 * 1024 * 1024) throw new Error('附件不得超过20MiB');
         const isAudio = original.type.startsWith('audio/') || /\.(wav|mp3|m4a|ogg|webm|flac)$/i.test(original.name);
         const file = isAudio ? await audioFileToWave(original) : original;
@@ -124,21 +142,30 @@ export function useChatMedia(slug: string) {
   };
 }
 
-export function ChatMediaInput({ media }: { media: ReturnType<typeof useChatMedia> }) {
+export function ChatMediaInput({ media, children }: { media: ReturnType<typeof useChatMedia>; children?: ReactNode }) {
   const input = useRef<HTMLInputElement>(null);
   return <div className={s.root}>
     {media.attachments.length > 0 && <div className={s.attachments}>{media.attachments.map(a => <div className={s.chip} key={a.attachmentId}>
-      <span>{a.name}</span><button type="button" aria-label={`移除 ${a.name}`} onClick={() => media.remove(a.attachmentId)}>×</button>
+      <span title={a.kind === 'source' ? '已上传，教师可按需查阅；解析进度见附件页' : a.name}>{a.name}</span><button type="button" aria-label={`移除 ${a.name}`} onClick={() => media.remove(a.attachmentId)}>×</button>
     </div>)}</div>}
     <div className={s.controls}>
-      <input ref={input} hidden type="file" multiple accept="image/png,image/jpeg,image/gif,audio/*" aria-label="选择聊天图片或音频" onChange={event => { void media.addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
-      <button type="button" disabled={media.pending || media.recording} onClick={() => input.current?.click()}>图片 / 音频</button>
-      <button type="button" disabled={media.pending} onClick={() => void (media.recording ? media.stopRecording() : media.startRecording())}>{media.recording ? `停止录音 ${media.seconds}s` : '录音'}</button>
-      <label>识别语言 <select value={media.language} disabled={media.pending || media.recording} onChange={event => media.setLanguage(event.target.value)}><option value="zh-CN">中文</option><option value="en-US">English</option></select></label>
-      {media.pending && <span role="status">正在本机解析…</span>}
+      <input ref={input} hidden type="file" multiple accept="image/png,image/jpeg,image/gif,audio/*,.pdf,.md,.markdown,.txt,.pptx,.docx,.xlsx,.csv" aria-label="上传附件" onChange={event => { void media.addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+      <button type="button" className={s.upload} aria-label="上传图片、音频或附件" title="上传图片、音频或附件" disabled={media.pending || media.recording} onClick={() => input.current?.click()}><UploadIcon size={21} /></button>
+      {media.pending && <span role="status" className={s.status}>正在处理附件…</span>}
+      <div className={s.actions}>
+        <select aria-label="识别语言" title="识别语言" value={media.language} disabled={media.pending || media.recording} onChange={event => media.setLanguage(event.target.value)}><option value="zh-CN">中文</option><option value="en-US">English</option></select>
+        {children}
+      </div>
     </div>
     {media.error && <div><p role="alert" className={s.error}>{media.error}</p>{media.canRetry && <button type="button" disabled={media.pending} onClick={media.retryUpload}>重试解析</button>}</div>}
   </div>;
+}
+
+export function ChatMicrophone({ media }: { media: ReturnType<typeof useChatMedia> }) {
+  const label = media.recording ? '停止录音' : '开始录音';
+  return <button type="button" className={s.microphone} data-recording={media.recording || undefined} aria-label={label} title={label} disabled={media.pending} onClick={() => void (media.recording ? media.stopRecording() : media.startRecording())}>
+    {media.recording ? <><StopIcon size={20} /><span role="status">{media.seconds}s</span></> : <MicrophoneIcon size={21} />}
+  </button>;
 }
 
 export function ChatMediaBlock({ slug, id, kind, name, text }: { slug: string; id: string; kind: 'image' | 'audio'; name?: string; text?: string }) {

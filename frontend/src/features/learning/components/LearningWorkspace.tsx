@@ -17,8 +17,8 @@ import s from './LearningWorkspace.module.css';
 
 const tabs = [
   { key: 'teacher', label: '教师' },
-  { key: 'assets', label: '资产' },
-  { key: 'sources', label: '资料' },
+  { key: 'assets', label: '笔记与复习' },
+  { key: 'sources', label: '附件' },
 ] as const;
 
 export function LearningWorkspace({ project }: { project: ProjectState }) {
@@ -64,8 +64,8 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
           ))}
         </nav>
         <div className={s.headerActions}>
-          {active === 'teacher' && <ConversationInstructions key={project.slug} slug={project.slug} />}
-          <SourceImportControl key={project.slug} slug={project.slug} compact />
+          {active === 'teacher' && <ConversationInstructions key={`instructions-${project.slug}`} slug={project.slug} />}
+          {active === 'sources' && <SourceImportControl key={`sources-${project.slug}`} slug={project.slug} compact />}
           {active === 'teacher' && <a href={conversationExportURL(project.slug)} download aria-label="导出全部对话" title="导出全部对话为 Markdown"><DownloadIcon /><span>导出对话</span></a>}
         </div>
       </header>

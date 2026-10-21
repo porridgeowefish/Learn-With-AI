@@ -31,7 +31,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
       } else {
         try {
           const response = await upload.mutateAsync({ file });
-          result = { name: file.name, failed: false, message: response.source.status === 'ready' ? '已保存并提取文字，请在资料页查看提取范围' : '已保存，正在自动解析' };
+          result = { name: file.name, failed: false, message: response.source.status === 'ready' ? '已保存并提取文字，请在附件页查看提取范围' : '已保存，正在自动解析' };
         } catch (error) {
           result = { name: file.name, failed: true, message: error instanceof Error ? error.message : '导入失败，请重试' };
         }
@@ -49,14 +49,14 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
 
   return <div className={`${s.control} ${compact ? s.compact : ''}`}>
     <button type="button" className={s.importButton} disabled={busy} onClick={() => input.current?.click()} title="本地自动解析 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV；每份不超过 100 MiB。旧版 DOC 请另存为 DOCX。">
-      {busy ? '正在导入…' : '导入资料'}
+      {busy ? '正在导入…' : '上传附件'}
     </button>
     <input ref={input} type="file" accept={fileTypes} multiple hidden onChange={event => void choose(event)} aria-label="选择要导入的资料" />
     {busy ? <span className={s.progress} role="status" title={progress}>{progress}</span> : results.length > 0 && <details className={s.feedback}>
       <summary className={failed ? s.failed : ''}><span role="status">{summary}</span></summary>
       <div className={s.resultPanel}>
         <ul>{results.map((result, index) => <li key={index} className={result.failed ? s.failed : ''}><strong>{result.name}</strong><span>{result.message}</span></li>)}</ul>
-        {saved > 0 && <p>解析进度和结果可在「资料」页查看。</p>}
+        {saved > 0 && <p>解析进度和结果可在「附件」页查看。</p>}
       </div>
     </details>}
   </div>;

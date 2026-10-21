@@ -1,6 +1,6 @@
 {
   "name": "learn-with-ai",
-  "version": "0.7.16",
+  "version": "0.7.17",
   "private": true,
   "description": "learn-with-ai — local learning workbench",
   "scripts": {

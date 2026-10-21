@@ -19,20 +19,20 @@ export function SourcesView({ slug }: { slug: string }) {
   return (
     <section className={s.sources}>
       <header>
-        <div><span>资料库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>免费识别使用本机 OCR，无需 API Key；一次启动后在后台处理整份资料，离开此页也会继续。可以查看进度或取消，本地识别重启后恢复。模型识别整份资料会逐页调用已配置的文档模型，按服务商计费。已提取正文可直接用于学习，公式和化学结构仍需对照原件核对。旧版 DOC 请另存为 DOCX 后导入。</p></div>
+        <div><span>附件库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>免费识别使用本机 OCR，无需 API Key；一次启动后在后台处理整份资料，离开此页也会继续。可以查看进度或取消，本地识别重启后恢复。模型识别整份资料会逐页调用已配置的文档模型，按服务商计费。已提取正文可直接用于学习，公式和化学结构仍需对照原件核对。旧版 DOC 请另存为 DOCX 后导入。</p></div>
         <SourceImportControl slug={slug} />
       </header>
       {sources.isError && <div className={s.error} role="alert">资料列表读取失败。<button type="button" onClick={() => void sources.refetch()}>重试</button></div>}
       {retry.isError && <div className={s.error} role="alert">重试解析失败：{retry.error.message}</div>}
       <section className={s.librarySection}>
-        <div className={s.sectionHeading}><div><span>上传资料</span><h3>文件项</h3></div><small>{visible.length} 份</small></div>
+        <div className={s.sectionHeading}><div><span>上传附件</span><h3>文件项</h3></div><small>{visible.length} 份</small></div>
         <div className={s.list}>
           {visible.map((source) => <article key={source.sourceId}>
             <div className={s.fileIcon}>{extension(source.displayName)}</div>
             <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容；原文件已保留。</span>}<SourceStructureControl slug={slug} source={source}/></div>
             <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}<button type="button" className={s.danger} aria-label={`删除资料 ${source.displayName}`} onClick={() => { remove.reset?.(); setSelected(source); }}>删除</button></div>
           </article>)}
-          {!sources.isLoading && !visible.length && <div className={s.empty}>尚未上传资料</div>}
+          {!sources.isLoading && !visible.length && <div className={s.empty}>尚未上传附件</div>}
         </div>
       </section>
       <Modal open={Boolean(selected)} onOpenChange={open => { if (!open && !remove.isPending) setSelected(undefined); }} title="删除资料" description="永久删除这份资料及其解析文字。" footer={<><Button onClick={() => setSelected(undefined)} disabled={remove.isPending}>取消</Button><Button variant="danger" loading={remove.isPending} onClick={() => selected && remove.mutate(selected.sourceId, { onSuccess: () => setSelected(undefined) })}>永久删除</Button></>}>

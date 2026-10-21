@@ -1,7 +1,7 @@
 import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { CopyIcon, DownloadIcon, EditIcon, RegenerateIcon, SearchIcon, SteerIcon, TrashIcon } from '@/shared/primitive/Icons';
+import { SendIcon, StopIcon, CopyIcon, DownloadIcon, EditIcon, RegenerateIcon, SearchIcon, SteerIcon, TrashIcon } from '@/shared/primitive/Icons';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import {
   discardQueuedTurn,
@@ -25,7 +25,7 @@ import {
 import { useAskAiSettings } from '@/features/settings';
 
 import { SourceCitations } from './SourceCitations';
-import { ChatMediaInput, ChatMediaBlock, useChatMedia } from './ChatMediaInput';
+import { ChatMediaInput, ChatMicrophone, ChatMediaBlock, useChatMedia } from './ChatMediaInput';
 import { QuickReplies, readLearningProgress, teacherMarkdown } from './LearningProgress';
 import s from './TeacherView.module.css';
 
@@ -240,7 +240,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const content = input.trim();
+    const content = input.trim() || (media.attachments.some(a => a.kind === 'source') ? '请结合附件继续讲解。' : '');
     if ((!content && !media.attachments.length) || media.pending || media.recording) return;
     await send(content);
   };
@@ -251,10 +251,10 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     if (media.pending || media.recording) return;
     const sendingSlug = slug;
     const sentMedia = media.attachments;
-    const conversationAttachmentIds = sentMedia.map(a => a.attachmentId);
+    const conversationAttachmentIds = sentMedia.filter(a => a.kind !== 'source').map(a => a.attachmentId);
     media.clear();
     setError('');
-    const attachmentRefs: string[] = [];
+    const attachmentRefs = sentMedia.filter(a => a.kind === 'source').map(a => a.attachmentId);
     if (live) {
       // Sending while streaming queues durably server-side; the queue chips
       // above the composer reflect and edit that state.
@@ -277,7 +277,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     const temporary: LiveResponse = {
       learner: { id: `local-${operationId}`, role: 'learner', status: 'completed', blocks: [
         { id: 'local', type: 'markdown', source: content },
-        ...sentMedia.map(a => ({ id: a.attachmentId, type: `chat-${a.kind}` as 'chat-image' | 'chat-audio', artifactRef: a.attachmentId, name: a.name, source: a.text })),
+        ...sentMedia.filter(a => a.kind !== 'source').map(a => ({ id: a.attachmentId, type: `chat-${a.kind}` as 'chat-image' | 'chat-audio', artifactRef: a.attachmentId, name: a.name, source: a.text })),
         ...attachmentRefs.map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
       ], createdAt: new Date().toISOString() },
       text: '', reasoning: '', taskIds: [], searches: [],
@@ -507,16 +507,16 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} placeholder={live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
-        {live ? <button type="submit" className={s.stop} disabled={(!input.trim() && !media.attachments.length) || media.pending || media.recording}>排队</button> : <button type="submit" disabled={(!input.trim() && !media.attachments.length) || media.pending || media.recording}>发送</button>}
-        {live?.responseId && <button type="button" className={s.stop} onClick={stop}>停止</button>}
-        <ChatMediaInput media={media} />
+        <ChatMediaInput media={media}>
+          {availableModels.length > 0 && <select className={s.modelSelect} aria-label="选择教师模型" title="选择教师模型" value={providerId} onChange={(event) => { setProviderId(event.target.value); localStorage.setItem(`lll.teacher.provider.${slug}`, event.target.value); }}>
+            {availableModels.map((provider) => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}
+          </select>}
+          <ChatMicrophone media={media} />
+          {live?.responseId && <button type="button" className={s.stop} aria-label="停止" title="停止回答" onClick={stop}><StopIcon size={21} /></button>}
+          <button type="submit" className={s.send} aria-label={live ? '排队' : '发送'} title={live ? '加入等待队列' : '发送'} disabled={(!input.trim() && !media.attachments.length) || media.pending || media.recording}><SendIcon size={22} /></button>
+        </ChatMediaInput>
         <div className={s.composerMeta}>
-          {availableModels.length > 0 && <label className={s.modelSelect}>模型
-            <select value={providerId} onChange={(event) => { setProviderId(event.target.value); localStorage.setItem(`lll.teacher.provider.${slug}`, event.target.value); }}>
-              {availableModels.map((provider) => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}
-            </select>
-          </label>}
-          {availableSources.length > 0 && <span className={s.materialStatus}>有 {availableSources.length} 份资料可查阅</span>}
+          {availableSources.length > 0 && <span className={s.materialStatus}>有 {availableSources.length} 份附件可查阅</span>}
           <span className={s.keyboardHint}>Enter 发送 · Shift + Enter 换行</span>
         </div>
       </form>
@@ -594,7 +594,7 @@ const Message = memo(function Message({ slug, message, sourceNames, getReasoning
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} initialOpen={getReasoningOpen(message.id)} onOpenChange={setReasoningOpen} />
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
-            : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span>
+            : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
         {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
         {notice && <div className={s.notice}>{notice}</div>}
