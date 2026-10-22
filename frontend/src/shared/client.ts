@@ -58,10 +58,9 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     } catch {
       parsed = { raw: text };
     }
-    const msg =
-      (parsed && typeof parsed === 'object' && 'error' in parsed && typeof (parsed as { error: unknown }).error === 'string'
-        ? (parsed as { error: string }).error
-        : res.statusText) || `HTTP ${res.status}`;
+    const detail = parsed && typeof parsed === 'object' && 'error' in parsed ? (parsed as { error: unknown }).error : null;
+    const message = typeof detail === 'string' ? detail : detail && typeof detail === 'object' && 'message' in detail && typeof detail.message === 'string' ? detail.message : res.statusText;
+    const msg = message || `HTTP ${res.status}`;
     throw new ApiError(res.status, msg, parsed);
   }
 

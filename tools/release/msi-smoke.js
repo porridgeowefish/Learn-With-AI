@@ -31,6 +31,7 @@ function install(msi, args, log) {
 function main(input) {
   if (process.platform !== "win32")
     throw new Error("MSI smoke requires Windows");
+  require('./temporary-root').prepareTemporaryRoot();
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "learn-msi-smoke-"));
   const identity = `learn-with-ai-smoke-${process.pid}`;
   const folder = path.join(process.env.LOCALAPPDATA, "Programs", identity);

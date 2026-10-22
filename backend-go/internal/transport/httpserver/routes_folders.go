@@ -5,7 +5,6 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // handleGetFolders returns the workspace-global folder layout.
@@ -56,7 +55,7 @@ func (s *Server) syncDisciplineMapFolders(store *folderstore.FolderStore) (folde
 	}
 	maps := make([]folderstore.MapFolderSpec, 0)
 	for _, project := range s.cache.All() {
-		if project.ProjectType == workspace.ProjectTypeDisciplineMap {
+		if project.ProjectType == folderstore.ProjectTypeDisciplineMap {
 			maps = append(maps, folderstore.MapFolderSpec{Slug: project.Slug, Title: project.Title})
 		}
 	}

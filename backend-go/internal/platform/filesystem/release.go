@@ -17,7 +17,7 @@ func DiscoverResourceRoot(wd, executable, mode string) (string, error) {
 			return "", fmt.Errorf("resolve executable: %w", err)
 		}
 		root := filepath.Dir(resolved)
-		for _, rel := range []string{filepath.Join("frontend", "dist", "index.html"), filepath.Join("learning-agents", "registry")} {
+		for _, rel := range []string{filepath.Join("frontend", "dist", "index.html"), filepath.Join("learning-prompts", "manifest.json")} {
 			if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
 				return "", fmt.Errorf("release resource missing: %s", rel)
 			}

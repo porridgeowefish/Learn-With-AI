@@ -7,6 +7,7 @@ import (
 	"errors"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"sort"
@@ -58,7 +59,7 @@ func write(path string, in any) error {
 	if err != nil {
 		return err
 	}
-	return projects.AtomicWriteFile(path, data, 0600)
+	return filesystem.AtomicWriteFile(path, data, 0600)
 }
 func (s *Store) Initialize(latestSeq uint64) error {
 	s.mu.Lock()

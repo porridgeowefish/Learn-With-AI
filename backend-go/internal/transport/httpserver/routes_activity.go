@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/activity"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 

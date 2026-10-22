@@ -2,39 +2,19 @@ package httpserver
 
 import (
 	"errors"
-	"io"
+	"github.com/xmz14/lll/backend-go/internal/app/projectservice"
+	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
+
 	"net/http"
-	"os"
-	"path/filepath"
+
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/modules/generation"
-	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
-	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
-
-// contentTypeFor returns the appropriate Content-Type for a file based on its extension.
-func contentTypeFor(name string) string {
-	ext := strings.ToLower(filepath.Ext(name))
-	switch ext {
-	case ".png":
-		return "image/png"
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".gif":
-		return "image/gif"
-	case ".webp":
-		return "image/webp"
-	case ".svg":
-		return "image/svg+xml"
-	default:
-		return "text/plain; charset=utf-8"
-	}
-}
 
 // handleDeleteProject permanently removes one learning project and its local
 // artifacts. The frontend owns the single user-confirmation step; the backend
@@ -44,38 +24,21 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	mediaLock := s.chatMediaLock(slug)
 	mediaLock.Lock()
 	defer mediaLock.Unlock()
-	if !workspace.ValidateSlug(slug) {
+	if !projects.ValidateSlug(slug) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return
 	}
-	if s.sessions.HasActiveProject(slug) {
-		httpx.Error(w, http.StatusConflict, "project_has_active_session")
-		return
-	}
-	deleteProject := workspace.DeleteProject
-	if s.generation != nil {
-		deleteProject = s.generation.DeleteProject
-	}
-	if err := deleteProject(slug); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			httpx.Error(w, http.StatusNotFound, "project not found")
+
+	if err := s.projectOperations().Delete(slug); err != nil {
+		if errors.Is(err, teacher.ErrResponseActive) || errors.Is(err, teacher.ErrNotesProjectBusy) {
+			httpx.Error(w, 409, err.Error())
 			return
 		}
-		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		learningWorkspaceError(w, err)
 		return
 	}
 
-	store, err := folderstore.NewFolderStore()
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "project deleted but folder cleanup failed: "+err.Error())
-		return
-	}
-	if _, err := store.RemoveProject(slug); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "project deleted but folder cleanup failed: "+err.Error())
-		return
-	}
 	s.cache.Invalidate(slug)
-	s.sessions.RemoveProject(slug)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"deleted": true, "projectId": slug})
 }
 
@@ -91,7 +54,7 @@ type createProjectRequest struct {
 	SystemPrompt string                      `json:"systemPrompt,omitempty"`
 	Title        string                      `json:"title"`
 	Slug         string                      `json:"slug,omitempty"`
-	ProjectType  workspace.ProjectType       `json:"projectType,omitempty"`
+	ProjectType  projects.ProjectType        `json:"projectType,omitempty"`
 	Why          string                      `json:"why,omitempty"`
 	Current      string                      `json:"current,omitempty"`
 	Target       string                      `json:"target,omitempty"`
@@ -133,20 +96,20 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 	slug := strings.TrimSpace(req.Slug)
 	if slug == "" {
-		slug = workspace.Slugify(title)
+		slug = projects.Slugify(title)
 	}
-	if !workspace.ValidateSlug(slug) {
+	if !projects.ValidateSlug(slug) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug: "+slug)
 		return
 	}
-	projectType := workspace.NormalizeProjectType(req.ProjectType)
-	if !workspace.ValidateProjectType(projectType) {
+	projectType := projects.NormalizeProjectType(req.ProjectType)
+	if !projects.ValidateProjectType(projectType) {
 		httpx.Error(w, http.StatusBadRequest, "invalid_project_type")
 		return
 	}
-	var scope *learningscope.Scope
+	var scope *projects.Scope
 	if req.ScopeSource != nil {
-		if projectType != workspace.ProjectTypeSystemLearning {
+		if projectType != projects.ProjectTypeSystemLearning {
 			httpx.Error(w, http.StatusBadRequest, "scope_source_requires_system_learning")
 			return
 		}
@@ -157,7 +120,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		}
 		scope = &resolved
 	}
-	if err := workspace.CreateProjectSkeletonWithInput(slug, title, "", workspace.ProjectInput{
+	state, err := s.projectOperations().Create(slug, title, projects.ProjectInput{
 		SystemPrompt:  req.SystemPrompt,
 		ProjectType:   projectType,
 		Why:           req.Why,
@@ -165,8 +128,9 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		Target:        req.Target,
 		Standard:      req.Standard,
 		LearningScope: scope,
-	}); err != nil {
-		if workspace.IsSlugConflict(err) {
+	})
+	if err != nil {
+		if projects.IsSlugConflict(err) {
 			httpx.Error(w, http.StatusConflict, "project already exists: "+slug)
 			return
 		}
@@ -174,34 +138,30 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cache.Invalidate(slug)
-	state, _ := workspace.ReadProjectState(slug)
-	if s.generation != nil {
-		s.generation.ReviveProject(slug)
-	}
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"project": state})
 }
 
-func resolveMapLearningScope(source learningScopeSourceRequest) (learningscope.Scope, error) {
+func resolveMapLearningScope(source learningScopeSourceRequest) (projects.Scope, error) {
 	source.Type = strings.TrimSpace(source.Type)
 	source.MapSlug = strings.TrimSpace(source.MapSlug)
 	source.TopicID = strings.TrimSpace(source.TopicID)
-	if source.Type != learningscope.SourceDisciplineMap ||
-		!workspace.ValidateSlug(source.MapSlug) || source.TopicID == "" {
-		return learningscope.Scope{}, errors.New("invalid_scope_source")
+	if source.Type != projects.SourceDisciplineMap ||
+		!projects.ValidateSlug(source.MapSlug) || source.TopicID == "" {
+		return projects.Scope{}, errors.New("invalid_scope_source")
 	}
-	state, err := workspace.ReadProjectState(source.MapSlug)
-	if err != nil || state.ProjectType != workspace.ProjectTypeDisciplineMap {
-		return learningscope.Scope{}, errors.New("invalid_scope_source")
+	state, err := projects.ReadProjectState(source.MapSlug)
+	if err != nil || state.ProjectType != projects.ProjectTypeDisciplineMap {
+		return projects.Scope{}, errors.New("invalid_scope_source")
 	}
 	projection, err := generation.ReadMap(source.MapSlug, source.MapVersionID)
 	if err != nil {
-		return learningscope.Scope{}, errors.New("discipline_topics_unavailable")
+		return projects.Scope{}, errors.New("discipline_topics_unavailable")
 	}
-	topic, ok := learningscope.FindTopic(projection.Topics, source.TopicID)
+	topic, ok := projects.FindTopic(projection.Topics, source.TopicID)
 	if !ok {
-		return learningscope.Scope{}, errors.New("discipline_topic_not_found")
+		return projects.Scope{}, errors.New("discipline_topic_not_found")
 	}
-	scope := learningscope.SnapshotFromTopic(source.MapSlug, topic, time.Now())
+	scope := projects.SnapshotFromTopic(source.MapSlug, topic, time.Now())
 	scope.Source.MapVersionID = projection.MapVersionID
 	return scope, nil
 }
@@ -209,11 +169,11 @@ func resolveMapLearningScope(source learningScopeSourceRequest) (learningscope.S
 // handleGetProject returns one project's full state.
 func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
-	if !workspace.ValidateSlug(slug) {
+	if !projects.ValidateSlug(slug) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return
 	}
-	state, err := workspace.ReadProjectState(slug)
+	state, err := projects.ReadProjectState(slug)
 	if err != nil {
 		if errors.Is(err, errors.New("not found")) || strings.Contains(err.Error(), "not exist") {
 			httpx.Error(w, http.StatusNotFound, "project not found")
@@ -224,173 +184,19 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"project": struct {
-			*workspace.ProjectState
-			GeneratedZones []workspace.ZoneName `json:"generatedZones"`
+			*projects.ProjectState
 		}{
-			ProjectState:   state,
-			GeneratedZones: state.GeneratedZones,
+			ProjectState: state,
 		},
 	})
 }
 
-// handleProjectTree preserves the legacy endpoint name but returns the same
-// flat, peer-level project set used by the sidebar.
-func (s *Server) handleProjectTree(w http.ResponseWriter, r *http.Request) {
-	if err := s.cache.Rebuild(); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	flat := s.cache.All()
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": flat})
-}
-
-// handleGetZone returns a single zone resource.
-func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-	zone := r.PathValue("zone")
-	if !workspace.ValidateSlug(slug) {
-		httpx.Error(w, http.StatusBadRequest, "invalid slug")
-		return
-	}
-	if !workspace.ValidateZoneName(zone) {
-		httpx.Error(w, http.StatusBadRequest, "invalid zone: "+zone)
-		return
-	}
-	state, err := workspace.ReadProjectState(slug)
-	if err != nil {
-		httpx.Error(w, http.StatusNotFound, "project_not_found")
-		return
-	}
-	if state.ProjectType != workspace.ProjectTypeSystemLearning {
-		httpx.Error(w, http.StatusBadRequest, "project_has_no_zones")
-		return
-	}
-	zoneName := workspace.ZoneName(zone)
-	preds, err := workspace.ResolvePredecessorFiles(slug, zoneName)
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"zone":         zoneName,
-		"predecessors": preds,
-	})
-}
-
-// handleReadFile returns the raw text of a project file by relative path.
-// Restricted to active legacy-reader folders. Global learner preferences use the
-// dedicated workspace-level preferences endpoint.
-func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-	if !workspace.ValidateSlug(slug) {
-		httpx.Error(w, http.StatusBadRequest, "invalid slug")
-		return
-	}
-	rel := strings.TrimPrefix(r.URL.Path, "/files/projects/"+slug+"/")
-	if rel == "" || strings.Contains(rel, "..") || strings.ContainsAny(rel, "\\") {
-		httpx.Error(w, http.StatusBadRequest, "invalid path")
-		return
-	}
-	root, err := workspace.ProjectRootForSlug(slug)
-	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	abs := filepath.Join(root, filepath.FromSlash(rel))
-	// Path traversal check
-	relCheck, err := filepath.Rel(root, abs)
-	if err != nil || strings.HasPrefix(relCheck, "..") {
-		httpx.Error(w, http.StatusBadRequest, "path escapes project")
-		return
-	}
-	// Allow only specific dirs.
-	parts := strings.Split(filepath.ToSlash(relCheck), "/")
-	if len(parts) == 0 {
-		httpx.Error(w, http.StatusBadRequest, "no path")
-		return
-	}
-	top := parts[0]
-	allowedTop := map[string]bool{"intro": true, "explain": true, "practice": true}
-	if !allowedTop[top] {
-		httpx.Error(w, http.StatusForbidden, "directory not readable")
-		return
-	}
-	if top == "practice" && len(parts) == 2 && parts[1] == "answer-key.json" {
-		httpx.Error(w, http.StatusForbidden, "answer key is private")
-		return
-	}
-	data, err := os.ReadFile(abs)
-	if err != nil {
-		httpx.Error(w, http.StatusNotFound, "file not found")
-		return
-	}
-	w.Header().Set("Content-Type", contentTypeFor(filepath.Base(abs)))
-	w.Write(data)
-}
-
-// handleWriteFile is the POST counterpart of handleReadFile.
-// Write whitelist: explain/notes.md and intro/survey.json. Retired Summary,
-// Extend, and project-memory paths are intentionally absent.
-func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-	if !workspace.ValidateSlug(slug) {
-		httpx.Error(w, http.StatusBadRequest, "invalid slug")
-		return
-	}
-	rel := strings.TrimPrefix(r.URL.Path, "/files/projects/"+slug+"/")
-	if rel == "" || strings.Contains(rel, "..") || strings.ContainsAny(rel, "\\") {
-		httpx.Error(w, http.StatusBadRequest, "invalid path")
-		return
-	}
-	root, err := workspace.ProjectRootForSlug(slug)
-	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	abs := filepath.Join(root, filepath.FromSlash(rel))
-	relCheck, err := filepath.Rel(root, abs)
-	if err != nil || strings.HasPrefix(relCheck, "..") {
-		httpx.Error(w, http.StatusBadRequest, "path escapes project")
-		return
-	}
-	parts := strings.Split(filepath.ToSlash(relCheck), "/")
-	if len(parts) != 2 {
-		httpx.Error(w, http.StatusForbidden, "POST writes only allowed for <dir>/<filename>")
-		return
-	}
-	dir, file := parts[0], parts[1]
-	allowed := false
-	// explain/ is read-only except for explain/notes.md (learner-owned notes).
-	if dir == "explain" && file == "notes.md" {
-		allowed = true
-	}
-	if dir == "intro" && file == "survey.json" {
-		allowed = true
-	}
-	if !allowed {
-		httpx.Error(w, http.StatusForbidden, "directory not writable")
-		return
-	}
-	if !validEditableFilename.MatchString(file) {
-		httpx.Error(w, http.StatusBadRequest, "invalid filename")
-		return
-	}
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(body) > 1<<20 {
-		httpx.Error(w, http.StatusRequestEntityTooLarge, "file too large (>1MB)")
-		return
-	}
-	if err := workspace.AtomicWriteFile(abs, body, 0o644); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	s.cache.Invalidate(slug)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "bytes": len(body)})
-}
-
 // ensure workspace is imported even if no direct usage
-var _ = workspace.ZoneIntro
+
+func (s *Server) projectOperations() *projectservice.Service {
+	operations := &projectservice.Service{Teaching: s.teachingLifecycle(), Tools: s.learningTools(), Notes: s.notes}
+	if s.generation != nil {
+		operations.Generation = s.generation
+	}
+	return operations
+}

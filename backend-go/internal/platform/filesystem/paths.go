@@ -1,5 +1,5 @@
 // Package filesystem exposes canonical filesystem roots for LLL.
-// All other packages resolve project, agent, and workspace paths through here.
+// All other packages resolve project and workspace paths through here.
 package filesystem
 
 import (
@@ -38,12 +38,10 @@ func DefaultWorkspaceRoot(projectRoot string) string {
 // WORKSPACE is the user's learning workspace (defaults to
 // DefaultWorkspaceRoot(PROJECT_ROOT); configurable via WORKSPACE env).
 // PROJECTS_ROOT holds all learning project folders.
-// AGENTS_ROOT holds agent registry + charter files.
 var (
 	PROJECT_ROOT   string
 	WORKSPACE      string
 	PROJECTS_ROOT  string
-	AGENTS_ROOT    string
 	FRONTEND_ROOT  string
 	FRONTEND_INDEX string
 )
@@ -125,6 +123,5 @@ func ConfigureWorkspace(root string) error {
 		return fmt.Errorf("create workspace root: %w", err)
 	}
 	PROJECTS_ROOT = filepath.Join(WORKSPACE, "projects")
-	AGENTS_ROOT = filepath.Join(WORKSPACE, "learning-agents")
 	return nil
 }

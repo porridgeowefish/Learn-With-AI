@@ -6,6 +6,7 @@ const net = require('node:net');
 const { spawn } = require('node:child_process');
 
 async function smoke(binary) {
+  require('./temporary-root').prepareTemporaryRoot();
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'learn-with-ai-smoke-'));
   const workspace = path.join(scratch, 'workspace');
   const socket = net.createServer();
@@ -15,7 +16,7 @@ async function smoke(binary) {
   const invalid = path.join(scratch, 'missing-cli');
   const child = spawn(path.resolve(binary), ['--no-browser', '--port', String(port), '--workspace', workspace], {
     cwd: scratch, windowsHide: true,
-    env: { ...process.env, CLAUDE_BIN: invalid, CODEX_BIN: invalid, CODEBUDDY_BIN: invalid, WORKBUDDY_BIN: invalid, HERMES_BIN: invalid, TRAE_BIN: invalid },
+    env: { ...process.env, WORKSPACE:workspace, LLL_WORKSPACE_ROOT:workspace, CLAUDE_BIN: invalid, CODEX_BIN: invalid, CODEBUDDY_BIN: invalid, WORKBUDDY_BIN: invalid, HERMES_BIN: invalid, TRAE_BIN: invalid },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '', exited = false;
@@ -38,7 +39,7 @@ async function smoke(binary) {
     const retired = await fetch(`${base}/api/projects/nonexistent/generated`);
     assert.equal(retired.status, 404);
     // A different port must not bypass the workspace's single-writer boundary.
-    const duplicate = spawn(path.resolve(binary), ['--no-browser', '--port', String(port === 65535 ? port-1 : port+1), '--workspace', workspace], { cwd: scratch, windowsHide: true, env: {...process.env, CLAUDE_BIN:invalid,CODEX_BIN:invalid,CODEBUDDY_BIN:invalid,WORKBUDDY_BIN:invalid,HERMES_BIN:invalid,TRAE_BIN:invalid}, stdio:['ignore','pipe','pipe'] });
+    const duplicate = spawn(path.resolve(binary), ['--no-browser', '--port', String(port === 65535 ? port-1 : port+1), '--workspace', workspace], { cwd: scratch, windowsHide: true, env: {...process.env, WORKSPACE:workspace, LLL_WORKSPACE_ROOT:workspace, CLAUDE_BIN:invalid,CODEX_BIN:invalid,CODEBUDDY_BIN:invalid,WORKBUDDY_BIN:invalid,HERMES_BIN:invalid,TRAE_BIN:invalid}, stdio:['ignore','pipe','pipe'] });
     let duplicateLog='';
     duplicate.stdout.on('data',data=>{duplicateLog+=data;});duplicate.stderr.on('data',data=>{duplicateLog+=data;});
     const duplicateCode=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{duplicate.kill();reject(new Error('Duplicate instance failed to exit'));},10000);duplicate.once('error',reject);duplicate.once('exit',code=>{clearTimeout(timer);resolve(code);});});

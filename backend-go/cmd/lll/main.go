@@ -74,10 +74,7 @@ func main() {
 	fmt.Printf("Learn-With-AI %s\n", Version)
 	fmt.Printf("  Workspace: %s\n", paths.WORKSPACE)
 	fmt.Printf("  Projects:  %s\n", paths.PROJECTS_ROOT)
-	fmt.Printf("  Agents:    %s\n", paths.AGENTS_ROOT)
 	fmt.Printf("  Frontend:  %s\n", paths.FRONTEND_ROOT)
-	fmt.Printf("  Claude:    %s (available=%t)\n", srv.Server.ClaudeBin, srv.Server.ClaudeAvailable)
-	fmt.Printf("  Runtime:   %s / %s (available=%t)\n", srv.Server.Runtime.ID, srv.Server.Runtime.Bin, srv.Server.Runtime.Available)
 	fmt.Printf("Listening on http://localhost:%s\n", portEnv)
 
 	httpServer := &http.Server{Addr: addr, Handler: srv.Server.Handler()}

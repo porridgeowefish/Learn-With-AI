@@ -2,7 +2,8 @@ package conversationstore
 
 import (
 	"errors"
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+
 	"os"
 	"path/filepath"
 	"unicode/utf8"
@@ -32,5 +33,5 @@ func (s *Store) SetSystemPrompt(value string) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return workspace.AtomicWriteFile(filepath.Join(s.root, "conversation", "system-prompt.txt"), []byte(value), 0o644)
+	return filesystem.AtomicWriteFile(filepath.Join(s.root, "conversation", "system-prompt.txt"), []byte(value), 0o644)
 }

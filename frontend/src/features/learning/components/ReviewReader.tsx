@@ -3,7 +3,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
 import type { ReactNode } from 'react';
 
 import { BodyAnnotations } from './BodyAnnotations';
-import readerStyles from '@/features/learning/components/ExplainReader.module.css';
+import readerStyles from './ReviewReader.module.css';
 import assetStyles from './AssetsView.module.css';
 
 interface BodyPage {

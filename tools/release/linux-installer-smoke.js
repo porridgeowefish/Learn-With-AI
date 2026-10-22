@@ -11,6 +11,7 @@ function preparePreferenceFile(privateFile) {
 
 function main() {
 if(process.platform!=='linux') throw new Error('Linux installer smoke requires Linux');
+require('./temporary-root').prepareTemporaryRoot();
 const bundle=path.resolve(process.argv[2]);
 const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'learn-linux-installer-smoke-'));
 const home=path.join(scratch,"learner's home");

@@ -2,8 +2,8 @@
 package generation
 
 import (
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	jobs "github.com/xmz14/lll/backend-go/internal/modules/generation/internal/jobs"
-	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
 type Input = jobs.Input
@@ -17,7 +17,7 @@ type Usage = jobs.Usage
 type MapCandidate = jobs.MapCandidate
 type MapValidationIssue = jobs.MapValidationIssue
 
-func New(gateway teacher.Gateway) *Service                { return jobs.New(gateway) }
+func New(gateway ai.Gateway) *Service                     { return jobs.New(gateway) }
 func ReadMap(slug, version string) (MapProjection, error) { return jobs.ReadMap(slug, version) }
 func UsageRecords(slug string) ([]Usage, error)           { return jobs.UsageRecords(slug) }
 func ValidatePractice(body string, count int) error       { return jobs.ValidatePractice(body, count) }

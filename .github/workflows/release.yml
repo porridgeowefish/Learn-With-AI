@@ -8,7 +8,7 @@ on:
       version:
         description: Release version (numeric major.minor.patch)
         required: true
-        default: '0.7.18'
+        default: '0.7.19'
       publish:
         description: Publish GitHub Release v<version> from this commit after all smokes pass
         type: boolean
@@ -55,7 +55,7 @@ jobs:
       # smokes below are the release gate.
       - name: Test portable infrastructure
         run: |
-          node tools/release/ci-run.js -- go test -count=1 ./tools/installer ./tools/release/legacy-migrate ./backend-go/internal/platform/... ./backend-go/internal/modules/teacher/... ./backend-go/internal/modules/assets/... ./backend-go/internal/modules/assistant/internal/runtime ./backend-go/internal/modules/assistant/internal/launch
+          node tools/release/ci-run.js -- go test -count=1 ./tools/installer ./tools/release/legacy-migrate ./backend-go/internal/platform/... ./backend-go/internal/modules/teacher/... ./backend-go/internal/modules/assets/...
       - name: Build, smoke and archive
         shell: bash
         env:

@@ -95,36 +95,6 @@ type Event struct {
 	Annotation    *Annotation `json:"annotation,omitempty"`
 }
 
-// legacyConfusion mirrors the retired explain/confusions.json wire shape.
-// Keeping this compatibility DTO local prevents the assets module from
-// depending on the legacy store implementation during the cutover.
-type legacyConfusion struct {
-	ID               string     `json:"id"`
-	SourceArtifactID string     `json:"sourceArtifactId,omitempty"`
-	CharStart        int        `json:"charStart"`
-	CharEnd          int        `json:"charEnd"`
-	QuoteSnapshot    string     `json:"quoteSnapshot"`
-	Notes            string     `json:"notes,omitempty"`
-	State            string     `json:"state"`
-	CreatedAt        string     `json:"createdAt"`
-	Ask              *legacyAsk `json:"ask,omitempty"`
-}
-
-type legacyAsk struct {
-	Messages     []legacyAskMessage `json:"messages,omitempty"`
-	Summary      string             `json:"summary,omitempty"`
-	SummaryState string             `json:"summaryState,omitempty"`
-	ProviderID   string             `json:"providerId,omitempty"`
-	UpdatedAt    string             `json:"updatedAt,omitempty"`
-}
-
-type legacyAskMessage struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"createdAt"`
-}
-
 type Store struct {
 	slug string
 	root string
@@ -229,52 +199,6 @@ func (s *Store) Create(in CreateInput) (Annotation, error) {
 		return Annotation{}, err
 	}
 	return annotation, nil
-}
-
-// ImportLegacy converts explain/confusions.json once while retaining the old
-// identifiers as both canonical IDs and explicit external references. Using
-// the old ID keeps compatibility routes addressable during the cutover.
-func (s *Store) ImportLegacy() error {
-	raw, err := os.ReadFile(filepath.Join(s.root, "explain", "confusions.json"))
-	if errors.Is(err, os.ErrNotExist) || len(strings.TrimSpace(string(raw))) == 0 {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	var legacy []legacyConfusion
-	if err := json.Unmarshal(raw, &legacy); err != nil {
-		return fmt.Errorf("decode legacy annotations: %w", err)
-	}
-	existing, err := s.List(true)
-	if err != nil {
-		return err
-	}
-	known := make(map[string]bool, len(existing)*2)
-	for _, annotation := range existing {
-		known[annotation.AnnotationID] = true
-		known[annotation.LegacyExternalID] = true
-	}
-	for _, item := range legacy {
-		if item.ID == "" || known[item.ID] || strings.TrimSpace(item.QuoteSnapshot) == "" {
-			continue
-		}
-		createdAt, _ := time.Parse(time.RFC3339, item.CreatedAt)
-		var ask *Ask
-		if item.Ask != nil {
-			ask = &Ask{Summary: item.Ask.Summary, SummaryState: item.Ask.SummaryState, ProviderID: item.Ask.ProviderID}
-			ask.UpdatedAt, _ = time.Parse(time.RFC3339, item.Ask.UpdatedAt)
-			for _, message := range item.Ask.Messages {
-				messageAt, _ := time.Parse(time.RFC3339, message.CreatedAt)
-				ask.Messages = append(ask.Messages, Message{ID: message.ID, Role: message.Role, Content: message.Content, Status: "completed", CreatedAt: messageAt})
-			}
-		}
-		if _, err := s.Create(CreateInput{AnnotationID: item.ID, QuoteSnapshot: item.QuoteSnapshot, Anchors: Anchors{Start: item.CharStart, End: item.CharEnd}, Note: item.Notes, LegacyExternalID: item.ID, SourceArtifactID: item.SourceArtifactID, Status: State(item.State), CreatedAt: createdAt, Ask: ask}); err != nil {
-			return err
-		}
-		known[item.ID] = true
-	}
-	return nil
 }
 
 func (s *Store) Update(id string, note *string, state *State) (Annotation, error) {

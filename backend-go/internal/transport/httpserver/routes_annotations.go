@@ -15,9 +15,6 @@ func openAnnotationStore(slug string) (*annotationstore.AnnotationStore, error) 
 	if err != nil {
 		return nil, err
 	}
-	if err := store.ImportLegacy(); err != nil {
-		return nil, err
-	}
 	return store, nil
 }
 
@@ -125,12 +122,10 @@ func (s *Server) handleDeleteAnnotation(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleAnnotationAskAiStream(w http.ResponseWriter, r *http.Request) {
-	r.SetPathValue("confusionId", r.PathValue("annotationId"))
 	s.handleAskAiStream(w, r)
 }
 
 func (s *Server) handleAnnotationAskAiSummarize(w http.ResponseWriter, r *http.Request) {
-	r.SetPathValue("confusionId", r.PathValue("annotationId"))
 	s.handleAskAiSummarize(w, r)
 }
 
@@ -138,6 +133,5 @@ func (s *Server) emitAnnotationUpdated(slug, action, id string) {
 	if s.broadcaster != nil {
 		payload := map[string]any{"projectSlug": slug, "action": action, "id": id}
 		s.broadcaster.Emit("annotation-updated", payload)
-		s.broadcaster.Emit("confusion-updated", payload)
 	}
 }

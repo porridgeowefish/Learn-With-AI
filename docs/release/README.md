@@ -4,8 +4,8 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 | 系统 | 分发文件 | 安装与打开 |
 | --- | --- | --- |
-| Windows Intel / AMD 64 位 | learn-with-ai-0.7.18-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
-| Windows ARM64 | learn-with-ai-0.7.18-windows-arm64.msi | 同上，需要 Windows ARM64 |
+| Windows Intel / AMD 64 位 | learn-with-ai-0.7.19-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
+| Windows ARM64 | learn-with-ai-0.7.19-windows-arm64.msi | 同上，需要 Windows ARM64 |
 | macOS | darwin-…-app.tar.gz / 原生 CI 生成的 .pkg | 放进 Applications 后打开；当前 macOS 版本仍使用默认浏览器界面 |
 | Debian / Ubuntu | linux-….deb | sudo apt install ./文件名.deb；当前 Linux 版本仍使用默认浏览器界面 |
 | 其他 Linux | linux-…-install.tar.gz | 解压后运行 ./install.sh，从应用菜单打开；界面同上 |
@@ -26,6 +26,8 @@ Windows 应用使用 Microsoft Edge WebView2 Runtime。MSI 会检查该组件；
 
 ## 应用和资料
 
+从0.7.19起，应用停止支持旧版专用学习格式。遇到旧格式时显示明确提示，不自动转换或删除磁盘原件。请保留原目录，手动整理需要的内容；当前格式的项目及历史内容继续可用。
+
 Windows 在独立 WebView2 窗口中运行，Go 服务位于同一进程，绑定私有 IPv4 loopback 端口。关闭窗口会隐藏到系统托盘，后台继续运行。单击托盘图标恢复窗口，右键选择“退出”才停止自己的服务。侧栏没有退出按钮。学习偏好和 WebView 用户状态按当前用户保存。
 
 API 与默认模型在侧栏「设置」同页配置，配色在顶部。连接只显示预览，点击打开详情弹窗；提供方预置自动填写地址，可选择模型、填写 Key，自行配置可编辑完整连接参数。复习稿、练习题和学科地图独立调用所选 API，不需要 CLI 助教；练习支持选择题数，答案折叠在每道题下。学科地图可直接生成或根据上传参考资料组织章节。小节优先级为红色Ⅰ（关键必学）、黄色Ⅱ（中等深度）与绿色Ⅲ（深入选学），右上角有图例；旧地图重新生成后获得评级。新任务的教师会主动开始教学，正文顶部直接给出文字进度，每次讲一个知识点。
@@ -44,7 +46,7 @@ macOS 默认数据为 ~/Library/Application Support/learn-with-ai；Linux 为 $X
 
 仓库 Start-LLL / npm run build / npm start 是快速源码验证工具，保留在仓库中，不进入公开 MSI。开发二进制统一生成到 dist/dev/，发布包位于 dist/releases/，dist/ 根目录不保留 EXE。npm run build:desktop 生成带图标的本机原生开发应用；只有显式执行 npm run desktop:install 才创建原生开发快捷方式，目标是 exe。安装版 MSI 只管理一个正式桌面入口。
 
-使用 node tools/release/build-release.js --version 0.7.18 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
+使用 node tools/release/build-release.js --version 0.7.19 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
 
 GitHub Actions 在 v 开头的标签或勾选 publish 的手动运行中发布 Release（全部平台冒烟测试通过后才发布）；不勾选时只生成构件。本地包附带 SHA256SUMS 与 THIRD_PARTY_NOTICES.txt。当前构件未进行代码签名。
 

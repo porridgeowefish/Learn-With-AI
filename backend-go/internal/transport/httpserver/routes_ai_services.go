@@ -1,12 +1,12 @@
 package httpserver
 
 import (
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
 type aiServiceBinding struct {
@@ -33,7 +33,7 @@ func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	cfg, err := teacher.LoadConfig()
+	cfg, err := ai.LoadConfig()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "unable to load AI services")
 		return
@@ -47,7 +47,7 @@ func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
 			}
 			resource.Providers = append(resource.Providers, aiServiceProvider{ID: provider.ID, Kind: kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv})
 		}
-		for _, name := range []string{"teacher", "annotationAskAI", "conversationCompaction", "notes", "ocr", "documentStructure", "review", "practice", "disciplineMap"} {
+		for _, name := range []string{"teacher", "annotationAskAI", "notes", "ocr", "documentStructure", "review", "practice", "disciplineMap"} {
 			if binding, ok := cfg.Bindings[name]; ok {
 				resource.Bindings[name] = aiServiceBinding{ProviderID: binding.ProviderID, Model: binding.Model}
 				continue
@@ -73,19 +73,19 @@ func (s *Server) handlePutAIServices(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid AI services body")
 		return
 	}
-	old, loadErr := teacher.LoadConfig()
+	old, loadErr := ai.LoadConfig()
 	if loadErr != nil {
 		httpx.Error(w, http.StatusInternalServerError, "unable to load existing AI settings")
 		return
 	}
-	oldByID := map[string]teacher.ProviderConfig{}
+	oldByID := map[string]ai.ProviderConfig{}
 	if old != nil {
 		for _, provider := range old.Providers {
 			oldByID[provider.ID] = provider
 		}
 	}
 	teacherBinding := in.Bindings["teacher"]
-	providers := make([]teacher.ProviderConfig, 0, len(in.Providers))
+	providers := make([]ai.ProviderConfig, 0, len(in.Providers))
 	for _, provider := range in.Providers {
 		kind := provider.Kind
 		if kind == "openai-compatible" {
@@ -101,13 +101,13 @@ func (s *Server) handlePutAIServices(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		apiKey := provider.APIKey
-		providers = append(providers, teacher.ProviderConfig{ID: strings.TrimSpace(provider.ID), Kind: kind, Name: provider.Name, BaseURL: strings.TrimSpace(provider.BaseURL), APIKey: strings.TrimSpace(apiKey), APIKeyEnv: provider.APIKeyEnv, Model: strings.TrimSpace(model)})
+		providers = append(providers, ai.ProviderConfig{ID: strings.TrimSpace(provider.ID), Kind: kind, Name: provider.Name, BaseURL: strings.TrimSpace(provider.BaseURL), APIKey: strings.TrimSpace(apiKey), APIKeyEnv: provider.APIKeyEnv, Model: strings.TrimSpace(model)})
 	}
-	bindings := map[string]teacher.Binding{}
+	bindings := map[string]ai.Binding{}
 	for name, binding := range in.Bindings {
-		bindings[name] = teacher.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
+		bindings[name] = ai.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
-	if err := teacher.SaveConfig(teacher.Config{Default: teacherBinding.ProviderID, Providers: providers, Bindings: bindings}); err != nil {
+	if err := ai.SaveConfig(ai.Config{Default: teacherBinding.ProviderID, Providers: providers, Bindings: bindings}); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "unable to save AI services")
 		return
 	}
@@ -125,15 +125,15 @@ func (s *Server) handleProbeAIServices(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid probe request")
 		return
 	}
-	var provider teacher.ProviderConfig
+	var provider ai.ProviderConfig
 	if in.Inline != nil {
 		kind := in.Inline.Kind
 		if kind == "openai-compatible" {
 			kind = "openai"
 		}
-		provider = teacher.ProviderConfig{ID: in.Inline.ID, Kind: kind, BaseURL: in.Inline.BaseURL, APIKey: in.Inline.APIKey, Model: in.Model}
+		provider = ai.ProviderConfig{ID: in.Inline.ID, Kind: kind, BaseURL: in.Inline.BaseURL, APIKey: in.Inline.APIKey, Model: in.Model}
 	} else {
-		cfg, err := teacher.LoadConfig()
+		cfg, err := ai.LoadConfig()
 		if err != nil || cfg == nil || cfg.Find(in.ProviderID) == nil {
 			httpx.Error(w, http.StatusBadRequest, "provider not found")
 			return
@@ -144,7 +144,7 @@ func (s *Server) handleProbeAIServices(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	started := time.Now()
-	_, err := teacher.Complete(r.Context(), teacher.Provider{Kind: provider.Kind, BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: provider.Model}, "Reply with ok.", []teacher.AIMessage{{Role: "user", Content: "ping"}})
+	_, err := ai.Complete(r.Context(), ai.Provider{Kind: provider.Kind, BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: provider.Model}, "Reply with ok.", []ai.AIMessage{{Role: "user", Content: "ping"}})
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": false, "latencyMs": time.Since(started).Milliseconds(), "error": "provider probe failed"})
 		return

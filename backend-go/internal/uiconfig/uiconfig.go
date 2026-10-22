@@ -4,11 +4,9 @@ package uiconfig
 import (
 	"encoding/json"
 	"errors"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
-
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 type Theme string
@@ -34,9 +32,9 @@ func ValidTheme(theme Theme) bool {
 }
 
 var pathFn = func() string {
-	base := paths.WORKSPACE
+	base := filesystem.WORKSPACE
 	if base == "" {
-		base = paths.PROJECT_ROOT
+		base = filesystem.PROJECT_ROOT
 	}
 	return filepath.Join(base, "config.local.json")
 }
@@ -87,5 +85,5 @@ func Save(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return workspace.AtomicWriteFile(pathFn(), append(out, '\n'), 0o644)
+	return filesystem.AtomicWriteFile(pathFn(), append(out, '\n'), 0o644)
 }

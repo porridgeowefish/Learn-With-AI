@@ -129,6 +129,3 @@ func (s *Server) handleDisciplineMap(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, 200, m)
 }
-func (s *Server) handleRetiredLearning(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteJSON(w, http.StatusGone, map[string]any{"error": map[string]string{"code": "learning-cli-retired", "message": "请使用资料与资产工作区的API生成入口"}})
-}

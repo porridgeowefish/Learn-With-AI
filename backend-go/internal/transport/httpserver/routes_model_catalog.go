@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
 type catalogModel struct {
@@ -32,18 +32,18 @@ func (s *Server) handleModelCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	var in struct {
-		ProviderID string                  `json:"providerId"`
-		Inline     *teacher.ProviderConfig `json:"inline"`
+		ProviderID string             `json:"providerId"`
+		Inline     *ai.ProviderConfig `json:"inline"`
 	}
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, 400, "invalid connection draft")
 		return
 	}
-	var provider teacher.ProviderConfig
+	var provider ai.ProviderConfig
 	if in.Inline != nil {
 		provider = *in.Inline
 	} else {
-		cfg, err := teacher.LoadConfig()
+		cfg, err := ai.LoadConfig()
 		if err != nil || cfg == nil {
 			httpx.Error(w, 400, "connection unavailable")
 			return

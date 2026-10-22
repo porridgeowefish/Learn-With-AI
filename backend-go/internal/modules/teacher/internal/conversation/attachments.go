@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -108,12 +109,12 @@ func (s *Store) AddAttachment(ctx context.Context, name, language string, data [
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return Attachment{}, err
 	}
-	if err := workspace.AtomicWriteFile(filepath.Join(dir, "original"), data, 0600); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(dir, "original"), data, 0600); err != nil {
 		_ = os.RemoveAll(dir)
 		return Attachment{}, err
 	}
 	encoded, _ := json.Marshal(a)
-	if err := workspace.AtomicWriteFile(filepath.Join(dir, "attachment.json"), encoded, 0600); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(dir, "attachment.json"), encoded, 0600); err != nil {
 		_ = os.RemoveAll(dir)
 		return Attachment{}, err
 	}

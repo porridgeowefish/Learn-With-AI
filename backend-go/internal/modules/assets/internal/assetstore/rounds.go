@@ -11,10 +11,9 @@ import (
 // Practice rounds reuse immutable asset versions. Learner edits belong to the
 // same round; a generated version marks the start of another exercise set.
 type PracticeRound struct {
-	LegacyAnswers map[string]LegacyAnswer `json:"legacyAnswers,omitempty"`
-	VersionID     string                  `json:"versionId"`
-	Content       string                  `json:"content"`
-	CreatedAt     time.Time               `json:"createdAt"`
+	VersionID string    `json:"versionId"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 func (s *Store) PracticeRounds() ([]PracticeRound, error) {
@@ -48,7 +47,7 @@ func (s *Store) PracticeRounds() ([]PracticeRound, error) {
 			return nil, errors.New("practice version hash mismatch")
 		}
 		if !selected && (strings.TrimSpace(string(content)) != "" || v.Author == "learner") {
-			rounds = append(rounds, PracticeRound{VersionID: id, Content: string(content), CreatedAt: v.CreatedAt, LegacyAnswers: s.legacyAnswers(string(content))})
+			rounds = append(rounds, PracticeRound{VersionID: id, Content: string(content), CreatedAt: v.CreatedAt})
 			selected = true
 		}
 		if v.Author != "learner" {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"io"
 	"os"
 	"path/filepath"
@@ -72,7 +73,7 @@ func (s *Service) failMap(slug string, j Job, text string, issue *MapValidationI
 	}
 	j.Validation = issue
 	file := candidatePath(root, j.ID)
-	if len(text) <= 4<<20 && os.MkdirAll(filepath.Dir(file), 0700) == nil && projects.AtomicWriteFile(file, []byte(text), 0600) == nil {
+	if len(text) <= 4<<20 && os.MkdirAll(filepath.Dir(file), 0700) == nil && filesystem.AtomicWriteFile(file, []byte(text), 0600) == nil {
 		j.CandidateAvailable = true
 	} else {
 		copy := *issue

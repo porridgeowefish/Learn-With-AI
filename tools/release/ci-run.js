@@ -18,6 +18,7 @@ const options = argv.slice(0, split);
 const [command, ...args] = argv.slice(split + 1);
 const prefixIndex = options.indexOf('--temp-logs');
 const tempPrefix = prefixIndex >= 0 ? options[prefixIndex + 1] : '';
+require('./temporary-root').prepareTemporaryRoot();
 
 function escape(value) {
   return value.replace(/%/g, '%25').replace(/\r/g, '').replace(/\n/g, '%0A').replace(/::/g, ': :');

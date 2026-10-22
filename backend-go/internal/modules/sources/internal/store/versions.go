@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
-	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 	"io/fs"
 	"os"
@@ -126,7 +127,7 @@ func (s *Store) publishDerivedLocked(rev *Revision, files map[string][]byte, typ
 	sort.Slice(refs, func(i, j int) bool { return refs[i].Key < refs[j].Key })
 	// An orphan complete version after a crash is harmless: only current.json publishes it.
 	for key, data := range all {
-		if e = projects.AtomicWriteFile(filepath.Join(dir, filepath.FromSlash(key)), data, 0o644); e != nil {
+		if e = filesystem.AtomicWriteFile(filepath.Join(dir, filepath.FromSlash(key)), data, 0o644); e != nil {
 			return e
 		}
 	}

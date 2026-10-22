@@ -3,8 +3,9 @@ package noteservice
 import (
 	"context"
 	"errors"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
+
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
 	config "github.com/xmz14/lll/backend-go/internal/platform/config"
@@ -12,12 +13,14 @@ import (
 	"time"
 )
 
+var ErrProjectBusy = errors.New("project has active note generation")
+
 type Service struct {
+	deleted                 sync.Map
 	initializationFailed    map[string]bool
 	OnInitializationFailure func(string, error)
 	generator               notestore.NoteGenerator
 	OnUpdated               func(string, string, string, string)
-	ProjectBlocked          func(string) bool
 	mu                      sync.Mutex
 	settingsMu              sync.Mutex
 	pending                 map[string]bool
@@ -69,7 +72,8 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 func (s *Service) blocked(slug string) bool {
-	return s.initializationFailed[slug] || (s.ProjectBlocked != nil && s.ProjectBlocked(slug))
+	_, deleted := s.deleted.Load(slug)
+	return deleted || s.initializationFailed[slug]
 }
 func (s *Service) Close() error {
 	if s.cancel != nil {
@@ -92,7 +96,7 @@ func (s *Service) Notify(slug string) {
 }
 func (s *Service) observe(slug string, cfg notestore.AutoNotesSettings) error {
 	if s.blocked(slug) {
-		return errors.New("project migration blocked")
+		return errors.New("project unavailable")
 	}
 	c, err := conversation.New(slug)
 	if err != nil {
@@ -114,7 +118,7 @@ func (s *Service) observe(slug string, cfg notestore.AutoNotesSettings) error {
 		return err
 	}
 	if cfg.ProviderID == "" {
-		if ai, err := aiconfig.Load(); err == nil && ai != nil {
+		if ai, err := ai.LoadConfig(); err == nil && ai != nil {
 			if binding, ok := ai.Bindings["notes"]; ok {
 				cfg.ProviderID = binding.ProviderID
 				if cfg.Model == "" {
@@ -124,7 +128,7 @@ func (s *Service) observe(slug string, cfg notestore.AutoNotesSettings) error {
 		}
 	}
 	if cfg.ProviderID != "" && cfg.Model == "" {
-		if ai, err := aiconfig.Load(); err == nil && ai != nil {
+		if ai, err := ai.LoadConfig(); err == nil && ai != nil {
 			if p := ai.FindExact(cfg.ProviderID); p != nil {
 				cfg.Model = p.Model
 			}
@@ -154,7 +158,7 @@ func (s *Service) UpdateSettings(cfg notestore.AutoNotesSettings) error {
 		return err
 	}
 	if cfg.ProviderID != "" {
-		ai, err := aiconfig.Load()
+		ai, err := ai.LoadConfig()
 		if err != nil {
 			return err
 		}
@@ -214,6 +218,10 @@ func (s *Service) dispatch() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for slug := range s.pending {
+		if s.blocked(slug) {
+			delete(s.pending, slug)
+			continue
+		}
 		if len(s.busy) >= 2 {
 			return
 		}
@@ -301,4 +309,26 @@ func (s *Service) initializeProject(slug string) error {
 		return err
 	}
 	return store.Recover()
+}
+
+// DeleteProject excludes note observation and dispatch while deleting current data.
+func (s *Service) DeleteProject(slug string, remove func(string) error) error {
+	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.busy[slug] {
+		return ErrProjectBusy
+	}
+	if err := remove(slug); err != nil {
+		return err
+	}
+	s.deleted.Store(slug, true)
+	delete(s.pending, slug)
+	return nil
+}
+func (s *Service) ReviveProject(slug string) {
+	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
+	s.deleted.Delete(slug)
 }

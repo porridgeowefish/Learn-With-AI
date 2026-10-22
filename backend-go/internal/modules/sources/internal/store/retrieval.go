@@ -4,13 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
-
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 var ErrSourceDeleted = errors.New("source_deleted")
@@ -134,7 +133,7 @@ func (s *Store) PublishRetrieval(sourceID, revisionID, hash, key string, data []
 	if _, _, _, err := s.readRevisionLocked(sourceID, revisionID, hash); err != nil {
 		return err
 	}
-	return workspace.AtomicWriteFile(filepath.Join(s.root, sourceID, "revisions", revisionID, "derived", "retrieval", key), data, 0o600)
+	return filesystem.AtomicWriteFile(filepath.Join(s.root, sourceID, "revisions", revisionID, "derived", "retrieval", key), data, 0o600)
 }
 func (s *Store) SetRetrievalStatus(sourceID, revisionID, hash string, status RetrievalStatus) error {
 	s.mu.Lock()

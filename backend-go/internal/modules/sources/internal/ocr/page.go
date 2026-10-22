@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	config "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
@@ -25,8 +26,8 @@ func LocalPageAvailable() bool {
 // Capture the selected purpose before queueing. Do not run the potentially
 // slow system probe here, and never let a later cloud binding adopt this task.
 func AutomaticPageSelection() (providerID, model string) {
-	settings, ok, err := config.LoadAI()
-	if err == nil && ok {
+	settings, err := ai.LoadConfig()
+	if err == nil && settings != nil {
 		binding, exists := settings.Bindings["documentStructure"]
 		if !exists {
 			binding = settings.Bindings["ocr"]
@@ -97,8 +98,8 @@ func ResolvePageProvider(providerID, model string) (PageProvider, error) {
 		}
 		return PageProvider{}, errors.New("local-ocr-unavailable")
 	}
-	settings, ok, e := config.LoadAI()
-	if e != nil || !ok {
+	settings, e := ai.LoadConfig()
+	if e != nil || settings == nil {
 		if providerID == "" {
 			if local, available := localPageProvider(); available {
 				return local, nil

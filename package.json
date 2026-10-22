@@ -1,6 +1,6 @@
 {
   "name": "learn-with-ai",
-  "version": "0.7.18",
+  "version": "0.7.19",
   "private": true,
   "description": "learn-with-ai — local learning workbench",
   "scripts": {
@@ -12,7 +12,7 @@
     "start": "node tools/release/manage.js start",
     "test": "go test ./...",
     "test:verbose": "go test -v ./...",
-    "archcheck": "go run ./tools/archcheck -repo . -report .artifacts/quality/architecture/dependency-report.json",
+    "archcheck": "go run ./tools/archcheck -repo . -report trash/verification/architecture/dependency-report.json",
     "check:repo": "node tools/check/check-repository-hygiene.js",
     "check:fast": "node tools/check/run-check.js fast",
     "check": "node tools/check/run-check.js complete",

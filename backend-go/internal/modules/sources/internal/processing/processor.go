@@ -14,12 +14,11 @@ import (
 )
 
 type Processor struct {
-	OnUpdated      func(string, store.Source)
-	ProjectBlocked func(string) bool
-	notify         chan struct{}
-	done           chan struct{}
-	cancel         context.CancelFunc
-	once           sync.Once
+	OnUpdated func(string, store.Source)
+	notify    chan struct{}
+	done      chan struct{}
+	cancel    context.CancelFunc
+	once      sync.Once
 }
 
 func New(onUpdated func(string, store.Source)) *Processor {
@@ -63,7 +62,7 @@ func (p *Processor) drain(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if (unit.ProjectType != projects.ProjectTypeSystemLearning && unit.ProjectType != projects.ProjectTypeDisciplineMap) || (p.ProjectBlocked != nil && p.ProjectBlocked(unit.Slug)) {
+		if unit.ProjectType != projects.ProjectTypeSystemLearning && unit.ProjectType != projects.ProjectTypeDisciplineMap {
 			continue
 		}
 		st, err := store.New(unit.Slug)

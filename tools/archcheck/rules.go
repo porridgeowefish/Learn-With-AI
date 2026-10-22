@@ -55,6 +55,13 @@ func check(repoRoot, allowFile string, withFrontend bool) ([]Violation, stats, e
 	}
 
 	var violations []Violation
+	for _, retired := range []string{"learning-agents", "backend-go/internal/modules/assistant", "backend-go/internal/compatibility", "backend-go/internal/modules/learning", "backend-go/internal/app/integration", "frontend/src/features/legacy-zones", "frontend/src/features/agents"} {
+		if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(retired))); err == nil {
+			violations = append(violations, Violation{Rule: "R6-retired-surface", Importer: retired, Detail: "retired runtime or UI must not return"})
+		} else if !os.IsNotExist(err) {
+			return nil, st, err
+		}
+	}
 
 	pkgs, err := listGoPackages(repoRoot, "./backend-go/...")
 	if err != nil {
@@ -93,6 +100,9 @@ func check(repoRoot, allowFile string, withFrontend bool) ([]Violation, stats, e
 
 // checkGoEdge applies R1–R3 to one import edge.
 func checkGoEdge(importer, imported string) *Violation {
+	if moduleOf(importer) == "ai" && strings.HasPrefix(imported, modulesPrefix+"/") && moduleOf(imported) != "ai" {
+		return &Violation{Rule: "R5-ai-imports-business", Importer: importer, Imported: imported}
+	}
 	if strings.HasPrefix(importer, transportPrefix) {
 		if m := moduleInternalRe.FindStringSubmatch(imported); m != nil {
 			return &Violation{Rule: "R1-transport-imports-module-private", Importer: importer, Imported: imported, Detail: fmt.Sprintf("module %q internals are private", m[1])}

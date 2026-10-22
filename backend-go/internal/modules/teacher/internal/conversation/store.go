@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"io"
 	"os"
 	"path/filepath"
@@ -1063,5 +1064,5 @@ func writeJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	return workspace.AtomicWriteFile(path, append(data, '\n'), 0o644)
+	return filesystem.AtomicWriteFile(path, append(data, '\n'), 0o644)
 }

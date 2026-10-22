@@ -14,10 +14,8 @@ import {
   resumeTeacherTurn,
   startTeacherOpening,
   learningWorkspaceKeys,
-  useAssistantTasks,
   useConversation,
   useSources,
-  type AssistantTask,
   type ConversationMessage,
   type QueuedTurn,
   type TeacherStreamFrame,
@@ -40,9 +38,7 @@ interface LiveResponse {
   teacherId?: string;
   responseId?: string;
   text: string;
-  reasoning: string;
-  taskIds: string[];
-  searches: SearchStatus[];
+  reasoning: string;  searches: SearchStatus[];
   notice?: string;
   reading?: { operationId: string; operation: string; sourceId?: string; displayRange?: string };
 }
@@ -55,7 +51,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const conversation = useConversation(slug);
   const conversationRef = useRef(conversation.data);
   conversationRef.current = conversation.data;
-  const tasksQuery = useAssistantTasks(slug);
   const sourcesQuery = useSources(slug);
   const modelSettings = useAskAiSettings();
   const [input, setInput] = useState('');
@@ -79,7 +74,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const setReasoningOpen = useCallback((messageID: string, open: boolean) => {
     setReasoningExpanded(current => current[messageID] === open ? current : { ...current, [messageID]: open });
   }, []);
-  const tasksById = useMemo(() => new Map((tasksQuery.data ?? []).map((task) => [task.id, task])), [tasksQuery.data]);
   const sourceNames = useMemo(() => new Map((sourcesQuery.data ?? []).map((source) => [source.sourceId, source.displayName])), [sourcesQuery.data]);
   const availableSources = useMemo(() => (sourcesQuery.data ?? []).filter((source) => source.status === 'ready'), [sourcesQuery.data]);
   const availableModels = useMemo(() => (modelSettings.data?.providers ?? []).filter((provider) => provider.id && provider.model && provider.baseURL), [modelSettings.data?.providers]);
@@ -194,7 +188,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       if (frame.type === 'turn-accepted') {
         setLive((current) => current ?? {
           learner: latestLearner ?? { id: String(frame.data.learnerMessageId), role: 'learner', status: 'completed', blocks: [], createdAt: new Date().toISOString() },
-          responseId: String(frame.data.responseId), text: '', reasoning: '', taskIds: [], searches: [],
+          responseId: String(frame.data.responseId), text: '', reasoning: '', searches: [],
         });
       }
       handleTeacherFrame(frame);
@@ -284,7 +278,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         ...sentMedia.filter(a => a.kind !== 'source').map(a => ({ id: a.attachmentId, type: `chat-${a.kind}` as 'chat-image' | 'chat-audio', artifactRef: a.attachmentId, name: a.name, source: a.text })),
         ...attachmentRefs.map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
       ], createdAt: new Date().toISOString() },
-      text: '', reasoning: '', taskIds: [], searches: [],
+      text: '', reasoning: '', searches: [],
     };
     setLive(temporary);
     let accepted = false;
@@ -312,7 +306,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         ...(item.mediaBlocks ?? []),
         ...(item.attachmentRefs ?? []).map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
       ], createdAt: new Date().toISOString() },
-      text: '', reasoning: '', taskIds: [], searches: [],
+      text: '', reasoning: '', searches: [],
     });
     await runStream(async (signal) => {
       await steerQueuedTurn(slug, item.queueId, signal, frame => { if (!signal.aborted) handleTeacherFrame(frame); });
@@ -327,7 +321,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     setError('');
     followStream.current = true;
     pendingDeltas.current = { text: '', reasoning: '' };
-    setLive({ learner: trigger, text: '', reasoning: '', taskIds: [], searches: [] });
+    setLive({ learner: trigger, text: '', reasoning: '', searches: [] });
     await runStream(async (signal) => {
       await regenerateTeacherResponse(slug, responseId, signal, frame => { if (!signal.aborted) handleTeacherFrame(frame); });
     });
@@ -392,13 +386,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     }
   };
 
-  const linksByMessage = useMemo(() => {
-    const links = new Map<string, string[]>();
-    for (const link of conversation.data?.taskLinks ?? []) {
-      links.set(link.messageId, [...(links.get(link.messageId) ?? []), link.taskId]);
-    }
-    return links;
-  }, [conversation.data?.taskLinks]);
   const queueItems = useMemo(() => conversation.data?.queue ?? [], [conversation.data?.queue]);
   const lastTeacherMessage = useMemo(() => {
     const messages = conversation.data?.messages ?? [];
@@ -444,7 +431,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         {conversation.isLoading && <div className={s.loading}>教师正在准备对话…</div>}
         {conversation.hasPrevious && <button type="button" className={s.loadPrevious} onClick={() => void loadPrevious()} disabled={conversation.isLoadingPrevious}>{conversation.isLoadingPrevious ? '正在加载…' : '加载更早对话'}</button>}
         {(conversation.data?.messages ?? []).filter((message) => message.id !== live?.learner.id && message.operationId !== 'teacher-welcome-v1').map((message) => (
-          <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} reasoningOpen={Boolean(reasoningExpanded[message.id])} setReasoningOpen={setReasoningOpen} actions={{
+          <Message key={message.id} slug={slug} message={message} sourceNames={sourceNames} reasoningOpen={Boolean(reasoningExpanded[message.id])} setReasoningOpen={setReasoningOpen} actions={{
             copied: copiedMessageId === message.id,
             onCopy: copyMessage,
             onDownload: downloadMessage,
@@ -455,7 +442,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         {!live && quickReplyTarget && <QuickReplies suggestions={readLearningProgress(messageMarkdown(quickReplyTarget))?.replies ?? []} onSend={(text) => void send(text)} />}
         {live && (
           <>
-            {live.learner.id !== 'teacher-opening' && <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} reasoningOpen={false} setReasoningOpen={setReasoningOpen} />}
+            {live.learner.id !== 'teacher-opening' && <Message slug={slug} message={live.learner} sourceNames={sourceNames} reasoningOpen={false} setReasoningOpen={setReasoningOpen} />}
             {live.reading && <div className={s.searches} role="status">
               {live.reading.operation === 'search' ? '正在查找资料' : '正在查阅'}
               {live.reading.sourceId && <> · {sourceNames.get(live.reading.sourceId) ?? '资料'}</>}
@@ -475,7 +462,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             <Message slug={slug} message={{ id: live.teacherId ?? 'streaming-teacher', role: 'teacher', status: 'completed', blocks: [
               ...(live.reasoning ? [{ id: 'reasoning', type: 'reasoning-summary' as const, source: live.reasoning }] : []),
               ...(live.text ? [{ id: 'text', type: 'markdown' as const, source: live.text }] : []),
-            ], createdAt: new Date().toISOString() }} tasks={live.taskIds.map((id) => tasksById.get(id) ?? { id, type: 'consolidate', objective: '助教任务', status: 'queued', createdAt: '', updatedAt: '' })} sourceNames={sourceNames} reasoningOpen={Boolean(reasoningExpanded[live.teacherId ?? 'streaming-teacher'])} setReasoningOpen={setReasoningOpen} notice={live.notice} streaming />
+            ], createdAt: new Date().toISOString() }} sourceNames={sourceNames} reasoningOpen={Boolean(reasoningExpanded[live.teacherId ?? 'streaming-teacher'])} setReasoningOpen={setReasoningOpen} notice={live.notice} streaming />
           </>
         )}
         {error && <div className={s.error}>{error}</div>}
@@ -544,8 +531,6 @@ function handleFrame(frame: TeacherStreamFrame, setLive: React.Dispatch<React.Se
     }
     if (frame.type === 'text-delta') return { ...current, text: current.text + String(frame.data.delta ?? '') };
     if (frame.type === 'reasoning-summary-delta') return { ...current, reasoning: current.reasoning + String(frame.data.delta ?? '') };
-    if (frame.type === 'task-accepted') return { ...current, taskIds: [...current.taskIds, String(frame.data.taskId)] };
-    if (frame.type === 'tool-rejected') return { ...current, notice: rejectionText(String(frame.data.code)) };
     if (frame.type === 'search-started') return { ...current, searches: [...current.searches, { query: String(frame.data.query ?? '') }] };
     if (frame.type === 'search-completed' || frame.type === 'search-failed') {
       return { ...current, searches: current.searches.map((search, index) => index === current.searches.length - 1 && !search.count && !search.failed
@@ -554,12 +539,6 @@ function handleFrame(frame: TeacherStreamFrame, setLive: React.Dispatch<React.Se
     }
     return current;
   });
-}
-
-function rejectionText(code: string) {
-  if (code === 'same_type_active') return '同类型助教任务已经在进行，本次没有重复创建。';
-  if (code === 'delegation_not_approved') return '助教任务没有创建：需要先说明方案，并由你在后续消息中明确同意。';
-  return '助教任务没有创建，你可以继续和教师确认方案。';
 }
 
 // MessageActions stays primitive-valued (or stable callbacks) so the memo
@@ -572,7 +551,7 @@ interface MessageActions {
   onRegenerate: () => void;
 }
 
-const Message = memo(function Message({ slug, message, sourceNames, reasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; reasoningOpen: boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
+const Message = memo(function Message({ slug, message, sourceNames, reasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; sourceNames: Map<string, string>; reasoningOpen: boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
   const teacher = message.role === 'teacher';
   const [selectedEvidence, setSelectedEvidence] = useState('');
   const citations = message.sourceCitations ?? [];
@@ -616,7 +595,6 @@ const Message = memo(function Message({ slug, message, sourceNames, reasoningOpe
   && previous.streaming === next.streaming
   && previous.notice === next.notice
   && previous.sourceNames === next.sourceNames
-  && sameTasks(previous.tasks, next.tasks)
   && previous.actions?.copied === next.actions?.copied
   && previous.actions?.canRegenerate === next.actions?.canRegenerate
   && previous.actions?.onCopy === next.actions?.onCopy
@@ -639,11 +617,4 @@ function ReasoningBlock({ messageID, source, streaming, open, onOpenChange }: { 
     </button>
     <div id={panelID} role="region" aria-label="思考内容" hidden={!open} className={s.reasoningText} aria-busy={streaming}>{source}</div>
   </div>;
-}
-
-function sameTasks(left: AssistantTask[], right: AssistantTask[]) {
-  return left.length === right.length && left.every((task, index) => {
-    const other = right[index];
-    return task.id === other?.id && task.status === other.status && task.updatedAt === other.updatedAt;
-  });
 }

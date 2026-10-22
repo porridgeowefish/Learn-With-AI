@@ -6,34 +6,7 @@ import s from './AssetsView.module.css';
 
 export interface PracticeQuestion { question: string; answer: string; kind?: string; options?: Array<{id:string;text:string}> }
 export const withoutPracticeTitle = (source:string) => source.replace(/^\s*#\s+(?:练习|练习题)[ \t]*(?:\r?\n|$)/, '');
-
-type LegacyAnswers=Record<string,{answer:unknown;explanation?:string}>;
-function parseLegacyPractice(source:string,legacyAnswers?:LegacyAnswers): {intro:string;questions:PracticeQuestion[]} | null {
- const candidates=[{raw:source.trim(),whole:source},...Array.from(source.matchAll(/```(?:json)?\s*\n([\s\S]*?)\n```/g),match=>({raw:match[1],whole:match[0]}))];
- for(const candidate of candidates){
-  try{
-   const data=JSON.parse(candidate.raw) as {tasks?:Array<Record<string,unknown>>;answers?:Record<string,unknown>};
-   if(!Array.isArray(data.tasks)||!data.tasks.length)continue;
-   const questions=data.tasks.map((task,index):PracticeQuestion=>{
-    const kind=typeof task.type==='string'?task.type:undefined;
-    const options=Array.isArray(task.options)?task.options.map((option,i)=>{
-     if(typeof option==='string')return {id:String.fromCharCode(65+i),text:option};
-     const value=option as Record<string,unknown>;
-     return {id:String(value.id??value.label??String.fromCharCode(65+i)),text:String(value.text??value.content??value.value??'')};
-    }):task.options&&typeof task.options==='object'?Object.entries(task.options).map(([id,text])=>({id,text:String(text)})):undefined;
-    const legacy=legacyAnswers?.[String(task.id)];
-    const storedAnswer=task.answer??task.correctAnswer??data.answers?.[String(task.id)]??legacy?.answer;
-    const answer=storedAnswer&&typeof storedAnswer==='object'?JSON.stringify(storedAnswer,null,2):String(storedAnswer??'这道旧题没有附带参考答案。');
-    const difficulty=typeof task.difficulty==='number'?` · 难度：${task.difficulty}/5`:'';
-    return {question:`## 第${index+1}题\n${kind?`题型：${kind}${difficulty}\n\n`:''}${String(task.question??task.prompt??task.content??'')}\n${task.hint?`\n提示：${String(task.hint)}\n`:''}`,kind,options,answer:`### 参考答案\n${answer}\n\n### 解析\n${String(task.explanation??legacy?.explanation??'原题未附解析。')}`};
-   });
-   return {intro:withoutPracticeTitle(source.replace(candidate.whole,'')).trim(),questions};
-  }catch{/* Historical free-form Markdown remains readable below. */}
- }
- return null;
-}
-export function parsePractice(source: string,legacyAnswers?:LegacyAnswers): {intro:string;questions:PracticeQuestion[]} | null {
- const legacy=parseLegacyPractice(source,legacyAnswers);if(legacy)return legacy;
+export function parsePractice(source: string): {intro:string;questions:PracticeQuestion[]} | null {
  const lines=source.split(/\r?\n/), boundaries:number[]=[], answers=new Map<number,number>(), explanations=new Map<number,number>();
  let fence: {char:string;length:number}|null=null, math=false;
  const structural=new Set<number>();
@@ -101,8 +74,8 @@ export interface PracticeTestHandlers {
 /** Objective rounds are a test: answers are scored by the round's own key
  * once submitted, and the score stays until the learner chooses 重新测试.
  * Without handlers (guided demo) the score lives only in memory. */
-export function PracticeReader({content,versionId,legacyAnswers,result,onSubmit,onRetake}:{content:string;versionId:string;legacyAnswers?:LegacyAnswers}&PracticeTestHandlers) {
- const parsed=useMemo(()=>parsePractice(content,legacyAnswers),[content,legacyAnswers]);
+export function PracticeReader({content,versionId,result,onSubmit,onRetake}:{content:string;versionId:string}&PracticeTestHandlers) {
+ const parsed=useMemo(()=>parsePractice(content),[content]);
  if(!parsed)return <MarkdownView source={withoutPracticeTitle(content)} className={s.markdown}/>;
  return <PracticeTest key={versionId} intro={parsed.intro} questions={parsed.questions} versionId={versionId} result={result} onSubmit={onSubmit} onRetake={onRetake}/>;
 }

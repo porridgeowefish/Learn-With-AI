@@ -7,13 +7,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 const Filename = "preferences.md"
@@ -38,7 +36,7 @@ type Snapshot struct {
 	Content string `json:"-"`
 }
 
-func Path() string { return filepath.Join(paths.WORKSPACE, Filename) }
+func Path() string { return filepath.Join(filesystem.WORKSPACE, Filename) }
 
 // Read returns one bounded snapshot without causing writes. This is the only
 // operation available to AI-facing services.
@@ -90,7 +88,7 @@ func Ensure() (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	if recovered.Exists {
-		if err := workspace.AtomicWriteFile(Path(), []byte(recovered.Content), 0o644); err != nil {
+		if err := filesystem.AtomicWriteFile(Path(), []byte(recovered.Content), 0o644); err != nil {
 			return Snapshot{}, fmt.Errorf("restore preferences backup: %w", err)
 		}
 		return Snapshot{Path: Path(), Exists: true, Content: recovered.Content}, nil
@@ -122,7 +120,7 @@ func Write(content string) (Snapshot, error) {
 	if err := writeBackup(content); err != nil {
 		return Snapshot{}, err
 	}
-	if err := workspace.AtomicWriteFile(Path(), []byte(content), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(Path(), []byte(content), 0o644); err != nil {
 		return Snapshot{}, err
 	}
 	return Snapshot{Path: Path(), Exists: true, Content: content}, nil
@@ -157,7 +155,7 @@ func writeBackup(content string) error {
 	if err != nil {
 		return err
 	}
-	if err := workspace.AtomicWriteFile(backup, []byte(content), 0o600); err != nil {
+	if err := filesystem.AtomicWriteFile(backup, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("backup preferences: %w", err)
 	}
 	return nil
@@ -172,7 +170,7 @@ func restoreNonEmptyBackup() (Snapshot, bool, error) {
 	if err != nil || !recovered.Exists || recovered.Content == "" {
 		return Snapshot{}, false, err
 	}
-	if err := workspace.AtomicWriteFile(Path(), []byte(recovered.Content), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(Path(), []byte(recovered.Content), 0o644); err != nil {
 		return Snapshot{}, false, fmt.Errorf("restore preferences backup: %w", err)
 	}
 	return Snapshot{Path: Path(), Exists: true, Content: recovered.Content}, true, nil
@@ -183,7 +181,7 @@ func backupPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve preferences backup directory: %w", err)
 	}
-	workspaceRoot, err := filepath.Abs(paths.WORKSPACE)
+	workspaceRoot, err := filepath.Abs(filesystem.WORKSPACE)
 	if err != nil {
 		return "", fmt.Errorf("resolve workspace for preferences backup: %w", err)
 	}

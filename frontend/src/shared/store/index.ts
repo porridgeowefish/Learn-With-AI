@@ -4,6 +4,5 @@
 
 export { useUiStore } from './slices/ui';
 export { useProjectStore } from './slices/project';
-export { useSessionStore } from './slices/session';
 export { useConnectionStore } from '@/app/store/connection';
 export type { ConnectionStatus } from '@/app/store/connection';

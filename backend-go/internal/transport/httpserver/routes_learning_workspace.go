@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
+
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
-	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
@@ -27,7 +27,7 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 		learningWorkspaceError(w, err)
 		return
 	}
-	if err := ensureTeacherGreeting(store, r.PathValue("id")); err != nil {
+	if err := teacher.EnsureGreeting(store, r.PathValue("id")); err != nil {
 		learningWorkspaceError(w, err)
 		return
 	}
@@ -46,284 +46,6 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, projection)
-}
-
-// teacherTurnLock serializes turn lifecycle decisions (start, steer,
-// regenerate, queue advance) for one project. Streaming itself is not held.
-func (s *Server) teacherTurnLock(slug string) *sync.Mutex {
-	value, _ := s.teacherTurnMu.LoadOrStore(slug, &sync.Mutex{})
-	return value.(*sync.Mutex)
-}
-
-// startTeacherRunLocked begins one provider response owned by the server-side
-// ActiveResponse registry. Caller must hold the project turn lock. When the
-// turn ends it advances the queue, so queued work continues without a client.
-func (s *Server) startTeacherRunLocked(slug string, start func(ctx context.Context, emit func(teacher.StreamFrame)) error) *teacher.ActiveResponse {
-	activeTeacher := s.teacherResponses()
-	if activeTeacher.Project(slug) != nil {
-		return nil
-	}
-	ctx, run, started := activeTeacher.Start(slug)
-	if !started {
-		return nil
-	}
-	go func() {
-		responseID := ""
-		emit := func(frame teacher.StreamFrame) {
-			run.Append(frame)
-			if frame.Type == "message-started" {
-				s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
-			}
-			if frame.Type == "turn-accepted" {
-				if id, _ := frame.Data["responseId"].(string); id != "" && responseID == "" {
-					responseID = id
-					activeTeacher.Bind(id, run)
-				}
-			}
-		}
-		if err := start(ctx, emit); err != nil {
-			emit(teacher.StreamFrame{Type: "message-failed", Data: map[string]any{"code": "teacher_provider_unavailable", "partialPreserved": false}})
-		}
-		activeTeacher.Finish(slug, responseID, run)
-		s.advanceTeacherQueue(slug)
-		s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
-	}()
-	return run
-}
-
-// advanceTeacherQueue promotes the head of the durable queue when no response
-// is active. It is safe to call from any turn completion path.
-func (s *Server) advanceTeacherQueue(slug string) bool {
-	lock := s.teacherTurnLock(slug)
-	lock.Lock()
-	defer lock.Unlock()
-	if s.teacherResponses().Project(slug) != nil {
-		return false
-	}
-	store, err := teacher.NewConversation(slug)
-	if err != nil {
-		return false
-	}
-	promoted, ok, err := store.PromoteQueueHead("auto")
-	if err != nil || !ok {
-		return false
-	}
-	return s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(teacher.StreamFrame)) error {
-		return s.teacher.StreamPromotedTurn(ctx, slug, promoted, false, emit)
-	}) != nil
-}
-
-func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-	conversation, err := teacher.NewConversation(slug)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	if err := ensureTeacherGreeting(conversation, slug); err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	var in struct {
-		OperationID               string   `json:"operationId"`
-		Content                   string   `json:"content"`
-		AttachmentRefs            []string `json:"attachmentRefs"`
-		ConversationAttachmentIDs []string `json:"conversationAttachmentIds"`
-		ProviderID                string   `json:"providerId"`
-	}
-	if err := httpx.ReadJSON(r, &in); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid teacher turn")
-		return
-	}
-	lock := s.teacherTurnLock(slug)
-	if _, err := conversation.AttachmentBlocks(in.ConversationAttachmentIDs); err != nil {
-		httpx.Error(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	lock.Lock()
-	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(teacher.StreamFrame)) error {
-		return s.teacher.StreamTurn(ctx, slug, teacher.TurnInput{OperationID: in.OperationID, Content: in.Content, AttachmentRefs: in.AttachmentRefs, ConversationAttachmentIDs: in.ConversationAttachmentIDs, ProviderID: in.ProviderID}, emit)
-	})
-	lock.Unlock()
-	if run == nil {
-		httpx.Error(w, http.StatusConflict, "a teacher response is already active")
-		return
-	}
-	streamTeacherRun(w, r, run)
-}
-
-func (s *Server) handleQueueTeacherTurn(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-	conversation, err := teacher.NewConversation(slug)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	if err := ensureTeacherGreeting(conversation, slug); err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	var in struct {
-		OperationID               string   `json:"operationId"`
-		Content                   string   `json:"content"`
-		AttachmentRefs            []string `json:"attachmentRefs"`
-		ConversationAttachmentIDs []string `json:"conversationAttachmentIds"`
-		ProviderID                string   `json:"providerId"`
-	}
-	if err := httpx.ReadJSON(r, &in); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid queued turn")
-		return
-	}
-	content := strings.TrimSpace(in.Content)
-	if in.OperationID == "" || (content == "" && len(in.ConversationAttachmentIDs) == 0) || len([]byte(content)) > 64<<10 {
-		httpx.Error(w, http.StatusBadRequest, "invalid queued turn")
-		return
-	}
-	item, err := conversation.Enqueue(content, in.AttachmentRefs, in.OperationID, in.ProviderID, in.ConversationAttachmentIDs)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	// When no response is streaming the queue advances immediately, so an idle
-	// queue send behaves like a direct turn.
-	started := s.advanceTeacherQueue(slug)
-	promoted := false
-	if started {
-		promoted = true
-		if items, listErr := conversation.QueueItems(); listErr == nil {
-			for _, queued := range items {
-				if queued.QueueID == item.QueueID {
-					promoted = false
-					break
-				}
-			}
-		}
-	}
-	s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
-	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"queueId": item.QueueID, "promoted": promoted})
-}
-
-func (s *Server) handleEditQueuedTurn(w http.ResponseWriter, r *http.Request) {
-	slug, queueID := r.PathValue("id"), r.PathValue("queueId")
-	var in struct {
-		Content        string   `json:"content"`
-		AttachmentRefs []string `json:"attachmentRefs"`
-	}
-	if err := httpx.ReadJSON(r, &in); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid queued turn edit")
-		return
-	}
-	content := strings.TrimSpace(in.Content)
-	if content == "" || len([]byte(content)) > 64<<10 {
-		httpx.Error(w, http.StatusBadRequest, "invalid queued turn edit")
-		return
-	}
-	conversation, err := teacher.NewConversation(slug)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	if err := conversation.EditQueueItem(queueID, content, in.AttachmentRefs); err != nil {
-		writeQueueError(w, err)
-		return
-	}
-	s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"queueId": queueID})
-}
-
-func (s *Server) handleDiscardQueuedTurn(w http.ResponseWriter, r *http.Request) {
-	slug, queueID := r.PathValue("id"), r.PathValue("queueId")
-	conversation, err := teacher.NewConversation(slug)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	if err := conversation.DiscardQueueItem(queueID); err != nil {
-		writeQueueError(w, err)
-		return
-	}
-	s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"queueId": queueID, "discarded": true})
-}
-
-func (s *Server) handleSteerQueuedTurn(w http.ResponseWriter, r *http.Request) {
-	slug, queueID := r.PathValue("id"), r.PathValue("queueId")
-	conversation, err := teacher.NewConversation(slug)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	lock := s.teacherTurnLock(slug)
-	lock.Lock()
-	defer lock.Unlock()
-	if run := s.teacherResponses().Project(slug); run != nil {
-		run.Stop()
-		select {
-		case <-run.Done():
-		case <-time.After(30 * time.Second):
-			httpx.Error(w, http.StatusServiceUnavailable, "active teacher response did not stop in time")
-			return
-		}
-	}
-	promoted, err := conversation.PromoteQueueItem(queueID, "steer")
-	if err != nil {
-		writeQueueError(w, err)
-		return
-	}
-	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(teacher.StreamFrame)) error {
-		return s.teacher.StreamPromotedTurn(ctx, slug, promoted, true, emit)
-	})
-	if run == nil {
-		httpx.Error(w, http.StatusConflict, "steer conflict: a teacher response is already active")
-		return
-	}
-	s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
-	streamTeacherRun(w, r, run)
-}
-
-func (s *Server) handleRegenerateTeacherResponse(w http.ResponseWriter, r *http.Request) {
-	slug, responseID := r.PathValue("id"), r.PathValue("responseId")
-	var in struct {
-		ProviderID string `json:"providerId"`
-	}
-	_ = httpx.ReadJSON(r, &in)
-	conversation, err := teacher.NewConversation(slug)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	info, found, err := conversation.ResponseByID(responseID)
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	if !found {
-		httpx.Error(w, http.StatusNotFound, "teacher response not found")
-		return
-	}
-	if info.Active {
-		httpx.Error(w, http.StatusConflict, "response_active")
-		return
-	}
-	if info.Superseded {
-		httpx.Error(w, http.StatusConflict, "not_latest_response")
-		return
-	}
-	if latest, ok, _ := conversation.LatestResponseID(); !ok || latest != responseID {
-		httpx.Error(w, http.StatusConflict, "not_latest_response")
-		return
-	}
-	lock := s.teacherTurnLock(slug)
-	lock.Lock()
-	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(teacher.StreamFrame)) error {
-		return s.teacher.RegenerateResponse(ctx, slug, responseID, in.ProviderID, emit)
-	})
-	lock.Unlock()
-	if run == nil {
-		httpx.Error(w, http.StatusConflict, "response_active")
-		return
-	}
-	streamTeacherRun(w, r, run)
 }
 
 func (s *Server) handleExportConversation(w http.ResponseWriter, r *http.Request) {
@@ -391,7 +113,7 @@ func writeQueueError(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) handleActiveTeacherResponse(w http.ResponseWriter, r *http.Request) {
-	run := s.teacherResponses().Project(r.PathValue("id"))
+	run := s.teachingLifecycle().Responses.Project(r.PathValue("id"))
 	if run == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -433,69 +155,6 @@ func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *teacher.Activ
 		case <-notify:
 		}
 	}
-}
-
-func ensureTeacherGreeting(store *teacher.ConversationStore, slug string) error {
-	if store == nil {
-		return errors.New("teacher conversation is unavailable")
-	}
-	meta, err := store.Meta()
-	if err != nil {
-		return err
-	}
-	if meta.EventCount > 0 {
-		return nil
-	}
-	messages, err := store.AllMessages()
-	if err != nil || len(messages) > 0 {
-		return err
-	}
-	state, err := workspace.ReadProjectState(slug)
-	if err != nil {
-		return err
-	}
-	text := "你好，我是「" + state.Title + "」的教师。你可以直接告诉我：最想先弄懂什么、目前卡在哪里，或者希望我从哪里开始引导？"
-	_, _, err = store.AppendMessage("teacher", "completed", "teacher-welcome-v1", []teacher.Block{{Type: "markdown", Source: text}})
-	return err
-}
-
-func (s *Server) handleStopTeacherResponse(w http.ResponseWriter, r *http.Request) {
-	responseID := r.PathValue("responseId")
-	run := s.teacherResponses().Response(responseID)
-	if run == nil {
-		httpx.Error(w, http.StatusNotFound, "active teacher response not found")
-		return
-	}
-	run.Stop()
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"stopped": true, "responseId": responseID})
-}
-
-func (s *Server) handleListAssistantTasks(w http.ResponseWriter, r *http.Request) {
-	store, err := assistant.NewTaskStore(r.PathValue("id"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	tasks, err := store.List(r.URL.Query().Get("status"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
-}
-
-func (s *Server) handleGetAssistantTask(w http.ResponseWriter, r *http.Request) {
-	store, err := assistant.NewTaskStore(r.PathValue("id"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	task, err := store.Get(r.PathValue("taskId"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, task)
 }
 
 func (s *Server) handleListLearningAssets(w http.ResponseWriter, r *http.Request) {
@@ -841,6 +500,14 @@ func safeWorkspaceFile(base, relative string) (string, bool) {
 }
 
 func learningWorkspaceError(w http.ResponseWriter, err error) {
+	if errors.Is(err, workspace.ErrLegacyFormat) || errors.Is(err, workspace.ErrInvalidLayout) {
+		code, message := "project-layout-invalid", "项目数据不完整或相互矛盾，请手动处理磁盘原件。"
+		if errors.Is(err, workspace.ErrLegacyFormat) {
+			code, message = "legacy-format-unsupported", "已停止支持旧版专用格式；磁盘原件已保留，请手动处理。"
+		}
+		httpx.WriteJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": code, "message": message}})
+		return
+	}
 	status := http.StatusInternalServerError
 	message := "learning workspace operation failed"
 	if errors.Is(err, context.Canceled) {
@@ -855,11 +522,6 @@ func learningWorkspaceError(w http.ResponseWriter, err error) {
 	var conflict *assetstore.ConflictError
 	if errors.As(err, &conflict) {
 		httpx.WriteJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": "asset_edit_conflict", "message": "资产已被其他编辑更新", "currentEditRevision": conflict.CurrentRevision}})
-		return
-	}
-	var active *assistant.SameTypeActiveError
-	if errors.As(err, &active) {
-		httpx.WriteJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": "same_type_active", "message": "同类型助教任务正在进行", "existingTaskId": active.ExistingTaskID}})
 		return
 	}
 	if strings.Contains(strings.ToLower(err.Error()), "not exist") {

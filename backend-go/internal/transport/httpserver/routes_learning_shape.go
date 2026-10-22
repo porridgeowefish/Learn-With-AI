@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/activity"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,15 +14,11 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
-	"github.com/xmz14/lll/backend-go/internal/modules/generation"
-	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
-	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
-var completeLearningShapeAI = teacher.Complete
+var completeLearningShapeAI = ai.Complete
 
 type projectTypeAdviceMessage struct {
 	Role    string `json:"role"`
@@ -50,19 +49,19 @@ type disciplineLearningPlan struct {
 	UpdatedAt     string                   `json:"updatedAt"`
 }
 
-func configuredAskAIProvider() (teacher.Provider, error) {
-	cfg, err := teacher.LoadConfig()
+func configuredAskAIProvider() (ai.Provider, error) {
+	cfg, err := ai.LoadConfig()
 	if err != nil {
-		return teacher.Provider{}, err
+		return ai.Provider{}, err
 	}
 	if cfg == nil || !cfg.Enabled() {
-		return teacher.Provider{}, errors.New("ai_not_configured")
+		return ai.Provider{}, errors.New("ai_not_configured")
 	}
 	p := cfg.Find("")
 	if p == nil {
-		return teacher.Provider{}, errors.New("ai_not_configured")
+		return ai.Provider{}, errors.New("ai_not_configured")
 	}
-	return teacher.Provider{
+	return ai.Provider{
 		ID: p.ID, Kind: p.Kind, Name: p.Name, BaseURL: p.BaseURL, APIKey: p.APIKey,
 		Model: p.Model, Reasoning: p.Reasoning, Thinking: p.Thinking,
 	}, nil
@@ -130,7 +129,7 @@ JSON 字符串内部需要引用概念时使用全角引号「」，不要使用
 		"conversation": in.Messages,
 	}
 	input, _ := json.Marshal(payload)
-	out, err := completeLearningShapeAI(ctx, provider, system, []teacher.AIMessage{{Role: "user", Content: string(input)}})
+	out, err := completeLearningShapeAI(ctx, provider, system, []ai.AIMessage{{Role: "user", Content: string(input)}})
 	if err != nil {
 		httpx.Error(w, http.StatusBadGateway, "project type advice failed: "+err.Error())
 		return
@@ -245,51 +244,6 @@ func looseJSONTextField(text, key string, nextKeys ...string) string {
 	return strings.TrimSpace(rest[:end])
 }
 
-func (s *Server) handleGetDisciplineOverview(w http.ResponseWriter, r *http.Request) {
-	state, _, ok := requireDisciplineMap(w, r.PathValue("id"))
-	if !ok {
-		return
-	}
-	projection, err := generation.ReadMap(r.PathValue("id"), r.URL.Query().Get("versionId"))
-	if err != nil {
-		httpx.Error(w, http.StatusNotFound, "overview_not_found")
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"title": state.Title, "content": projection.OverviewMarkdown, "mapVersionId": projection.MapVersionID, "format": projection.Format})
-}
-
-func (s *Server) handleGetDisciplineTopics(w http.ResponseWriter, r *http.Request) {
-	_, _, ok := requireDisciplineMap(w, r.PathValue("id"))
-	if !ok {
-		return
-	}
-	projection, err := generation.ReadMap(r.PathValue("id"), r.URL.Query().Get("versionId"))
-	if os.IsNotExist(err) {
-		httpx.WriteJSON(w, http.StatusOK, learningscope.EmptyCatalog())
-		return
-	}
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "read_discipline_topics")
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"schemaVersion": projection.Topics.SchemaVersion, "topics": projection.Topics.Topics, "updatedAt": projection.Topics.UpdatedAt, "mapVersionId": projection.MapVersionID, "format": projection.Format})
-}
-
-func readDisciplineTopics(root string) (learningscope.Catalog, error) {
-	catalog, err := learningscope.ReadCatalog(filepath.Join(root, "discipline-topics.json"))
-	if err != nil {
-		return learningscope.Catalog{}, err
-	}
-	overview, err := os.ReadFile(filepath.Join(root, "overview.md"))
-	if err != nil {
-		return learningscope.Catalog{}, err
-	}
-	if err := learningscope.ValidateAgainstOverview(catalog, string(overview)); err != nil {
-		return learningscope.Catalog{}, err
-	}
-	return catalog, nil
-}
-
 func (s *Server) handleGetDisciplineLearningPlan(w http.ResponseWriter, r *http.Request) {
 	_, root, ok := requireDisciplineMap(w, r.PathValue("id"))
 	if !ok {
@@ -339,7 +293,7 @@ func (s *Server) handlePutDisciplineLearningPlan(w http.ResponseWriter, r *http.
 		httpx.Error(w, http.StatusInternalServerError, "encode_learning_plan")
 		return
 	}
-	if err := workspace.AtomicWriteFile(filepath.Join(root, "learning-plan.json"), raw, 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(root, "learning-plan.json"), raw, 0o644); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "write_learning_plan")
 		return
 	}
@@ -432,44 +386,6 @@ func validLearningTaskTime(value string, optional bool) bool {
 	}
 	_, err := time.Parse(time.RFC3339, value)
 	return err == nil
-}
-
-func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http.Request) {
-	state, _, ok := requireDisciplineMap(w, r.PathValue("id"))
-	if !ok {
-		return
-	}
-	runtime, _ := s.runtimeSnapshot()
-	if !runtime.Available {
-		httpx.Error(w, http.StatusServiceUnavailable, string(runtime.ID)+" binary not available")
-		return
-	}
-	encyclopedia, found := s.agents.Get("encyclopedia")
-	if !found || strings.TrimSpace(encyclopedia.CharterText) == "" {
-		httpx.Error(w, http.StatusInternalServerError, "encyclopedia_agent_not_configured")
-		return
-	}
-	pkg, err := assistant.BuildProjectAgent(assistant.ProjectAgentRequest{
-		ProjectSlug: state.Slug,
-		AgentID:     encyclopedia.ID,
-		OutputPaths: []string{"overview.md", "discipline-topics.json"},
-	}, s.agents)
-	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, "prompt assembly: "+err.Error())
-		return
-	}
-	sess := s.startAgentSession(
-		runtime,
-		state.Slug,
-		"学科总览",
-		encyclopedia,
-		pkg,
-		assistant.NormalizePermissionMode(""),
-	)
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"session": sess,
-		"runDir":  pkg.RunDirName,
-	})
 }
 
 func requireDisciplineMap(w http.ResponseWriter, slug string) (*workspace.ProjectState, string, bool) {

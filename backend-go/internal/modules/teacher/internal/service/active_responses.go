@@ -3,6 +3,7 @@ package teacherservice
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 // ActiveResponse owns a provider response independently from an HTTP connection.
@@ -59,6 +60,7 @@ func (r *ActiveResponse) Snapshot(after int) ([]StreamFrame, bool, <-chan struct
 func (r *ActiveResponse) Stop() { r.cancel() }
 
 type ActiveResponses struct {
+	closed    bool
 	mu        sync.RWMutex
 	byID      map[string]*ActiveResponse
 	byProject map[string]*ActiveResponse
@@ -71,7 +73,7 @@ func NewActiveResponses() *ActiveResponses {
 func (a *ActiveResponses) Start(projectSlug string) (context.Context, *ActiveResponse, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.byProject[projectSlug] != nil {
+	if a.closed || a.byProject[projectSlug] != nil {
 		return nil, nil, false
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -87,7 +89,6 @@ func (a *ActiveResponses) Bind(responseID string, response *ActiveResponse) {
 }
 
 func (a *ActiveResponses) Finish(projectSlug, responseID string, response *ActiveResponse) {
-	response.Finish()
 	a.mu.Lock()
 	if responseID != "" {
 		delete(a.byID, responseID)
@@ -96,6 +97,7 @@ func (a *ActiveResponses) Finish(projectSlug, responseID string, response *Activ
 		delete(a.byProject, projectSlug)
 	}
 	a.mu.Unlock()
+	response.Finish()
 }
 
 func (a *ActiveResponses) Project(projectSlug string) *ActiveResponse {
@@ -108,4 +110,24 @@ func (a *ActiveResponses) Response(responseID string) *ActiveResponse {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.byID[responseID]
+}
+
+func (a *ActiveResponses) StopAll() {
+	a.mu.Lock()
+	a.closed = true
+	var runs []*ActiveResponse
+	for _, r := range a.byProject {
+		runs = append(runs, r)
+		r.Stop()
+	}
+	a.mu.Unlock()
+	timer := time.NewTimer(30 * time.Second)
+	defer timer.Stop()
+	for _, r := range runs {
+		select {
+		case <-r.Done():
+		case <-timer.C:
+			return
+		}
+	}
 }

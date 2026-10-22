@@ -18,7 +18,7 @@ import (
 
 func main() {
 	repoRoot := flag.String("repo", ".", "repository root")
-	reportPath := flag.String("report", ".artifacts/quality/architecture/dependency-report.json", "machine-readable report output")
+	reportPath := flag.String("report", "trash/verification/architecture/dependency-report.json", "machine-readable report output")
 	allowFile := flag.String("allow", "", "optional file listing temporarily-allowed imports (one 'importer -> imported' per line, '#' comments)")
 	skipFrontend := flag.Bool("skip-frontend", false, "skip the frontend feature-boundary rule")
 	flag.Parse()

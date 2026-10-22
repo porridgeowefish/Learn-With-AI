@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { AskMessage } from '@/features/legacy-zones/api/confusions';
+import type { AskMessage } from '@/features/learning/api/annotations';
 
 export interface LiveAskMessage extends AskMessage {
   thinking?: string; // live-only; not persisted by the backend

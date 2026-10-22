@@ -4,6 +4,7 @@ Thumbs.db
 dist/
 coverage/
 .artifacts/
+/trash/
 .env
 .env.*
 !.env.example

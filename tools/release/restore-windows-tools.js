@@ -9,6 +9,7 @@ const { toolchainPaths } = require("./windows-msi");
 
 async function main() {
   if (process.platform !== "win32") throw new Error("Windows packaging tools require Windows");
+  require('./temporary-root').prepareTemporaryRoot();
   const tools = toolchainPaths();
   const environment = {
     ...process.env,

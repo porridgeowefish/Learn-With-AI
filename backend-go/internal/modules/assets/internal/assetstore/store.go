@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"sort"
@@ -84,13 +85,6 @@ func New(slug string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, key := range []string{"intro", "body"} {
-		if _, err := os.Stat(filepath.Join(root, "assets", key)); err == nil {
-			return nil, errors.New("review migration required before opening assets")
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-	}
 	v, _ := locks.LoadOrStore(root, &sync.Mutex{})
 	s := &Store{root: root, mu: v.(*sync.Mutex)}
 	if err := s.ensure(); err != nil {
@@ -122,7 +116,7 @@ func (s *Store) ensure() error {
 			continue
 		}
 		content := ""
-		if err := s.createInitialLocked(key, content, "migration"); err != nil {
+		if err := s.createInitialLocked(key, content, "system"); err != nil {
 			return err
 		}
 	}
@@ -260,7 +254,7 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 				meta.ConversationCursor = through
 			}
 			meta.UpdatedAt = version.CreatedAt
-			if err := workspace.AtomicWriteFile(filepath.Join(dir, "current.md"), []byte(content), 0o644); err != nil {
+			if err := filesystem.AtomicWriteFile(filepath.Join(dir, "current.md"), []byte(content), 0o644); err != nil {
 				return CandidateResult{}, err
 			}
 			if err := writeJSON(filepath.Join(dir, "asset.json"), meta); err != nil {
@@ -364,13 +358,13 @@ func writeAssetFiles(dir, content string, meta Meta, version Version) error {
 	if err := os.MkdirAll(versionDir, 0o755); err != nil {
 		return err
 	}
-	if err := workspace.AtomicWriteFile(filepath.Join(versionDir, "content.md"), []byte(content), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(versionDir, "content.md"), []byte(content), 0o644); err != nil {
 		return err
 	}
 	if err := writeJSON(filepath.Join(versionDir, "version.json"), version); err != nil {
 		return err
 	}
-	if err := workspace.AtomicWriteFile(filepath.Join(dir, "current.md"), []byte(content), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(dir, "current.md"), []byte(content), 0o644); err != nil {
 		return err
 	}
 	return writeJSON(filepath.Join(dir, "asset.json"), meta)
@@ -438,5 +432,5 @@ func writeJSON(path string, value any) error {
 	if err != nil {
 		return fmt.Errorf("encode json: %w", err)
 	}
-	return workspace.AtomicWriteFile(path, append(data, '\n'), 0o644)
+	return filesystem.AtomicWriteFile(path, append(data, '\n'), 0o644)
 }

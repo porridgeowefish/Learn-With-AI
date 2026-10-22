@@ -38,7 +38,6 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
       }
     };
     const unsubscribers = [
-      subscribeToSSE(SSE_EVENTS.assistantTaskUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.tasks(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.teacherNoteUpdated, forProject(() => {void queryClient.invalidateQueries({ queryKey: ['learning-workspace',project.slug,'notes'] });void queryClient.invalidateQueries({queryKey:['usage']});})),
       subscribeToSSE(SSE_EVENTS.learningAssetUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.assets(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.sourceUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(project.slug) }); })),

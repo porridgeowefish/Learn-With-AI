@@ -8,13 +8,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/xmz14/lll/backend-go/internal/modules/projects/internal/workspace"
-	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // Folder is one user-created grouping of project slugs (references only).
@@ -54,7 +54,7 @@ type Store struct {
 func New() (*Store, error) {
 	projectsDir := workspace.ProjectsRoot()
 	newPath := filepath.Join(projectsDir, "folders.json")
-	legacyPath := filepath.Join(paths.WORKSPACE, "folders.json")
+	legacyPath := filepath.Join(filesystem.WORKSPACE, "folders.json")
 	if _, err := os.Stat(newPath); err != nil {
 		if data, readErr := os.ReadFile(legacyPath); readErr == nil && len(data) > 0 {
 			if err := os.MkdirAll(projectsDir, 0o755); err != nil {
@@ -86,7 +86,7 @@ func (s *Store) load() error {
 		return nil
 	}
 	if err := json.Unmarshal(raw, &s.data); err != nil {
-		_, _ = workspace.BackupCorruptFile(s.filePath, err)
+		_, _ = filesystem.BackupCorruptFile(s.filePath, err)
 		s.data = Layout{}
 		return nil
 	}
@@ -101,7 +101,7 @@ func (s *Store) save() error {
 	if err := os.MkdirAll(filepath.Dir(s.filePath), 0o755); err != nil {
 		return err
 	}
-	return workspace.AtomicWriteFile(s.filePath, raw, 0o644)
+	return filesystem.AtomicWriteFile(s.filePath, raw, 0o644)
 }
 
 // Layout returns a copy of the current folder layout. Folders is always a

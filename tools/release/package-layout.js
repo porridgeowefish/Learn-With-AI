@@ -16,7 +16,7 @@ function packagePaths(goos, arch, root = repoRoot) {
     const absolute = path.join(root, relative);
     const info = fs.lstatSync(absolute);
     if (info.isSymbolicLink()) throw new Error(`Linked resource forbidden: ${relative}`);
-    if (/(^|\/)(workspace|projects|node_modules|\.git|\.artifacts)(\/|$)|(^|\/)(config\.local\.json|preferences\.md|\.env(?:\..*)?)$/.test(relative)) {
+    if (/(^|\/)(workspace|projects|node_modules|\.git|\.artifacts|trash)(\/|$)|(^|\/)(config\.local\.json|preferences\.md|\.env(?:\..*)?)$/.test(relative)) {
       throw new Error(`Private resource forbidden: ${relative}`);
     }
     if (info.isDirectory()) {
@@ -27,8 +27,8 @@ function packagePaths(goos, arch, root = repoRoot) {
       throw new Error(`Nonregular resource forbidden: ${relative}`);
     }
   }
-  for (const relative of ['frontend/dist', 'learning-agents', 'learning-prompts', 'config/config.example.json', 'LICENSE', 'docs/release/README.md', 'docs/release/THIRD_PARTY_NOTICES.txt']) walk(relative);
-  if (!names.includes('frontend/dist/index.html') || !names.includes('learning-prompts/review.md') || !names.includes('learning-prompts/manifest.json') || !names.some(name => name.startsWith('learning-agents/registry/') && name.endsWith('.json'))) {
+  for (const relative of ['frontend/dist', 'learning-prompts', 'config/config.example.json', 'LICENSE', 'docs/release/README.md', 'docs/release/THIRD_PARTY_NOTICES.txt']) walk(relative);
+  if (!names.includes('frontend/dist/index.html') || !names.includes('learning-prompts/review.md') || !names.includes('learning-prompts/manifest.json')) {
     throw new Error('Release resources are incomplete');
   }
   return names;

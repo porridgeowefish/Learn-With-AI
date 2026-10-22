@@ -35,12 +35,6 @@ export interface SourceCitation {
   quoteHash: string;
 }
 
-export interface TaskLink {
-  messageId: string;
-  taskId: string;
-  toolCallId?: string;
-}
-
 export interface ConversationProjection {
   conversationId: string;
   unitId: string;
@@ -51,7 +45,6 @@ export interface ConversationProjection {
   hasPrevious: boolean;
   totalMessages: number;
   messages: ConversationMessage[];
-  taskLinks: TaskLink[];
   queue?: QueuedTurn[];
   latestResponseId?: string;
 }
@@ -62,18 +55,6 @@ export interface QueuedTurn {
   attachmentRefs?: string[];
   mediaBlocks?: MessageBlock[];
   queuedAt: string;
-}
-
-export interface AssistantTask {
-  id: string;
-  type: 'consolidate';
-  objective: string;
-  status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed' | 'cancelled';
-  phase?: 'preparing' | 'executing' | 'validating' | 'committing';
-  result?: { summary: string; assetUpdates?: Record<string, string> };
-  failure?: { code: string; message: string; suggestion?: string };
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface AssetMeta {
@@ -92,7 +73,7 @@ export interface LearningAsset {
   contentKind: 'markdown';
 }
 
-export interface PracticeRound { versionId:string; content:string; createdAt:string; legacyAnswers?:Record<string,{answer:unknown;explanation?:string}> }
+export interface PracticeRound { versionId:string; content:string; createdAt:string }
 export function usePracticeRounds(slug:string,enabled=true){
  return useQuery({queryKey:['learning-workspace',slug,'assets','practice','rounds'],queryFn:async()=>(await http.get<{rounds:PracticeRound[]}>(`/api/projects/${encodeURIComponent(slug)}/assets/practice/rounds`)).rounds,enabled:enabled&&Boolean(slug)});
 }
@@ -158,8 +139,6 @@ export type TeacherStreamFrame =
   | { type: 'message-started'; data: { teacherMessageId: string } }
   | { type: 'message-reset'; data: { messageId: string; code: string } }
   | { type: 'text-delta' | 'reasoning-summary-delta'; data: { blockId: string; delta: string } }
-  | { type: 'task-accepted'; data: { toolCallId: string; taskId: string; status: string } }
-  | { type: 'tool-rejected'; data: { toolCallId: string; code: string; existingTaskId?: string } }
   | { type: 'search-started'; data: { query: string } }
   | { type: 'search-completed'; data: { query: string; count: number } }
   | { type: 'search-failed'; data: { query: string; code: string } }
@@ -169,7 +148,6 @@ export type TeacherStreamFrame =
 
 export const learningWorkspaceKeys = {
   conversation: (slug: string) => ['learning-workspace', slug, 'conversation'] as const,
-  tasks: (slug: string) => ['learning-workspace', slug, 'tasks'] as const,
   assets: (slug: string) => ['learning-workspace', slug, 'assets'] as const,
   asset: (slug: string, key: string) => ['learning-workspace', slug, 'assets', key] as const,
   annotations: (slug: string) => ['learning-workspace', slug, 'annotations'] as const,
@@ -193,10 +171,8 @@ export function useConversation(slug: string) {
     if (!pages?.length) return undefined;
     const newest = pages[0];
     const messages = new Map<string, ConversationMessage>();
-    const taskLinks = new Map<string, TaskLink>();
     for (const page of [...pages].reverse()) {
       for (const message of page.messages ?? []) messages.set(message.id, { ...message, blocks: message.blocks ?? [] });
-      for (const link of page.taskLinks ?? []) taskLinks.set(`${link.messageId}:${link.taskId}`, link);
     }
     return {
       ...newest,
@@ -204,7 +180,6 @@ export function useConversation(slug: string) {
       hasMore: Boolean(query.hasNextPage),
       hasPrevious: Boolean(query.hasNextPage),
       messages: [...messages.values()],
-      taskLinks: [...taskLinks.values()],
     } satisfies ConversationProjection;
   }, [query.data?.pages, query.hasNextPage]);
   return {
@@ -214,10 +189,6 @@ export function useConversation(slug: string) {
     loadPrevious: query.fetchNextPage,
     isLoadingPrevious: query.isFetchingNextPage,
   };
-}
-
-export function useAssistantTasks(slug: string) {
-  return useQuery({ queryKey: keys.tasks(slug), queryFn: async () => (await http.get<{ tasks: AssistantTask[] }>(`/api/projects/${encodeURIComponent(slug)}/assistant-tasks`)).tasks.filter(task => task.type === 'consolidate'), enabled: Boolean(slug), refetchInterval: (query) => query.state.data?.some((task) => task.status === 'queued' || task.status === 'running') ? 2500 : false });
 }
 
 export function useAssets(slug: string) {

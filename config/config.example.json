@@ -28,10 +28,6 @@
         "providerId": "primary",
         "model": ""
       },
-      "conversationCompaction": {
-        "providerId": "primary",
-        "model": ""
-      },
       "annotationAskAI": {
         "providerId": "primary",
         "model": ""
@@ -46,25 +42,6 @@
     "provider": "zhipu",
     "apiKeyEnv": "LLL_WEB_SEARCH_API_KEY",
     "engine": "search_std"
-  },
-  "assistant": {
-    "runtime": "claude",
-    "maxConcurrent": 5,
-    "maxConcurrentPerProject": 2,
-    "bins": {}
-  },
-  "image": {
-    "enabled": false,
-    "baseURL": "",
-    "apiKeyEnv": "LLL_IMAGE_API_KEY",
-    "model": "",
-    "promptModel": "",
-    "pythonBin": "python",
-    "backup": {
-      "baseURL": "",
-      "apiKeyEnv": "LLL_IMAGE_BACKUP_API_KEY",
-      "model": ""
-    }
   },
   "ui": {
     "theme": "lychee-paper"

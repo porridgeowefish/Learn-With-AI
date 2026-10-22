@@ -4,13 +4,9 @@ import (
 	"net/http"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+
 	"github.com/xmz14/lll/backend-go/internal/uiconfig"
 )
-
-type updateAgentRuntimeRequest struct {
-	Selected assistant.RuntimeID `json:"selected"`
-}
 
 func (s *Server) handleGetAppearance(w http.ResponseWriter, r *http.Request) {
 	cfg, err := uiconfig.Load()
@@ -36,56 +32,4 @@ func (s *Server) handlePutAppearance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, cfg)
-}
-
-func (s *Server) handleGetAgentRuntimeSettings(w http.ResponseWriter, r *http.Request) {
-	cfg, err := assistant.LoadRuntime()
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "unable to load CLI configuration")
-		return
-	}
-	options := assistant.ListRuntimes(cfg)
-	rt := assistant.ResolveRuntime(cfg)
-	s.mu.Lock()
-	s.Runtime, s.RuntimeOptions = rt, options
-	s.mu.Unlock()
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"selected":  rt.ID,
-		"runtime":   rt,
-		"providers": options,
-	})
-}
-
-func (s *Server) handlePutAgentRuntimeSettings(w http.ResponseWriter, r *http.Request) {
-	var req updateAgentRuntimeRequest
-	if err := httpx.ReadJSON(r, &req); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
-		return
-	}
-	if _, ok := assistant.RuntimeDefinitionByID(req.Selected); !ok {
-		httpx.Error(w, http.StatusBadRequest, "unknown agent runtime")
-		return
-	}
-	if err := assistant.SaveSelectedRuntime(req.Selected); err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "save agent runtime: "+err.Error())
-		return
-	}
-	cfg, err := assistant.LoadRuntime()
-	if err != nil {
-		httpx.Error(w, http.StatusInternalServerError, "reload agent runtime: "+err.Error())
-		return
-	}
-	selected := assistant.ResolveRuntime(cfg)
-	options := assistant.ListRuntimes(cfg)
-
-	s.mu.Lock()
-	s.Runtime = selected
-	s.RuntimeOptions = options
-	s.mu.Unlock()
-
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"selected":  selected.ID,
-		"runtime":   selected,
-		"providers": options,
-	})
 }

@@ -13,7 +13,6 @@ type Event struct {
 }
 
 // Broadcaster dispatches typed events to all subscribed SSE clients.
-// Implements assistant.LaunchEventEmitter.
 type Broadcaster struct {
 	mu      sync.RWMutex
 	clients map[chan Event]struct{}
@@ -46,7 +45,7 @@ func (b *Broadcaster) Emit(event string, payload any) {
 		select {
 		case ch <- Event{Type: event, Payload: payload}:
 		default:
-			// drop on full buffer; client will see session-completed later anyway
+			// Clients reconcile durable state after reconnecting.
 		}
 	}
 }

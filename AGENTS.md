@@ -67,6 +67,8 @@ Public CI runs `check:fast`; run `check:full` locally before release.
 
 冒烟测试完成、失败或中断后，必须按 [testing.md](docs/harness-skill/rules/testing.md) 清理并核验本轮临时产物；清理未完成不得声明测试收尾完成。
 
+所有过程垃圾统一直接写入项目根 `trash/<迭代ID>/`，详见 [临时产物规则](docs/harness-skill/rules/artifacts.md)。`/trash/` 永久 Git 忽略，不上传 GitHub。运行检验截图、测试/执行日志、一次性脚本和测试构建副本都归此处；正式项目知识、可复用测试与 README 产品截图按原归属保留。收尾默认归拢到 trash，不以删除成功为前置条件。
+
 ## 3. Team Principles
 
 ```text

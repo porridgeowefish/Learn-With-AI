@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
+	sources "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +15,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
-	"github.com/xmz14/lll/backend-go/internal/modules/sources"
+
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
@@ -107,6 +109,9 @@ func (s *Service) recoverLocked() error {
 		return e
 	}
 	for _, p := range list {
+		if p.LayoutStatus != "current" {
+			continue
+		}
 		root, e := projects.ProjectRootForSlug(p.Slug)
 		if e != nil {
 			return e
@@ -183,14 +188,14 @@ func committedResult(slug string, j Job) ([]string, error) {
 	}
 	return nil, nil
 }
-func frozenProvider(j Job) (teacher.ProviderConfig, error) {
-	cfg, e := teacher.LoadConfig()
+func frozenProvider(j Job) (ai.ProviderConfig, error) {
+	cfg, e := ai.LoadConfig()
 	if e != nil || cfg == nil {
-		return teacher.ProviderConfig{}, problem("provider-unavailable", 409)
+		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	p := cfg.FindExact(j.ProviderID)
 	if p == nil || p.APIKey == "" || p.BaseURL == "" || (p.Kind != "openai" && p.Kind != "anthropic") {
-		return teacher.ProviderConfig{}, problem("provider-unavailable", 409)
+		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	copy := *p
 	copy.Model = j.Model
@@ -209,7 +214,10 @@ func (s *Service) claim(ctx context.Context) (string, Job, bool) {
 	var oldest Job
 	selectedSlug, selectedRoot := "", ""
 	for _, p := range list {
-		if s.deleted[p.Slug] || (s.ProjectBlocked != nil && s.ProjectBlocked(p.Slug)) {
+		if p.LayoutStatus != "current" {
+			continue
+		}
+		if s.deleted[p.Slug] {
 			continue
 		}
 		root, e := projects.ProjectRootForSlug(p.Slug)
@@ -275,14 +283,14 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		s.fail(slug, j, "provider-unavailable")
 		return
 	}
-	outputBudget := teacher.GenerationOutputTokens(p)
+	outputBudget := ai.GenerationOutputTokens(p)
 	thinkingBudget := f.MaxThinkingTokens
 	if thinkingBudget == 0 {
-		thinkingBudget = teacher.GenerationThinkingTokens(p)
+		thinkingBudget = ai.GenerationThinkingTokens(p)
 	}
-	req := teacher.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: outputBudget, MaxThinkingTokens: thinkingBudget}
+	req := ai.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: outputBudget, MaxThinkingTokens: thinkingBudget}
 	if len(f.Sources) > 0 {
-		req.Tools = teacher.SourceTools()
+		req.Tools = sources.Tools()
 	}
 	var searcher teacher.WebSearcher
 	if f.WebSearchEnabled {
@@ -311,7 +319,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	completedTokensEstimated := false
 	lastProgress := time.Time{}
 	for round := 0; round < 8; round++ {
-		available, e := teacher.CheckGenerationRequest(req, p)
+		available, e := ai.CheckGenerationRequest(req, p)
 		if e != nil {
 			s.fail(slug, j, "input-budget-exhausted")
 			return
@@ -334,7 +342,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			return
 		}
 		var body, providerContent, providerReasoning strings.Builder
-		var pending []teacher.ToolCall
+		var pending []ai.ToolCall
 		var thinking []json.RawMessage
 		var tokens map[string]int
 		limited, rawProgress := false, false
@@ -352,7 +360,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 				}
 			}
 		}
-		err := s.gateway.Stream(ctx, req, func(ev teacher.GatewayEvent) {
+		err := s.gateway.Stream(ctx, req, func(ev ai.GatewayEvent) {
 			switch ev.Type {
 			case "output-limit":
 				limited = true
@@ -426,7 +434,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			s.fail(slug, j, "tool-budget-exhausted")
 			return
 		}
-		req.Messages = append(req.Messages, teacher.GatewayMessage{Role: "assistant", Content: text, ToolCalls: pending, ThinkingBlocks: thinking, ProviderContent: providerContent.String(), ReasoningContent: providerReasoning.String()})
+		req.Messages = append(req.Messages, ai.GatewayMessage{Role: "assistant", Content: text, ToolCalls: pending, ThinkingBlocks: thinking, ProviderContent: providerContent.String(), ReasoningContent: providerReasoning.String()})
 		for _, call := range pending {
 			if call.ToolName == "search_web" {
 				webCalls++
@@ -448,7 +456,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 					s.fail(slug, j, "search-budget-exhausted")
 					return
 				}
-				req.Messages = append(req.Messages, teacher.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
+				req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
 				continue
 			}
 			sourceCalls++
@@ -476,7 +484,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 					j.Coverage.ReadRanges = append(j.Coverage.ReadRanges, hit.Citation)
 				}
 			}
-			req.Messages = append(req.Messages, teacher.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
+			req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
 		}
 	}
 	if !s.phase(slug, &j, "validating") {
@@ -570,8 +578,8 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	_ = s.saveLocked(slug, root, &j)
 }
 
-func webSearchTool() teacher.Tool {
-	return teacher.Tool{Name: "search_web", Description: "受控检索公开信息，只有实际证据支持时才能声称最新进展已核验。", Schema: map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"query": map[string]any{"type": "string", "minLength": 1, "maxLength": 256}}, "required": []string{"query"}}}
+func webSearchTool() ai.Tool {
+	return ai.Tool{Name: "search_web", Description: "受控检索公开信息，只有实际证据支持时才能声称最新进展已核验。", Schema: map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"query": map[string]any{"type": "string", "minLength": 1, "maxLength": 256}}, "required": []string{"query"}}}
 }
 func (s *Service) fail(slug string, j Job, code string) {
 	s.mu.Lock()
@@ -595,7 +603,7 @@ func (s *Service) failLocked(slug, root string, j Job, code string) {
 	j.ErrorCode = code
 	_ = s.saveLocked(slug, root, &j)
 }
-func executeSource(ctx context.Context, r *sources.Reader, docs []sources.SourceDocument, call teacher.ToolCall, budget int) sources.SourceResult {
+func executeSource(ctx context.Context, r *sources.Reader, docs []sources.SourceDocument, call ai.ToolCall, budget int) sources.SourceResult {
 	decode := func(out any) error {
 		raw, e := json.Marshal(call.Arguments)
 		if e != nil {

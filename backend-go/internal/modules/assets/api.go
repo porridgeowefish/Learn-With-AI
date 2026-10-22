@@ -23,7 +23,6 @@ type (
 	Store           = assetstore.Store
 	CandidateInput  = assetstore.CandidateInput
 	CandidateResult = assetstore.CandidateResult
-	MigrationResult = assetstore.MigrationResult
 
 	PracticeResult   = assetstore.PracticeResult
 	PracticeItemMark = assetstore.PracticeItemMark
@@ -49,8 +48,6 @@ var (
 func New(slug string) (*Store, error) { return assetstore.New(slug) }
 
 func CoreKeys() []string { return assetstore.CoreKeys() }
-
-func MigrateReview(slug string) (MigrationResult, error) { return assetstore.MigrateReview(slug) }
 
 func NewAnnotations(slug string) (*AnnotationStore, error) {
 	return annotationstore.New(slug)

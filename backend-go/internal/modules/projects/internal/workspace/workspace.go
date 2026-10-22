@@ -4,33 +4,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	learningscope "github.com/xmz14/lll/backend-go/internal/modules/projects/internal/learningscope"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
-
-	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
-
-// ZoneName is the canonical name of one of the active learning zones.
-type ZoneName string
 
 // ProjectType distinguishes broad orientation maps from focused learning work.
 type ProjectType string
 
 const (
-	ZoneIntro    ZoneName = "Intro"
-	ZoneExplain  ZoneName = "Explain"
-	ZonePractice ZoneName = "Practice"
-
 	ProjectTypeDisciplineMap  ProjectType = "discipline-map"
 	ProjectTypeSystemLearning ProjectType = "system-learning"
 )
-
-// AllZones enumerates the active zones in canonical order.
-var AllZones = []ZoneName{ZoneIntro, ZoneExplain, ZonePractice}
 
 // validSlugPattern is the strict slug validator for URL/path parameters.
 // Allows lowercase ASCII letters/digits/hyphens AND CJK / other lowercase
@@ -38,42 +28,16 @@ var AllZones = []ZoneName{ZoneIntro, ZoneExplain, ZonePractice}
 // Rejects uppercase ASCII to keep URLs predictable.
 var validSlugPattern = regexp.MustCompile(`^[a-z0-9\p{Ll}\p{Lo}][a-z0-9\p{Ll}\p{Lo}\-]*$`)
 
-// zoneFilename is the file each zone writes to (slice-relevant subset).
-var zoneFilenames = map[ZoneName]string{
-	ZoneIntro:    "output.md",
-	ZoneExplain:  "output.md",
-	ZonePractice: "tasks.json",
-}
-
 // ProjectState is the persistent per-project state.
 type ProjectState struct {
-	ID             string        `json:"id"`
-	Title          string        `json:"title"`
-	Slug           string        `json:"slug"`
-	ProjectType    ProjectType   `json:"projectType"`
-	Status         string        `json:"status"`
-	ActiveZone     ZoneName      `json:"activeZone,omitempty"`
-	CreatedAt      time.Time     `json:"createdAt"`
-	UpdatedAt      time.Time     `json:"updatedAt"`
-	LastArtifacts  []ArtifactRef `json:"lastArtifacts,omitempty"`
-	GeneratedZones []ZoneName    `json:"-"`
-}
-
-// ArtifactRef links a session/turn to a curated zone file.
-type ArtifactRef struct {
-	ZoneName  ZoneName  `json:"zoneName"`
-	Filename  string    `json:"filename"`
-	SessionID string    `json:"sessionId,omitempty"`
-	RunDirRel string    `json:"runDirRel,omitempty"`
-	WrittenAt time.Time `json:"writtenAt"`
-}
-
-// PredecessorFile represents one input to a zone's prompt.
-type PredecessorFile struct {
-	ZoneName ZoneName `json:"zoneName"`
-	Path     string   `json:"path"`    // absolute path
-	RelPath  string   `json:"relPath"` // relative to project root
-	Exists   bool     `json:"exists"`
+	LayoutVersion int         `json:"layoutVersion,omitempty"`
+	ID            string      `json:"id"`
+	Title         string      `json:"title"`
+	Slug          string      `json:"slug"`
+	ProjectType   ProjectType `json:"projectType"`
+	Status        string      `json:"status"`
+	CreatedAt     time.Time   `json:"createdAt"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
 }
 
 // ProjectMeta is the lightweight summary used in the tree listing.
@@ -83,6 +47,7 @@ type ProjectMeta struct {
 	Title             string      `json:"title"`
 	ProjectType       ProjectType `json:"projectType"`
 	OverviewAvailable bool        `json:"overviewAvailable"`
+	LayoutStatus      string      `json:"layoutStatus,omitempty"`
 }
 
 // NormalizeProjectType preserves legacy projects and clients by treating an
@@ -106,16 +71,6 @@ func ValidateSlug(s string) bool {
 		return false
 	}
 	return validSlugPattern.MatchString(s)
-}
-
-// ValidateZoneName returns true if z is one of the five zones.
-func ValidateZoneName(z string) bool {
-	for _, valid := range AllZones {
-		if string(valid) == z {
-			return true
-		}
-	}
-	return false
 }
 
 // projectRoot returns the absolute path to a project's folder.
@@ -148,7 +103,7 @@ func activeProjectsRoot() string {
 	if projectsRootOverride != "" {
 		return projectsRootOverride
 	}
-	return paths.PROJECTS_ROOT
+	return filesystem.PROJECTS_ROOT
 }
 
 // ProjectExists reports whether a project state file is on disk.
@@ -219,9 +174,9 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	}
 
 	// Folder tree. Discipline maps deliberately do not own learning zones.
-	dirs := []string{"", "runs", "runs/_index", "assets"}
+	dirs := []string{"", "assets"}
 	if projectType == ProjectTypeSystemLearning {
-		dirs = append(dirs, "intro", "explain", "practice", "progress")
+		dirs = append(dirs, "conversation", "progress")
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
@@ -233,16 +188,14 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	parsed, _ := time.Parse(time.RFC3339, now)
 
 	state := &ProjectState{
-		ID:          slug,
-		Title:       title,
-		Slug:        slug,
-		ProjectType: projectType,
-		Status:      "active",
-		CreatedAt:   parsed,
-		UpdatedAt:   parsed,
-	}
-	if projectType == ProjectTypeSystemLearning {
-		state.ActiveZone = ZoneIntro
+		LayoutVersion: 1,
+		ID:            slug,
+		Title:         title,
+		Slug:          slug,
+		ProjectType:   projectType,
+		Status:        "active",
+		CreatedAt:     parsed,
+		UpdatedAt:     parsed,
 	}
 
 	// state.json (atomic)
@@ -252,15 +205,15 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 
 	// project.md
 	projectMd := fmt.Sprintf("# %s\n\n%s", title, defaultProjectMdBodyForInput(in))
-	if err := AtomicWriteFile(filepath.Join(root, "project.md"), []byte(projectMd), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(root, "project.md"), []byte(projectMd), 0o644); err != nil {
 		return err
 	}
 
 	if projectType == ProjectTypeSystemLearning {
-		if err := AtomicWriteFile(filepath.Join(root, "conversation", "system-prompt.txt"), []byte(in.SystemPrompt), 0o644); err != nil {
+		if err := filesystem.AtomicWriteFile(filepath.Join(root, "conversation", "system-prompt.txt"), []byte(in.SystemPrompt), 0o644); err != nil {
 			return err
 		}
-		var scope any = newDraftLearningScope(title, parsed)
+		var scope any = learningscope.NewDraft(title, parsed)
 		if in.LearningScope != nil {
 			scope = in.LearningScope
 		}
@@ -268,20 +221,12 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 		if err != nil {
 			return fmt.Errorf("encode learning scope: %w", err)
 		}
-		if err := AtomicWriteFile(filepath.Join(root, "learning-scope.json"), scopeBytes, 0o644); err != nil {
+		if err := filesystem.AtomicWriteFile(filepath.Join(root, "learning-scope.json"), scopeBytes, 0o644); err != nil {
 			return err
 		}
 	} else {
-		overview := fmt.Sprintf("# %s：学科总览\n\n当前总览尚未生成。点击“生成学科总览”，了解学科边界、主要领域、研究方法和典型应用。\n", title)
-		if err := AtomicWriteFile(filepath.Join(root, "overview.md"), []byte(overview), 0o644); err != nil {
-			return err
-		}
 		plan := []byte("{\n  \"schemaVersion\": 1,\n  \"items\": [],\n  \"updatedAt\": \"\"\n}\n")
-		if err := AtomicWriteFile(filepath.Join(root, "learning-plan.json"), plan, 0o644); err != nil {
-			return err
-		}
-		topics := []byte("{\n  \"schemaVersion\": 1,\n  \"topics\": [],\n  \"updatedAt\": \"\"\n}\n")
-		if err := AtomicWriteFile(filepath.Join(root, "discipline-topics.json"), topics, 0o644); err != nil {
+		if err := filesystem.AtomicWriteFile(filepath.Join(root, "learning-plan.json"), plan, 0o644); err != nil {
 			return err
 		}
 	}
@@ -301,70 +246,18 @@ func ReadProjectState(slug string) (*ProjectState, error) {
 	}
 	var s ProjectState
 	if err := json.Unmarshal(data, &s); err != nil {
-		return nil, fmt.Errorf("decode state.json: %w", err)
+		return nil, fmt.Errorf("%w: decode state.json", ErrInvalidLayout)
 	}
 	s.ProjectType = NormalizeProjectType(s.ProjectType)
-	if s.ProjectType == ProjectTypeDisciplineMap {
-		s.ActiveZone = ""
+	if err := checkLayout(root, &s); err != nil {
+		return nil, err
 	}
-	s.GeneratedZones = detectGeneratedZones(root)
 	return &s, nil
-}
-
-func detectGeneratedZones(root string) []ZoneName {
-	var generated []ZoneName
-	if nonEmptyFile(filepath.Join(root, "intro", "output.md")) ||
-		validJSONObject(filepath.Join(root, "intro", "assessment.json")) {
-		generated = append(generated, ZoneIntro)
-	}
-	if validExplainManifest(filepath.Join(root, "explain", "manifest.json")) ||
-		nonEmptyFile(filepath.Join(root, "explain", "output.md")) {
-		generated = append(generated, ZoneExplain)
-	}
-	if validTaskSet(filepath.Join(root, "practice", "tasks.json")) {
-		generated = append(generated, ZonePractice)
-	}
-	return generated
 }
 
 func nonEmptyFile(path string) bool {
 	data, err := os.ReadFile(path)
 	return err == nil && len(strings.TrimSpace(string(data))) > 0
-}
-
-func validJSONObject(path string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil || len(strings.TrimSpace(string(data))) == 0 {
-		return false
-	}
-	var value map[string]any
-	return json.Unmarshal(data, &value) == nil
-}
-
-func validExplainManifest(path string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	var manifest struct {
-		Pages []json.RawMessage `json:"pages"`
-	}
-	return json.Unmarshal(data, &manifest) == nil && len(manifest.Pages) > 0
-}
-
-func validTaskSet(path string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	var taskSet struct {
-		Tasks []json.RawMessage `json:"tasks"`
-	}
-	if json.Unmarshal(data, &taskSet) == nil && len(taskSet.Tasks) > 0 {
-		return true
-	}
-	var legacy []json.RawMessage
-	return json.Unmarshal(data, &legacy) == nil && len(legacy) > 0
 }
 
 // WriteProjectState persists state.json atomically in the flat project root.
@@ -378,7 +271,7 @@ func WriteProjectState(slug string, state *ProjectState, parentSlug string) erro
 	if err != nil {
 		return err
 	}
-	return AtomicWriteFile(filepath.Join(root, "state.json"), data, 0o644)
+	return filesystem.AtomicWriteFile(filepath.Join(root, "state.json"), data, 0o644)
 }
 
 // IndexAll returns top-level peer projects.
@@ -428,135 +321,11 @@ func walkProjects(dir string, out *[]ProjectMeta) error {
 			Slug:              s.Slug,
 			Title:             s.Title,
 			ProjectType:       s.ProjectType,
-			OverviewAvailable: s.ProjectType == ProjectTypeDisciplineMap && nonEmptyFile(filepath.Join(childDir, "overview.md")),
+			OverviewAvailable: s.ProjectType == ProjectTypeDisciplineMap && nonEmptyFile(filepath.Join(childDir, "map", "current.json")),
+			LayoutStatus:      layoutStatus(childDir, &s),
 		})
 	}
 	return nil
-}
-
-// ResolvePredecessorFiles returns the input file paths for a given zone
-// according to the dependency graph:
-//
-//	Intro -> Explain
-//	Explain -> Practice
-func ResolvePredecessorFiles(slug string, zone ZoneName) ([]PredecessorFile, error) {
-	root, err := projectRoot(slug)
-	if err != nil {
-		return nil, err
-	}
-	var preds []ZoneName
-	switch zone {
-	case ZoneIntro:
-		preds = nil
-	case ZoneExplain:
-		preds = []ZoneName{ZoneIntro}
-	case ZonePractice:
-		preds = []ZoneName{ZoneExplain}
-	default:
-		return nil, fmt.Errorf("unknown zone: %s", zone)
-	}
-	var out []PredecessorFile
-	for _, p := range preds {
-		filename := zoneFilenames[p]
-		absPath := filepath.Join(root, strings.ToLower(string(p)), filename)
-		relPath := filepath.ToSlash(filepath.Join(strings.ToLower(string(p)), filename))
-		_, err := os.Stat(absPath)
-		exists := err == nil
-		// Skip predecessors whose file doesn't exist (pending).
-		if !exists && p != ZoneIntro {
-			// Still include the path so prompt-assembly can list pending predecessors,
-			// but only Intro is mandatory-empty.
-		}
-		out = append(out, PredecessorFile{
-			ZoneName: p,
-			Path:     absPath,
-			RelPath:  relPath,
-			Exists:   exists,
-		})
-	}
-	return out, nil
-}
-
-// SafeWriteArtifact writes content into an active zone folder atomically.
-func SafeWriteArtifact(slug string, zone ZoneName, filename string, content []byte) error {
-	if !ValidateZoneName(string(zone)) {
-		return fmt.Errorf("invalid zone: %s", zone)
-	}
-	if !validFilename(filename) {
-		return fmt.Errorf("invalid filename: %q", filename)
-	}
-	root, err := projectRoot(slug)
-	if err != nil {
-		return err
-	}
-	target := filepath.Join(root, strings.ToLower(string(zone)), filename)
-	return AtomicWriteFile(target, content, 0o644)
-}
-
-// ReadArtifact reads a zone file. Returns os.ErrNotExist-equivalent if missing.
-func ReadArtifact(slug string, zone ZoneName, filename string) ([]byte, error) {
-	if !ValidateZoneName(string(zone)) {
-		return nil, fmt.Errorf("invalid zone: %s", zone)
-	}
-	if !validFilename(filename) {
-		return nil, fmt.Errorf("invalid filename: %q", filename)
-	}
-	root, err := projectRoot(slug)
-	if err != nil {
-		return nil, err
-	}
-	return os.ReadFile(filepath.Join(root, strings.ToLower(string(zone)), filename))
-}
-
-// WriteRunFile writes a file under a project's runs/ directory.
-// runDirRel is the run subfolder like "runs/2026-06-08T15-explain".
-func WriteRunFile(slug, runDirRel, filename string, content []byte) error {
-	if !validFilename(filename) {
-		return fmt.Errorf("invalid filename: %q", filename)
-	}
-	root, err := projectRoot(slug)
-	if err != nil {
-		return err
-	}
-	target := filepath.Join(root, runDirRel, filename)
-	if _, err := filepath.Rel(filepath.Join(root, "runs"), target); err != nil {
-		return fmt.Errorf("run path escapes runs/: %w", err)
-	}
-	return AtomicWriteFile(target, content, 0o644)
-}
-
-// validFilename enforces a conservative filename pattern to avoid traversal.
-// Allows letters, digits, dash, underscore, dot. Must not start with a dot.
-func validFilename(name string) bool {
-	if name == "" || len(name) > 128 {
-		return false
-	}
-	if strings.ContainsAny(name, `/\`) {
-		return false
-	}
-	if name == "." || name == ".." || strings.HasPrefix(name, ".") {
-		return false
-	}
-	for _, r := range name {
-		switch {
-		case r >= 'a' && r <= 'z':
-		case r >= 'A' && r <= 'Z':
-		case r >= '0' && r <= '9':
-		case r == '-' || r == '_' || r == '.':
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-func appendUnique(slice []string, s string) []string {
-	for _, x := range slice {
-		if x == s {
-			return slice
-		}
-	}
-	return append(slice, s)
 }
 
 // SlugConflictError indicates a project with the same slug already exists.
@@ -587,33 +356,7 @@ type ProjectInput struct {
 	Current       string // current ability self-assessment
 	Target        string // target ability self-assessment
 	Standard      string // completion criteria the learner commits to
-	LearningScope any
-}
-
-func newDraftLearningScope(title string, now time.Time) any {
-	return struct {
-		SchemaVersion  int      `json:"schemaVersion"`
-		Status         string   `json:"status"`
-		Title          string   `json:"title"`
-		Goal           string   `json:"goal"`
-		InScope        []string `json:"inScope"`
-		OutOfScope     []string `json:"outOfScope"`
-		Prerequisites  []string `json:"prerequisites"`
-		OwnedConcepts  []string `json:"ownedConcepts"`
-		ReusedConcepts []string `json:"reusedConcepts"`
-		Source         struct {
-			Type string `json:"type"`
-		} `json:"source"`
-		UpdatedAt string `json:"updatedAt"`
-	}{
-		SchemaVersion: 1, Status: "draft", Title: strings.TrimSpace(title),
-		InScope: []string{}, OutOfScope: []string{}, Prerequisites: []string{},
-		OwnedConcepts: []string{}, ReusedConcepts: []string{},
-		Source: struct {
-			Type string `json:"type"`
-		}{Type: "standalone"},
-		UpdatedAt: now.UTC().Format(time.RFC3339),
-	}
+	LearningScope *learningscope.Scope
 }
 
 func defaultProjectMdBodyForInput(in ProjectInput) string {
@@ -670,10 +413,6 @@ _由学习者维护；智能体未经确认不得覆盖本文件。_`
 
 %s
 
-## Active Phase
-
-Intro
-
 ## Notes
 
 _Learner-owned. Agents will not overwrite this file without confirmation._`, why, current, target, standard)
@@ -711,7 +450,7 @@ func ProjectRootForSlug(slug string) (string, error) {
 
 // projectsRootOverride is set by tests to redirect PROJECTS_ROOT to a temp
 // directory. Production code never sets it (activeProjectsRoot falls back
-// to paths.PROJECTS_ROOT when empty).
+// to filesystem.PROJECTS_ROOT when empty).
 var projectsRootOverride string
 
 // ProjectsRootForTest returns the current override (test helper).

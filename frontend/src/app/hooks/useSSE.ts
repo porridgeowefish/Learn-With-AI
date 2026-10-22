@@ -44,26 +44,12 @@ function ensureConnection() {
   });
 
   // Always-on listeners: connection state updates.
-  // NOTE: We deliberately do NOT subscribe to `terminal-output` here.
-  // The authentic Claude output lives in the desktop PowerShell window
-  // (claudelauncher/console_windows.go). Mirroring it into the UI would
-  // recreate a fake terminal competing for the user's attention —
-  // exactly the double-track redundancy the user explicitly rejected.
   es.addEventListener(SSE_EVENTS.hello, () => {
     useConnectionStore.getState().markEvent();
   });
 
   // Fan out other event types to subscribers.
   const fanoutNames: SSEEventName[] = [
-    SSE_EVENTS.sessionCreated,
-    SSE_EVENTS.sessionState,
-    SSE_EVENTS.turnCreated,
-    SSE_EVENTS.artifactUpdated,
-    SSE_EVENTS.confusionUpdated,
-    SSE_EVENTS.runProgress,
-    SSE_EVENTS.sessionCompleted,
-    SSE_EVENTS.sessionFailed,
-    SSE_EVENTS.assistantTaskUpdated,
     SSE_EVENTS.learningAssetUpdated,
     SSE_EVENTS.teacherNoteUpdated,
     SSE_EVENTS.learningActivityUpdated,

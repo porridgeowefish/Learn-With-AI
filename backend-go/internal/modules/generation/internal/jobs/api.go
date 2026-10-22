@@ -10,6 +10,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
+	sources "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,9 +25,8 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
-	"github.com/xmz14/lll/backend-go/internal/modules/sources"
+
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 type Input struct {
@@ -88,7 +90,7 @@ type frozenInput struct {
 	System            string                   `json:"system"`
 	PromptHash        string                   `json:"promptHash"`
 	PromptVersion     string                   `json:"promptVersion"`
-	Messages          []teacher.GatewayMessage `json:"messages"`
+	Messages          []ai.GatewayMessage      `json:"messages"`
 	Sources           []sources.SourceDocument `json:"sources"`
 	BaseAsset         assets.Asset             `json:"baseAsset"`
 	BaseMapVersionID  string                   `json:"baseMapVersionId"`
@@ -123,20 +125,19 @@ func ErrorStatus(err error) int {
 }
 
 type Service struct {
-	mu             sync.Mutex
-	gateway        teacher.Gateway
-	active         map[string]context.CancelFunc
-	deleted        map[string]bool
-	notify         chan struct{}
-	stop           context.CancelFunc
-	workers        sync.WaitGroup
-	OnUpdated      func(string, Job)
-	ProjectBlocked func(string) bool
+	mu        sync.Mutex
+	gateway   ai.Gateway
+	active    map[string]context.CancelFunc
+	deleted   map[string]bool
+	notify    chan struct{}
+	stop      context.CancelFunc
+	workers   sync.WaitGroup
+	OnUpdated func(string, Job)
 }
 
-func New(gateway teacher.Gateway) *Service {
+func New(gateway ai.Gateway) *Service {
 	if gateway == nil {
-		gateway = teacher.Configured{}
+		gateway = ai.Configured{}
 	}
 	return &Service{gateway: gateway, active: map[string]context.CancelFunc{}, deleted: map[string]bool{}, notify: make(chan struct{}, 1)}
 }
@@ -215,7 +216,7 @@ func writeJSON(path string, v any) error {
 	if e = os.MkdirAll(filepath.Dir(path), 0755); e != nil {
 		return e
 	}
-	return projects.AtomicWriteFile(path, b, 0600)
+	return filesystem.AtomicWriteFile(path, b, 0600)
 }
 func readJSON(path string, v any) error {
 	b, e := os.ReadFile(path)
@@ -251,10 +252,10 @@ func loadJobs(root string) ([]Job, error) {
 	})
 	return out, nil
 }
-func resolveProvider(in Input) (teacher.ProviderConfig, error) {
-	cfg, e := teacher.LoadConfig()
+func resolveProvider(in Input) (ai.ProviderConfig, error) {
+	cfg, e := ai.LoadConfig()
 	if e != nil || cfg == nil {
-		return teacher.ProviderConfig{}, problem("provider-unavailable", 409)
+		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	name := in.Kind
 	if name == "discipline-map" {
@@ -264,7 +265,7 @@ func resolveProvider(in Input) (teacher.ProviderConfig, error) {
 	if !configured {
 		binding, configured = cfg.Bindings["teacher"]
 		if !configured {
-			binding = teacher.Binding{ProviderID: cfg.Default}
+			binding = ai.Binding{ProviderID: cfg.Default}
 		}
 	}
 	id := binding.ProviderID
@@ -273,7 +274,7 @@ func resolveProvider(in Input) (teacher.ProviderConfig, error) {
 	}
 	p := cfg.FindExact(id)
 	if p == nil || p.APIKey == "" || p.BaseURL == "" || (p.Kind != "openai" && p.Kind != "anthropic") {
-		return teacher.ProviderConfig{}, problem("provider-unavailable", 409)
+		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	chosen := *p
 	if in.Model != "" {
@@ -303,7 +304,7 @@ func prompt(kind string) (string, string, error) {
 			SHA256 string `json:"sha256"`
 		} `json:"resources"`
 	}
-	if e := readJSON(filepath.Join(paths.PROJECT_ROOT, "learning-prompts", "manifest.json"), &manifest); e != nil {
+	if e := readJSON(filepath.Join(filesystem.PROJECT_ROOT, "learning-prompts", "manifest.json"), &manifest); e != nil {
 		return "", "", problem("prompt-resource-unavailable", 503)
 	}
 	hashes := map[string]string{}
@@ -312,7 +313,7 @@ func prompt(kind string) (string, string, error) {
 	}
 	var b strings.Builder
 	for _, n := range names {
-		data, e := os.ReadFile(filepath.Join(paths.PROJECT_ROOT, "learning-prompts", n+".md"))
+		data, e := os.ReadFile(filepath.Join(filesystem.PROJECT_ROOT, "learning-prompts", n+".md"))
 		if e != nil || hashes["learning-prompts/"+n+".md"] != hash(string(data)) {
 			return "", "", problem("prompt-resource-unavailable", 503)
 		}
@@ -354,9 +355,6 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	}
 	if s.deleted[slug] {
 		return Job{}, problem("project-deleting", 410)
-	}
-	if s.ProjectBlocked != nil && s.ProjectBlocked(slug) {
-		return Job{}, problem("migration-blocked", 409)
 	}
 	state, e := projects.ReadProjectState(slug)
 	if e != nil {
@@ -567,18 +565,18 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	if e != nil {
 		return Job{}, e
 	}
-	f.Messages = []teacher.GatewayMessage{{Role: "user", Content: string(raw)}}
-	f.MaxOutputTokens = teacher.GenerationOutputTokens(p)
-	f.MaxThinkingTokens = teacher.GenerationThinkingTokens(p)
-	req := teacher.GatewayRequest{System: system, Messages: f.Messages, ProviderID: p.ID, Model: p.Model, MaxOutputTokens: f.MaxOutputTokens, MaxThinkingTokens: f.MaxThinkingTokens}
+	f.Messages = []ai.GatewayMessage{{Role: "user", Content: string(raw)}}
+	f.MaxOutputTokens = ai.GenerationOutputTokens(p)
+	f.MaxThinkingTokens = ai.GenerationThinkingTokens(p)
+	req := ai.GatewayRequest{System: system, Messages: f.Messages, ProviderID: p.ID, Model: p.Model, MaxOutputTokens: f.MaxOutputTokens, MaxThinkingTokens: f.MaxThinkingTokens}
 	if len(f.Sources) > 0 {
-		req.Tools = teacher.SourceTools()
+		req.Tools = sources.Tools()
 	}
 	f.WebSearchEnabled = teacher.ConfiguredWebSearch() != nil
 	if f.WebSearchEnabled {
 		req.Tools = append(req.Tools, webSearchTool())
 	}
-	if _, e = teacher.CheckGenerationRequest(req, p); e != nil && in.Kind != "discipline-map" {
+	if _, e = ai.CheckGenerationRequest(req, p); e != nil && in.Kind != "discipline-map" {
 		// Seal the largest complete prefix that fits. The rest remains after
 		// the committed cursor for the next explicit summary; no message is sliced.
 		messages, _ := payload["conversation"].([]map[string]any)
@@ -594,7 +592,7 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 			}
 			f.Messages[0].Content = string(raw)
 			req.Messages = f.Messages
-			_, e = teacher.CheckGenerationRequest(req, p)
+			_, e = ai.CheckGenerationRequest(req, p)
 		}
 	}
 	if e != nil {

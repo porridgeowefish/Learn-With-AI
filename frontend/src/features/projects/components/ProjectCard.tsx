@@ -45,6 +45,7 @@ export function ProjectCard({ project, variant = 'tile', className, onClick }: P
       </div>
       <div className={s.meta}>
         <code className={s.slug}>{project.slug}</code>
+ {project.layoutStatus && project.layoutStatus !== "current" && <Tag tone="muted">{project.layoutStatus === "legacy-format-unsupported" ? "旧版格式 · 需手动处理" : "数据需检查"}</Tag>}
         <Tag tone={project.projectType === 'discipline-map' ? 'orange' : 'muted'}>
           {project.projectType === 'discipline-map' ? '学科地图' : '系统学习'}
         </Tag>

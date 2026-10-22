@@ -9,6 +9,7 @@ const crypto=require('node:crypto');
 const {spawn}=require('node:child_process');
 
 async function main(binary){
+ require('./temporary-root').prepareTemporaryRoot();
  const fetch=(url,options={})=>globalThis.fetch(url,{...options,signal:AbortSignal.timeout(30000)});
  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'learn-source-smoke-'));
  const workspace=path.join(scratch,'workspace');fs.mkdirSync(workspace);
@@ -182,8 +183,7 @@ async function main(binary){
   const savedDraft=await fetch(base+mapEndpoint+'/'+badMap.id+'/candidate');assert.equal(savedDraft.status,200);
   assert.equal((await savedDraft.json()).content,'{invalid JSON map draft}');assert.equal(received.length,requestCount,'draft read called model');
   assert.equal((await (await fetch(base+'/api/projects/map-smoke/discipline-map')).json()).mapVersionId,plainDone.resultRefs[0],'invalid response replaced good map');
-  const taskResponse=await fetch(base+'/api/projects/parser-smoke/assistant-tasks');assert.equal(taskResponse.status,200);
-  const tasks=(await taskResponse.json()).tasks;assert(tasks===null||Array.isArray(tasks),'invalid task response');assert.equal((tasks??[]).length,0,'upload created assistant task');
+  const taskResponse=await fetch(base+'/api/projects/parser-smoke/assistant-tasks');assert.equal(taskResponse.status,404);
   const stopped=await fetch(base+'/api/system/shutdown',{method:'POST'});assert.equal(stopped.status,202);
   for(let i=0;i<50&&!exited;i++)await pause();assert(exited,'shutdown failed');
   console.log('Installed runtime: PDF/MD/PPTX/DOCX/XLSX/CSV, textless/malformed errors, exact 100MiB/oversize rejection, packaged review/practice/map prompts, embedded WASM PNG enhancement, no assistant passed');

@@ -15,7 +15,7 @@
 .headerActions a:hover { color: var(--fg); background: var(--surface-sunken); text-decoration: none; }
 .content { flex: 1; min-height: 0; overflow: hidden; }
 @media (max-width: 900px) {
-  .header { height: auto; min-height: var(--workspace-header-h); flex-basis: auto; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; padding: 10px 16px 0; }
+  .header { height: auto; min-height: var(--workspace-header-h); flex-basis: auto; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 32px 34px; gap: 8px 16px; padding: 10px 16px 0; }
   .identity { grid-column: 1; grid-row: 1; }
   .headerActions { grid-column: 2; grid-row: 1; }
   .identity span { flex-shrink: 0; display: none; }

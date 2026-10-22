@@ -16,6 +16,7 @@ const literal = value=>`'${value.replaceAll("'","''")}'`;
 
 async function main() {
   if(process.platform!=='win32') throw new Error('Windows installer smoke requires Windows');
+  require('./temporary-root').prepareTemporaryRoot();
   const installer=path.resolve(process.argv[2]);
   const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'learn-installer-smoke-'));
   const root=path.join(scratch,'Programs','中文安装目录');

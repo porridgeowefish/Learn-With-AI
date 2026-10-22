@@ -43,30 +43,7 @@ func SaveUI(theme string) error {
 	return writeRaw(activePath(""), raw)
 }
 
-// SaveAssistantRuntime writes assistant.runtime (sectioned when the
-// assistant section exists, otherwise the legacy flat agentRuntime key so
-// older builds stay readable during the compatibility period).
-func SaveAssistantRuntime(runtime string) error {
-	saveMu.Lock()
-	defer saveMu.Unlock()
-	raw, err := readRaw(activePath(""))
-	if err != nil {
-		return err
-	}
-	if _, ok := raw["assistant"]; ok {
-		section := map[string]any{}
-		if existing, ok := raw["assistant"].(map[string]any); ok {
-			section = existing
-		}
-		section["runtime"] = runtime
-		raw["assistant"] = section
-	} else {
-		raw["agentRuntime"] = runtime
-	}
-	return writeRaw(activePath(""), raw)
-}
-
-// AISettings mirrors teacher.Config for the settings flows.
+// AISettings mirrors ai.Config for the settings flows.
 type AISettings struct {
 	Default      string             `json:"default"`
 	SearchEngine string             `json:"searchEngine"`
@@ -206,7 +183,7 @@ func writeRaw(path string, raw map[string]any) error {
 }
 
 // atomicWrite is the sibling-temp+rename primitive (Windows-safe: same
-// volume). Mirrors workspace.AtomicWriteFile until platform/filesystem
+// volume). Mirrors filesystem.AtomicWriteFile until platform/filesystem
 // lands in a later wave; then this delegates.
 func atomicWrite(path string, content []byte) error {
 	dir := filepath.Dir(path)

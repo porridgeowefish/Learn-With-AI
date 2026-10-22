@@ -3,6 +3,8 @@ package generation
 import (
 	"encoding/json"
 	"errors"
+	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,15 +12,13 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
-	"github.com/xmz14/lll/backend-go/internal/modules/learning"
-	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 type MapProjection struct {
 	MapVersionID     string           `json:"mapVersionId"`
 	Format           string           `json:"format"`
 	OverviewMarkdown string           `json:"overviewMarkdown"`
-	Topics           learning.Catalog `json:"topics"`
+	Topics           projects.Catalog `json:"topics"`
 	Coverage         Coverage         `json:"coverage"`
 }
 type mapManifest struct {
@@ -67,10 +67,7 @@ func readMapLocked(root, version string) (MapProjection, error) {
 		var pointer mapPointer
 		e := readJSON(filepath.Join(root, "map", "current.json"), &pointer)
 		if errors.Is(e, os.ErrNotExist) {
-			if e = importLegacyMapLocked(root); e != nil {
-				return MapProjection{}, e
-			}
-			e = readJSON(filepath.Join(root, "map", "current.json"), &pointer)
+			return MapProjection{Format: "structured", Topics: projects.EmptyCatalog()}, nil
 		}
 		if e != nil || pointer.SchemaVersion != 1 || !safeID(pointer.VersionID) {
 			return MapProjection{}, problem("map-recovery-required", 409)
@@ -90,43 +87,21 @@ func readMapLocked(root, version string) (MapProjection, error) {
 	if e != nil || hash(string(overview)) != m.OverviewHash || hash(string(topics)) != m.TopicsHash || m.VersionID != version {
 		return MapProjection{}, problem("map-recovery-required", 409)
 	}
-	var catalog learning.Catalog
+	var catalog projects.Catalog
 	if json.Unmarshal(topics, &catalog) != nil {
-		catalog = learning.EmptyCatalog()
+		catalog = projects.EmptyCatalog()
 	}
 	return MapProjection{MapVersionID: version, Format: m.Format, OverviewMarkdown: string(overview), Topics: catalog, Coverage: m.Coverage}, nil
-}
-func importLegacyMapLocked(root string) error {
-	overview, e := os.ReadFile(filepath.Join(root, "overview.md"))
-	if e != nil {
-		return e
-	}
-	topics, e := os.ReadFile(filepath.Join(root, "discipline-topics.json"))
-	if errors.Is(e, os.ErrNotExist) {
-		topics, _ = json.Marshal(learning.EmptyCatalog())
-	} else if e != nil {
-		return e
-	}
-	format := "legacy"
-	var catalog learning.Catalog
-	if json.Unmarshal(topics, &catalog) == nil && learning.ValidateCatalog(&catalog) == nil && learning.ValidateAgainstOverview(catalog, string(overview)) == nil && len(catalog.Topics) > 0 {
-		format = "structured"
-	}
-	id := "legacy-" + hash(string(overview) + string(topics))[:24]
-	if e = writeMapVersion(root, id, "", format, overview, topics, Coverage{}); e != nil {
-		return e
-	}
-	return writeJSON(filepath.Join(root, "map", "current.json"), mapPointer{SchemaVersion: 1, VersionID: id})
 }
 func writeMapVersion(root, id, job, format string, overview, topics []byte, coverage Coverage) error {
 	dir := filepath.Join(root, "map", "versions", id)
 	if e := os.MkdirAll(dir, 0755); e != nil {
 		return e
 	}
-	if e := projects.AtomicWriteFile(filepath.Join(dir, "overview.md"), overview, 0600); e != nil {
+	if e := filesystem.AtomicWriteFile(filepath.Join(dir, "overview.md"), overview, 0600); e != nil {
 		return e
 	}
-	if e := projects.AtomicWriteFile(filepath.Join(dir, "topics.json"), topics, 0600); e != nil {
+	if e := filesystem.AtomicWriteFile(filepath.Join(dir, "topics.json"), topics, 0600); e != nil {
 		return e
 	}
 	return writeJSON(filepath.Join(dir, "manifest.json"), mapManifest{SchemaVersion: 1, VersionID: id, JobID: job, Format: format, OverviewHash: hash(string(overview)), TopicsHash: hash(string(topics)), Coverage: coverage, CreatedAt: time.Now().UTC()})
@@ -197,7 +172,7 @@ func validateNewMap(out *MapProjection) error {
 	return nil
 }
 func inspectNewMap(out *MapProjection) *MapValidationIssue {
-	if err := learning.ValidateCatalog(&out.Topics); err != nil {
+	if err := projects.ValidateCatalog(&out.Topics); err != nil {
 		messages := map[string]string{
 			"unsupported_discipline_topics_schema": "主题目录的版本字段不正确。",
 			"discipline_topics_too_large":          "主题目录超过 500 个小节。",
