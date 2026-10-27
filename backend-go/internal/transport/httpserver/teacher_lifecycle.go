@@ -118,3 +118,11 @@ func (s *Server) handleStopTeacherResponse(w http.ResponseWriter, r *http.Reques
 	}
 	httpx.WriteJSON(w, 200, map[string]any{"stopped": true, "responseId": id})
 }
+
+func (s *Server) handleResumeTeacherQueue(w http.ResponseWriter, r *http.Request) {
+	if err := s.teachingLifecycle().ResumeQueue(r.PathValue("id")); err != nil {
+		writeTeacherError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"queuePaused": false})
+}

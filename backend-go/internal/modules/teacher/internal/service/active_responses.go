@@ -8,20 +8,41 @@ import (
 
 // ActiveResponse owns a provider response independently from an HTTP connection.
 type ActiveResponse struct {
-	cancel   context.CancelFunc
-	mu       sync.Mutex
-	frames   []StreamFrame
-	done     bool
-	finished chan struct{}
-	notify   chan struct{}
+	cancel     context.CancelFunc
+	mu         sync.Mutex
+	frames     []StreamFrame
+	responseID string
+	done       bool
+	finished   chan struct{}
+	notify     chan struct{}
 }
 
 func (r *ActiveResponse) Append(frame StreamFrame) {
 	r.mu.Lock()
+	if id, _ := frame.Data["responseId"].(string); id != "" && r.responseID == "" {
+		r.responseID = id
+	}
+	data := make(map[string]any, len(frame.Data)+2)
+	for key, value := range frame.Data {
+		data[key] = value
+	}
+	data["responseId"] = r.responseID
+	data["frameSeq"] = len(r.frames) + 1
+	frame.Data = data
 	r.frames = append(r.frames, frame)
 	close(r.notify)
 	r.notify = make(chan struct{})
 	r.mu.Unlock()
+}
+
+// ReplayCursor accepts a cursor only within this in-memory response.
+func (r *ActiveResponse) ReplayCursor(responseID string, after int) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if responseID == "" || responseID != r.responseID || after < 0 || after > len(r.frames) {
+		return 0
+	}
+	return after
 }
 
 // Done is closed exactly once when the response reaches its terminal state.

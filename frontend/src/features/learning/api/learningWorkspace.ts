@@ -46,6 +46,7 @@ export interface ConversationProjection {
   totalMessages: number;
   messages: ConversationMessage[];
   queue?: QueuedTurn[];
+  queuePaused?: boolean;
   latestResponseId?: string;
 }
 
@@ -134,7 +135,7 @@ export interface SourceRevision {
   createdAt: string;
 }
 
-export type TeacherStreamFrame =
+export type TeacherStreamFrame = (
   | { type: 'turn-accepted'; data: { learnerMessageId: string; responseId: string } }
   | { type: 'message-started'; data: { teacherMessageId: string } }
   | { type: 'message-reset'; data: { messageId: string; code: string } }
@@ -144,7 +145,7 @@ export type TeacherStreamFrame =
   | { type: 'search-failed'; data: { query: string; code: string } }
   | { type: 'message-completed'; data: { messageId: string; latestSeq: number } }
   | { type: 'message-failed'; data: { messageId?: string; code: string; partialPreserved: boolean } }
-  | { type: string; data: Record<string, unknown> };
+  | { type: string; data: Record<string, unknown> }) & { responseId?: string; frameSeq?: number };
 
 export const learningWorkspaceKeys = {
   conversation: (slug: string) => ['learning-workspace', slug, 'conversation'] as const,
@@ -164,7 +165,7 @@ export function useConversation(slug: string) {
     initialPageParam: 0,
     getNextPageParam: (page) => page.hasPrevious && page.pageFromSeq > 0 ? page.pageFromSeq : undefined,
     enabled: Boolean(slug),
-    refetchInterval: (query) => query.state.data?.pages[0]?.queue?.length ? 1500 : false,
+    refetchInterval: (query) => query.state.data?.pages[0]?.queue?.length && !query.state.data.pages[0].queuePaused ? 1500 : false,
   });
   const data = useMemo(() => {
     const pages = query.data?.pages;
@@ -314,8 +315,11 @@ export async function streamTeacherTurn(slug: string, input: { operationId: stri
 
 // Reconnects to a teacher response that is still running in the backend. The
 // backend owns the generation; this request is only a disposable subscriber.
-export async function resumeTeacherTurn(slug: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/active`, { signal });
+export interface TeacherStreamCursor { responseId: string; frameSeq: number }
+
+export async function resumeTeacherTurn(slug: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void, cursor?: TeacherStreamCursor) {
+  const query = cursor ? `?responseId=${encodeURIComponent(cursor.responseId)}&afterFrame=${cursor.frameSeq}` : '';
+  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/active${query}`, { signal });
   if (response.status === 204) return false;
   if (!response.ok || !response.body) throw new ApiError(response.status, '教师响应无法恢复', await response.text());
   await consumeSSE(response, onFrame);
@@ -332,6 +336,10 @@ export async function startTeacherOpening(slug: string, signal: AbortSignal, onF
 
 export async function stopTeacherResponse(slug: string, responseId: string) {
   return http.post(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/${encodeURIComponent(responseId)}/stop`, { operationId: crypto.randomUUID() });
+}
+
+export function resumeTeacherQueue(slug: string) {
+  return http.post(`/api/projects/${encodeURIComponent(slug)}/conversation/queue/resume`, {});
 }
 
 // Queued turns: durable server-side waiting line for messages sent while the
@@ -369,7 +377,8 @@ async function consumeSSE(response: Response, onFrame: (frame: TeacherStreamFram
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  while (true) {
+  let terminal = false;
+  try { while (true) {
     const { value, done } = await reader.read();
     buffer += decoder.decode(value, { stream: !done });
     const chunks = buffer.split(/\r?\n\r?\n/);
@@ -381,9 +390,18 @@ async function consumeSSE(response: Response, onFrame: (frame: TeacherStreamFram
         if (line.startsWith('event:')) type = line.slice(6).trim();
         if (line.startsWith('data:')) data += line.slice(5).trim();
       }
-      if (type && data) onFrame({ type, data: JSON.parse(data) } as TeacherStreamFrame);
+      if (type && data) {
+        const parsed = JSON.parse(data);
+        if (type === 'message-completed' || type === 'message-failed') terminal = true;
+        onFrame({ type, data: parsed, responseId: parsed.responseId, frameSeq: parsed.frameSeq } as TeacherStreamFrame);
+      }
     }
     if (done) break;
+  }
+    if (!terminal) throw new Error('教师连接已中断，已保留收到的内容，请重新连接');
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
 }
 

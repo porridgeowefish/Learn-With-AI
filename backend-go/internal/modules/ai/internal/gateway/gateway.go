@@ -2,13 +2,11 @@ package teachergateway
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -64,12 +62,14 @@ type Event struct {
 }
 
 type Request struct {
-	System            string
-	Messages          []Message
-	Tools             []Tool
-	ProviderID        string
-	BindingName       string
-	Model             string
+	System      string
+	Messages    []Message
+	Tools       []Tool
+	ProviderID  string
+	BindingName string
+	Model       string
+	// MaxOutputTokens is a legacy budget annotation, not a provider override.
+	// The user-selected platform ModelOutputTokens owns the wire ceiling.
 	MaxOutputTokens   int
 	MaxThinkingTokens int
 }
@@ -99,32 +99,13 @@ func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) erro
 	if p == nil || p.APIKey == "" || p.BaseURL == "" || p.Model == "" {
 		return errors.New("teacher provider is not configured")
 	}
-	if p.Kind == "anthropic" {
-		return streamAnthropic(ctx, *p, in, emit)
-	}
-	return streamOpenAI(ctx, *p, in, emit)
+	return StreamProvider(ctx, *p, in, emit)
 }
 
 func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	var buffers toolBufferSet
 	var inline inlineThinkingFilter
-	messages := make([]map[string]any, 0, len(in.Messages)+1)
-	if in.System != "" {
-		messages = append(messages, map[string]any{"role": "system", "content": in.System})
-	}
-	for _, message := range in.Messages {
-		messages = append(messages, openAIMessage(message))
-	}
-	body := map[string]any{"model": p.Model, "messages": messages, "stream": true, "stream_options": map[string]any{"include_usage": true}}
-	body[openAIOutputLimitKey(p)] = platformconfig.ModelOutputTokens
-	if len(in.Tools) > 0 {
-		var tools []map[string]any
-		for _, tool := range in.Tools {
-			tools = append(tools, map[string]any{"type": "function", "function": map[string]any{"name": tool.Name, "description": tool.Description, "parameters": tool.Schema}})
-		}
-		body["tools"] = tools
-		body["tool_choice"] = "auto"
-	}
+	body := openAIRequest(p, in, true)
 	return streamJSONLines(ctx, strings.TrimRight(p.BaseURL, "/")+"/chat/completions", p, body, func(payload []byte) error {
 		if string(payload) == "[DONE]" {
 			return io.EOF
@@ -334,42 +315,7 @@ func anthropicMessage(message Message) map[string]any {
 }
 
 func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
-	var messages []map[string]any
-	previousTool := false
-	for _, message := range in.Messages {
-		mapped := anthropicMessage(message)
-		if message.ToolCallID != "" && previousTool && len(messages) > 0 {
-			last := messages[len(messages)-1]
-			last["content"] = append(last["content"].([]map[string]any), mapped["content"].([]map[string]any)...)
-		} else {
-			messages = append(messages, mapped)
-		}
-		previousTool = message.ToolCallID != ""
-	}
-	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": true, "max_tokens": platformconfig.ModelOutputTokens}
-	// Merely offering tools must not change the configured thinking channel.
-	// Older externally supplied tool history lacking signed blocks still uses
-	// the non-thinking request shape; live tool rounds retain them in memory.
-	replayableThinking := true
-	for _, message := range in.Messages {
-		if len(message.ToolCalls) > 0 && len(message.ThinkingBlocks) == 0 {
-			replayableThinking = false
-		}
-	}
-	if p.Thinking && replayableThinking {
-		thinkingBudget := 2048
-		if in.MaxThinkingTokens > 0 {
-			thinkingBudget = in.MaxThinkingTokens
-		}
-		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": thinkingBudget}
-	}
-	if len(in.Tools) > 0 {
-		var tools []map[string]any
-		for _, tool := range in.Tools {
-			tools = append(tools, map[string]any{"name": tool.Name, "description": tool.Description, "input_schema": tool.Schema})
-		}
-		body["tools"] = tools
-	}
+	body := anthropicRequest(p, in, true)
 	var toolBuffers toolBufferSet
 	blockTypes := map[int]string{}
 	thinkingBlocks := map[int]map[string]any{}
@@ -534,30 +480,11 @@ func emitOutputProgress(emit func(Event), text string) {
 }
 
 func streamJSONLines(ctx context.Context, url string, p askaiconfig.Provider, body any, onData func([]byte) error, onEnd func()) error {
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(raw))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if p.Kind == "anthropic" {
-		req.Header.Set("x-api-key", p.APIKey)
-		req.Header.Set("anthropic-version", "2023-06-01")
-	} else {
-		req.Header.Set("Authorization", "Bearer "+p.APIKey)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := requestProvider(ctx, url, p, body)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))
-	}
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 64<<10), 4<<20)
 	for scanner.Scan() {

@@ -65,6 +65,11 @@ func (s *Lifecycle) Turn(slug string, in TurnInput) (*ActiveResponse, error) {
 	if _, err = store.AttachmentBlocks(in.ConversationAttachmentIDs); err != nil {
 		return nil, ErrInvalidTurn
 	}
+	if paused, pauseErr := store.QueuePaused(); pauseErr != nil {
+		return nil, pauseErr
+	} else if paused {
+		return nil, ErrResponseActive
+	}
 	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(StreamFrame)) error {
 		return s.Service.StreamTurn(ctx, slug, in, emit)
 	})
@@ -254,7 +259,34 @@ func (s *Lifecycle) Stop(slug, id string) error {
 	if run == nil || run != s.Responses.Project(slug) {
 		return ErrResponseNotFound
 	}
+	store, err := NewConversation(slug)
+	if err != nil {
+		return err
+	}
+	if err = store.SetQueuePaused(true); err != nil {
+		return err
+	}
 	run.Stop()
+	s.notify(slug)
+	return nil
+}
+
+func (s *Lifecycle) ResumeQueue(slug string) error {
+	lock := s.lock(slug)
+	lock.Lock()
+	defer lock.Unlock()
+	if !s.available(slug) {
+		return ErrLifecycleClosed
+	}
+	store, err := NewConversation(slug)
+	if err != nil {
+		return err
+	}
+	if err = store.SetQueuePaused(false); err != nil {
+		return err
+	}
+	s.advanceQueueLocked(slug)
+	s.notify(slug)
 	return nil
 }
 
@@ -337,6 +369,9 @@ func (s *Lifecycle) advanceQueueLocked(slug string) bool {
 	}
 	store, err := NewConversation(slug)
 	if err != nil {
+		return false
+	}
+	if paused, err := store.QueuePaused(); err != nil || paused {
 		return false
 	}
 	promoted, ok, err := store.PromoteQueueHead("auto")

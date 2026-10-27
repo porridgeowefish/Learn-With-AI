@@ -84,6 +84,7 @@ type Projection struct {
 	Messages         []Message   `json:"messages"`
 	TaskLinks        []TaskLink  `json:"taskLinks"`
 	Queue            []QueueItem `json:"queue"`
+	QueuePaused      bool        `json:"queuePaused"`
 	LatestResponseID string      `json:"latestResponseId,omitempty"`
 }
 
@@ -329,7 +330,7 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		return Projection{}, err
 	}
 	hidden := hiddenTeacherMessages(events)
-	proj := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: meta.LatestSeq, Messages: []Message{}, TaskLinks: []TaskLink{}, Queue: replayQueue(events), LatestResponseID: replayResponses(events).latest}
+	proj := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: meta.LatestSeq, Messages: []Message{}, TaskLinks: []TaskLink{}, Queue: replayQueue(events), QueuePaused: replayQueuePaused(events), LatestResponseID: replayResponses(events).latest}
 	for _, event := range events {
 		if event.Type != "message-recorded" {
 			continue
@@ -427,6 +428,7 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 		Messages:         []Message{},
 		TaskLinks:        []TaskLink{},
 		Queue:            replayQueue(events),
+		QueuePaused:      replayQueuePaused(events),
 		LatestResponseID: replayResponses(events).latest,
 	}
 	selected := map[string]bool{}

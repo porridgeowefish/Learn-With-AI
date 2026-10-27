@@ -132,7 +132,8 @@ func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *teacher.Activ
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
-	frameID := 0
+	after, _ := strconv.Atoi(r.URL.Query().Get("afterFrame"))
+	frameID := run.ReplayCursor(r.URL.Query().Get("responseId"), after)
 	for {
 		frames, done, notify := run.Snapshot(frameID)
 		for _, frame := range frames {
