@@ -4,10 +4,10 @@
 // MATH PIPELINE (designed to be robust against marked's lexer eating
 // backslash escapes inside math):
 //
-//   1. Pre-scan input for $$...$$ (display) and $...$ (inline) BEFORE
-//      handing the markdown to marked.
+//   1. Protect literals and pre-scan dollar / backslash math delimiters
+//      BEFORE handing the markdown to marked's HTML renderer.
 //   2. Replace each math span with a unique plaintext placeholder
-//      (e.g. MATH-BLOCK-7) — these survive marked unchanged.
+//      with a source-unique prefix — these survive marked unchanged.
 //   3. Run marked.parse on the placeholder-stripped markdown.
 //   4. Render each captured math span to KaTeX HTML directly.
 //   5. Splice the rendered HTML back into the marked output.
@@ -21,7 +21,7 @@ import { useMemo } from 'react';
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import katex from 'katex';
+import { extractLatex } from '@/shared/lib/latexMarkup';
 import { extractMathHTML } from '@/shared/lib/mathMarkup';
 
 export interface MermaidBlock {
@@ -36,17 +36,12 @@ export interface MarkdownRender {
 }
 
 // Configure marked once. We do NOT add the KaTeX extension here — math
-// extraction happens before marked runs (see extractMath).
+// extraction happens before marked renders HTML (see extractLatex).
 marked.setOptions({
   gfm: true,
   breaks: false,
   async: false,
 });
-
-interface ExtractedMath {
-  stripped: string;
-  placeholders: Map<string, string>; // id → rendered KaTeX HTML
-}
 
 const svgPurifier = DOMPurify(window);
 svgPurifier.addHook('uponSanitizeAttribute', (_node, data) => {
@@ -79,54 +74,6 @@ function extractSVG(md: string): { stripped: string; placeholders: Map<string, s
       + '<div class="mermaid-placeholder"><span class="mermaid-pending">图示正在生成…</span></div>';
   }
   return { stripped, placeholders };
-}
-
-// extractMath scans markdown for $$...$$ and $...$, renders each via
-// KaTeX, and substitutes a unique plaintext placeholder. Marked sees
-// only the placeholders (and the surrounding text), so backslash escapes
-// inside math (\Sigma, \frac, ...) are never exposed to marked's lexer.
-function extractMath(md: string): ExtractedMath {
-  const placeholders = new Map<string, string>();
-  let i = 0;
-
-  // 1) Display math $$...$$  (greedy, multiline).
-  let out = md.replace(/\$\$([\s\S]+?)\$\$/g, (_, code: string) => {
-    const id = `MATHBLOCK${i++}X`;
-    let html = '';
-    try {
-      html = katex.renderToString(code.trim(), {
-        displayMode: true,
-        throwOnError: false,
-        output: 'html',
-        strict: 'ignore',
-      });
-    } catch (err) {
-      // Render an inline error marker rather than crashing the page.
-      html = `<code class="math-error">display math error: ${(err as Error).message}</code>`;
-    }
-    placeholders.set(id, html);
-    return id;
-  });
-
-  // 2) Inline math $...$  (single line, no nested $).
-  out = out.replace(/\$([^$\n\r][^$\n\r]*?)\$/g, (_, code: string) => {
-    const id = `MATHINLINE${i++}X`;
-    let html = '';
-    try {
-      html = katex.renderToString(code.trim(), {
-        displayMode: false,
-        throwOnError: false,
-        output: 'html',
-        strict: 'ignore',
-      });
-    } catch (err) {
-      html = `<code class="math-error">inline math error: ${(err as Error).message}</code>`;
-    }
-    placeholders.set(id, html);
-    return id;
-  });
-
-  return { stripped: out, placeholders };
 }
 
 function extractMermaid(md: string): { mdStripped: string; blocks: MermaidBlock[] } {
@@ -262,7 +209,7 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
   const withoutGUI = extractMathHTML(withoutFencedGUI, register);
 
   // Step 1: extract math BEFORE marked touches anything.
-  const { stripped, placeholders } = extractMath(withoutGUI);
+  const { stripped, placeholders } = extractLatex(withoutGUI);
 
   // Step 2: fenced SVG is treated as display media, sanitized before it can
   // enter the general Markdown HTML pipeline. External fetches and active SVG
@@ -280,7 +227,7 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
   const rawHtml = marked.parse(healed) as string;
 
   // Step 4: splice KaTeX-rendered HTML back into placeholders.
-  // Placeholder IDs are alphanumeric tokens (MATHBLOCK0X / MATHINLINE3X),
+  // Placeholder IDs are source-unique alphanumeric tokens,
   // which survived marked unchanged. replaceAll handles duplicates.
   let withMath = rawHtml;
   for (const [id, html] of placeholders) {

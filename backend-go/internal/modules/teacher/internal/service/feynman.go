@@ -44,5 +44,5 @@ func FeynmanSystemPrompt(review string) string {
 		review = string(runes[:FeynmanReviewLimit])
 		note = "\n（复习稿较长，这里只提供前一部分；对未提供的部分不要判定为讲漏。）"
 	}
-	return feynmanPrompt + "\n\n<复习稿>\n" + review + "\n</复习稿>" + note
+	return feynmanPrompt + mathFormattingPrompt + "\n\n<复习稿>\n" + review + "\n</复习稿>" + note
 }
