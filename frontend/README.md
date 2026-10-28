@@ -22,7 +22,7 @@ app/ 拥有路由、Providers、AppShell 和唯一全局 SSE。features/ 拥有�
 shared/ 拥有共享 UI、HTTP、类型和富文本工具。
 TanStack Query 管理服务端状态，Zustand 管理本地界面与选择。页面不得另开全局 EventSource。
 
-当前路由以 [router.tsx](src/app/router.tsx) 为准：首页、项目、用量、偏好和设置。
+当前路由以 [router.tsx](src/app/router.tsx) 为准：首页、项目、收藏、三维宝物展示、获取指南、用量、偏好和设置。
 memory、models 是兼容重定向，不是独立产品页面。
 
 ## 维护知识

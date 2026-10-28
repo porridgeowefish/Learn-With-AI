@@ -1,3 +1,4 @@
+import { CollectionShortcut } from '@/features/treasures';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { NavLink, useNavigate, useParams } from 'react-router-dom';
@@ -63,15 +64,18 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
           ))}
         </nav>
         <div className={s.headerActions}>
+          <CollectionShortcut/>
           {active === 'teacher' && <ConversationInstructions key={`instructions-${project.slug}`} slug={project.slug} />}
           {active === 'sources' && <SourceImportControl key={`sources-${project.slug}`} slug={project.slug} compact />}
           {active === 'teacher' && <a href={conversationExportURL(project.slug)} download aria-label="导出全部对话" title="导出全部对话为 Markdown"><DownloadIcon /><span>导出对话</span></a>}
         </div>
       </header>
-      <main className={s.content}>
+      <main className={`${s.content} ${s.withTreasure}`}>
+        <div className={s.mainPane}>
         {active === 'teacher' && <TeacherView key={project.slug} slug={project.slug} title={project.title} />}
         {active === 'assets' && <AssetsView slug={project.slug} />}
         {active === 'sources' && <SourcesView slug={project.slug} />}
+        </div><div className={s.treasureSlot} data-treasure-slot/>
       </main>
     </div>
   );

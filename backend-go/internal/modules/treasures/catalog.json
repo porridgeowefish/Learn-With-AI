@@ -1,0 +1,502 @@
+[
+  {
+    "id": "cockle",
+    "name": "鸟蛤",
+    "english": "Cockle",
+    "kind": "shell",
+    "form": "clam",
+    "color": "#ebbc84",
+    "tier": 1,
+    "url": "assets/refined/cockle.glb"
+  },
+  {
+    "id": "blue-mussel",
+    "name": "蓝贻贝",
+    "english": "Blue Mussel",
+    "kind": "shell",
+    "form": "mussel",
+    "color": "#193b64",
+    "tier": 1,
+    "url": "assets/refined/blue-mussel.glb"
+  },
+  {
+    "id": "limpet",
+    "name": "笠贝",
+    "english": "Limpet",
+    "kind": "shell",
+    "form": "cap",
+    "color": "#d9bb8e",
+    "tier": 1,
+    "url": "assets/refined/limpet.glb"
+  },
+  {
+    "id": "periwinkle",
+    "name": "滨螺",
+    "english": "Periwinkle",
+    "kind": "shell",
+    "form": "spiral",
+    "color": "#c5a77e",
+    "tier": 1,
+    "url": "assets/refined/periwinkle.glb"
+  },
+  {
+    "id": "clam",
+    "name": "文蛤",
+    "english": "Clam",
+    "kind": "shell",
+    "form": "clam",
+    "color": "#f3e7d0",
+    "tier": 1,
+    "url": "assets/refined/clam.glb"
+  },
+  {
+    "id": "scallop",
+    "name": "扇贝",
+    "english": "Scallop",
+    "kind": "shell",
+    "form": "fan",
+    "color": "#f4a688",
+    "tier": 2,
+    "url": "assets/refined/scallop.glb"
+  },
+  {
+    "id": "oyster",
+    "name": "牡蛎",
+    "english": "Oyster",
+    "kind": "shell",
+    "form": "oyster",
+    "color": "#c8b9a1",
+    "tier": 2,
+    "url": "assets/refined/oyster.glb"
+  },
+  {
+    "id": "razor-clam",
+    "name": "蛏子",
+    "english": "Razor Clam",
+    "kind": "shell",
+    "form": "razor",
+    "color": "#dba96a",
+    "tier": 2,
+    "url": "assets/refined/razor-clam.glb"
+  },
+  {
+    "id": "slipper-shell",
+    "name": "舟螺",
+    "english": "Slipper Shell",
+    "kind": "shell",
+    "form": "slipper",
+    "color": "#edc99d",
+    "tier": 2,
+    "url": "assets/refined/slipper-shell.glb"
+  },
+  {
+    "id": "auger",
+    "name": "笋螺",
+    "english": "Auger",
+    "kind": "shell",
+    "form": "tower",
+    "color": "#ecc99a",
+    "tier": 2,
+    "url": "assets/refined/auger.glb"
+  },
+  {
+    "id": "tower-shell",
+    "name": "塔螺",
+    "english": "Tower Shell",
+    "kind": "shell",
+    "form": "tower",
+    "color": "#cba67d",
+    "tier": 3,
+    "url": "assets/refined/tower-shell.glb"
+  },
+  {
+    "id": "moon-snail",
+    "name": "玉螺",
+    "english": "Moon Snail",
+    "kind": "shell",
+    "form": "spiral",
+    "color": "#e9d9df",
+    "tier": 3,
+    "url": "assets/refined/moon-snail.glb"
+  },
+  {
+    "id": "olive-shell",
+    "name": "榧螺",
+    "english": "Olive Shell",
+    "kind": "shell",
+    "form": "olive",
+    "color": "#f2d6a7",
+    "tier": 3,
+    "url": "assets/refined/olive-shell.glb"
+  },
+  {
+    "id": "cowrie",
+    "name": "宝螺",
+    "english": "Cowrie",
+    "kind": "shell",
+    "form": "cowrie",
+    "color": "#f8e8cc",
+    "tier": 3,
+    "url": "assets/refined/cowrie.glb"
+  },
+  {
+    "id": "sundial",
+    "name": "车轮螺",
+    "english": "Sundial",
+    "kind": "shell",
+    "form": "sundial",
+    "color": "#dcb687",
+    "tier": 3,
+    "url": "assets/refined/sundial.glb"
+  },
+  {
+    "id": "abalone",
+    "name": "鲍壳",
+    "english": "Abalone",
+    "kind": "shell",
+    "form": "abalone",
+    "color": "#85b9b5",
+    "tier": 4,
+    "url": "assets/refined/abalone.glb"
+  },
+  {
+    "id": "murex",
+    "name": "骨螺",
+    "english": "Murex",
+    "kind": "shell",
+    "form": "murex",
+    "color": "#f3cba9",
+    "tier": 4,
+    "url": "assets/refined/murex.glb"
+  },
+  {
+    "id": "harp-shell",
+    "name": "竖琴螺",
+    "english": "Harp Shell",
+    "kind": "shell",
+    "form": "harp",
+    "color": "#eec5a1",
+    "tier": 4,
+    "url": "assets/refined/harp-shell.glb"
+  },
+  {
+    "id": "lion-paw",
+    "name": "狮爪贝",
+    "english": "Lion Paw",
+    "kind": "shell",
+    "form": "fan",
+    "color": "#f59b64",
+    "tier": 4,
+    "url": "assets/refined/lion-paw.glb"
+  },
+  {
+    "id": "wentletrap",
+    "name": "梯螺",
+    "english": "Wentletrap",
+    "kind": "shell",
+    "form": "tower",
+    "color": "#f5eadd",
+    "tier": 4,
+    "url": "assets/refined/wentletrap.glb"
+  },
+  {
+    "id": "nautilus",
+    "name": "鹦鹉螺",
+    "english": "Nautilus",
+    "kind": "shell",
+    "form": "nautilus",
+    "color": "#efdcb5",
+    "tier": 5,
+    "url": "assets/refined/nautilus.glb"
+  },
+  {
+    "id": "paper-nautilus",
+    "name": "纸鹦鹉螺",
+    "english": "Paper Nautilus",
+    "kind": "shell",
+    "form": "nautilus",
+    "color": "#fff0dd",
+    "tier": 5,
+    "url": "assets/refined/paper-nautilus.glb"
+  },
+  {
+    "id": "venus-comb",
+    "name": "维纳斯骨螺",
+    "english": "Venus Comb",
+    "kind": "shell",
+    "form": "comb",
+    "color": "#efc6a0",
+    "tier": 5,
+    "url": "assets/refined/venus-comb.glb"
+  },
+  {
+    "id": "triton",
+    "name": "法螺",
+    "english": "Triton",
+    "kind": "shell",
+    "form": "triton",
+    "color": "#dc9e64",
+    "tier": 5,
+    "url": "assets/refined/triton.glb"
+  },
+  {
+    "id": "spider-conch",
+    "name": "蜘蛛螺",
+    "english": "Spider Conch",
+    "kind": "shell",
+    "form": "spider",
+    "color": "#f1c5aa",
+    "tier": 5,
+    "url": "assets/refined/spider-conch.glb"
+  },
+  {
+    "id": "rock-crystal",
+    "name": "白水晶",
+    "english": "Rock Crystal",
+    "kind": "gem",
+    "form": "point",
+    "color": "#edf8ff",
+    "tier": 1,
+    "url": "assets/jewelry/rock-crystal.glb"
+  },
+  {
+    "id": "rose-quartz",
+    "name": "粉水晶",
+    "english": "Rose Quartz",
+    "kind": "gem",
+    "form": "tumbled",
+    "color": "#eda7bd",
+    "tier": 1,
+    "url": "assets/refined/rose-quartz.glb"
+  },
+  {
+    "id": "smoky-quartz",
+    "name": "烟水晶",
+    "english": "Smoky Quartz",
+    "kind": "gem",
+    "form": "cushion",
+    "color": "#927356",
+    "tier": 1,
+    "url": "assets/jewelry/smoky-quartz.glb"
+  },
+  {
+    "id": "red-jasper",
+    "name": "红碧玉",
+    "english": "Red Jasper",
+    "kind": "gem",
+    "form": "tumbled",
+    "color": "#a33524",
+    "tier": 1,
+    "url": "assets/refined/red-jasper.glb"
+  },
+  {
+    "id": "banded-agate",
+    "name": "缠丝玛瑙",
+    "english": "Banded Agate",
+    "kind": "gem",
+    "form": "cabochon",
+    "color": "#d9a06a",
+    "tier": 1,
+    "url": "assets/refined/banded-agate.glb"
+  },
+  {
+    "id": "amethyst",
+    "name": "紫水晶",
+    "english": "Amethyst",
+    "kind": "gem",
+    "form": "cluster",
+    "color": "#9c53c3",
+    "tier": 2,
+    "url": "assets/jewelry/amethyst.glb"
+  },
+  {
+    "id": "citrine",
+    "name": "黄水晶",
+    "english": "Citrine",
+    "kind": "gem",
+    "form": "pear",
+    "color": "#f3b330",
+    "tier": 2,
+    "url": "assets/jewelry/citrine.glb"
+  },
+  {
+    "id": "carnelian",
+    "name": "红玉髓",
+    "english": "Carnelian",
+    "kind": "gem",
+    "form": "cabochon",
+    "color": "#ed7025",
+    "tier": 2,
+    "url": "assets/refined/carnelian.glb"
+  },
+  {
+    "id": "lapis-lazuli",
+    "name": "青金石",
+    "english": "Lapis Lazuli",
+    "kind": "gem",
+    "form": "cabochon",
+    "color": "#1646a3",
+    "tier": 2,
+    "url": "assets/refined/lapis-lazuli.glb"
+  },
+  {
+    "id": "tiger-eye",
+    "name": "虎眼石",
+    "english": "Tiger Eye",
+    "kind": "gem",
+    "form": "cabochon",
+    "color": "#b88331",
+    "tier": 2,
+    "url": "assets/refined/tiger-eye.glb"
+  },
+  {
+    "id": "aquamarine",
+    "name": "海蓝宝",
+    "english": "Aquamarine",
+    "kind": "gem",
+    "form": "emerald",
+    "color": "#7ddce7",
+    "tier": 3,
+    "url": "assets/jewelry/aquamarine.glb"
+  },
+  {
+    "id": "peridot",
+    "name": "橄榄石",
+    "english": "Peridot",
+    "kind": "gem",
+    "form": "oval",
+    "color": "#a4d933",
+    "tier": 3,
+    "url": "assets/jewelry/peridot.glb"
+  },
+  {
+    "id": "garnet",
+    "name": "石榴石",
+    "english": "Garnet",
+    "kind": "gem",
+    "form": "round",
+    "color": "#be213c",
+    "tier": 3,
+    "url": "assets/jewelry/garnet.glb"
+  },
+  {
+    "id": "moonstone",
+    "name": "月光石",
+    "english": "Moonstone",
+    "kind": "gem",
+    "form": "cabochon",
+    "color": "#d7e5fc",
+    "tier": 3,
+    "url": "assets/refined/moonstone.glb"
+  },
+  {
+    "id": "labradorite",
+    "name": "拉长石",
+    "english": "Labradorite",
+    "kind": "gem",
+    "form": "tumbled",
+    "color": "#335d76",
+    "tier": 3,
+    "url": "assets/refined/labradorite.glb"
+  },
+  {
+    "id": "tourmaline",
+    "name": "碧玺",
+    "english": "Tourmaline",
+    "kind": "gem",
+    "form": "point",
+    "color": "#60b37a",
+    "tier": 4,
+    "url": "assets/jewelry/tourmaline.glb"
+  },
+  {
+    "id": "tanzanite",
+    "name": "坦桑石",
+    "english": "Tanzanite",
+    "kind": "gem",
+    "form": "trillion",
+    "color": "#5e63dc",
+    "tier": 4,
+    "url": "assets/jewelry/tanzanite.glb"
+  },
+  {
+    "id": "spinel",
+    "name": "尖晶石",
+    "english": "Spinel",
+    "kind": "gem",
+    "form": "cushion",
+    "color": "#ef4482",
+    "tier": 4,
+    "url": "assets/jewelry/spinel.glb"
+  },
+  {
+    "id": "zircon",
+    "name": "锆石",
+    "english": "Zircon",
+    "kind": "gem",
+    "form": "round",
+    "color": "#38bde0",
+    "tier": 4,
+    "url": "assets/jewelry/zircon.glb"
+  },
+  {
+    "id": "imperial-topaz",
+    "name": "帝王托帕",
+    "english": "Imperial Topaz",
+    "kind": "gem",
+    "form": "emerald",
+    "color": "#efb16c",
+    "tier": 4,
+    "url": "assets/jewelry/imperial-topaz.glb"
+  },
+  {
+    "id": "diamond",
+    "name": "钻石",
+    "english": "Diamond",
+    "kind": "gem",
+    "form": "round",
+    "color": "#f7fcff",
+    "tier": 5,
+    "url": "assets/jewelry/diamond.glb"
+  },
+  {
+    "id": "ruby",
+    "name": "红宝石",
+    "english": "Ruby",
+    "kind": "gem",
+    "form": "oval",
+    "color": "#db1744",
+    "tier": 5,
+    "url": "assets/jewelry/ruby.glb"
+  },
+  {
+    "id": "emerald",
+    "name": "祖母绿",
+    "english": "Emerald",
+    "kind": "gem",
+    "form": "emerald",
+    "color": "#1bb779",
+    "tier": 5,
+    "url": "assets/jewelry/emerald.glb"
+  },
+  {
+    "id": "sapphire",
+    "name": "蓝宝石",
+    "english": "Sapphire",
+    "kind": "gem",
+    "form": "cushion",
+    "color": "#254dcc",
+    "tier": 5,
+    "url": "assets/jewelry/sapphire.glb"
+  },
+  {
+    "id": "black-opal",
+    "name": "黑欧泊",
+    "english": "Black Opal",
+    "kind": "gem",
+    "form": "cabochon",
+    "color": "#102333",
+    "tier": 5,
+    "url": "assets/refined/black-opal.glb"
+  }
+]

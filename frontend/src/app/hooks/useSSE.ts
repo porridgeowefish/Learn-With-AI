@@ -50,6 +50,8 @@ function ensureConnection() {
 
   // Fan out other event types to subscribers.
   const fanoutNames: SSEEventName[] = [
+    SSE_EVENTS.hello,
+    SSE_EVENTS.treasureAwarded,
     SSE_EVENTS.learningAssetUpdated,
     SSE_EVENTS.teacherNoteUpdated,
     SSE_EVENTS.learningActivityUpdated,

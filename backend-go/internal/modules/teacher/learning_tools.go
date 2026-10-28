@@ -20,6 +20,7 @@ var ErrAnnotationMissing = errors.New("annotation not found")
 // HTTP adapters only forward the returned stream and encode domain errors.
 type LearningTools struct {
 	OnActivity          func(string, activity.ProgressEvent)
+	OnFeynmanCompleted  func(slug, sessionID, messageID, content string)
 	OnAnnotationUpdated func(string, string, string)
 	ctx                 context.Context
 	cancel              context.CancelFunc
@@ -260,6 +261,7 @@ func (s *LearningTools) PrepareFeynman(slug, id string, in ToolInput) (ToolStrea
 			}
 			messages = append(messages, ai.AIMessage{Role: role, Content: m.Content})
 		}
+		learnerID := ""
 		if in.Content == "" {
 			messages = append(messages, ai.AIMessage{Role: "user", Content: FeynmanOpening})
 		} else {
@@ -269,6 +271,7 @@ func (s *LearningTools) PrepareFeynman(slug, id string, in ToolInput) (ToolStrea
 			}
 			messages = append(messages, ai.AIMessage{Role: "user", Content: in.Content})
 			last := updated.Messages[len(updated.Messages)-1]
+			learnerID = last.ID
 			s.activity(slug, activity.ProgressEvent{ID: "feynman:" + last.ID, SourceType: "feynman", SourceID: session.SessionID, ActivityDelta: 1, Title: "讲给教师听"})
 		}
 		var text strings.Builder
@@ -294,6 +297,9 @@ func (s *LearningTools) PrepareFeynman(slug, id string, in ToolInput) (ToolStrea
 			}
 		}
 		if err == nil {
+			if learnerID != "" && text.Len() > 0 && s.OnFeynmanCompleted != nil {
+				s.OnFeynmanCompleted(slug, session.SessionID, learnerID, in.Content)
+			}
 			emit(ai.AIFrame{Type: "done"})
 		}
 		return err

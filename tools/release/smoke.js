@@ -36,6 +36,27 @@ async function smoke(binary) {
     const index = await fetch(base);
     assert.equal(index.status, 200);
     assert.match(await index.text(), /Learn-With-AI/);
+    // The installed application must ship the real collectible assets without seeded rewards.
+    const collection = await (await fetch(`${base}/api/treasures`)).json();
+    assert.equal(collection.catalog.length, 50);
+    assert.deepEqual(collection.rewards, []);
+    assert(!fs.existsSync(path.join(workspace, 'treasures', 'ledger.json')), 'Startup seeded a reward ledger');
+    for (const item of collection.catalog) {
+      for (const resource of [item.url, `assets/thumbs/${item.id}.webp`]) {
+        const asset = await fetch(`${base}/treasures/${resource}`, { method: 'HEAD' });
+        assert.equal(asset.status, 200, `Packaged collectible missing: ${resource}`);
+        assert(!asset.headers.get('content-type')?.includes('text/html'), `SPA fallback masked missing asset: ${resource}`);
+        assert(Number(asset.headers.get('content-length')) > 12, `Empty collectible: ${resource}`);
+      }
+    }
+    for (const name of ['01-lagoon','02-sunset','03-moonlight','04-volcanic','05-mediterranean','06-pink-sand']) {
+      const background = await fetch(`${base}/treasures/references/${name}.png`, { method:'HEAD' });
+      assert.equal(background.status, 200);
+      assert.match(background.headers.get('content-type'), /image\/png/);
+    }
+    const ocean = await fetch(`${base}/treasures/assets/ocean/spectral-atlas.png`, { method:'HEAD' });
+    assert.equal(ocean.status, 200);
+    assert.match(ocean.headers.get('content-type'), /image\/png/);
     const retired = await fetch(`${base}/api/projects/nonexistent/generated`);
     assert.equal(retired.status, 404);
     // A different port must not bypass the workspace's single-writer boundary.

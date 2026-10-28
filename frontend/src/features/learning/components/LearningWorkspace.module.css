@@ -23,3 +23,5 @@
   .headerActions { gap: 4px; }
   .headerActions a span { display: none; }
 }
+
+.withTreasure{display:flex;gap:16px;min-width:0}.mainPane{flex:1;min-width:0;min-height:0;height:100%;overflow:hidden}.treasureSlot{width:290px;flex-shrink:0;overflow:auto}.treasureSlot:empty{display:none}@media(max-width:760px){.withTreasure{flex-direction:column;gap:6px}.mainPane{height:auto}.treasureSlot{width:100%;max-height:160px;flex-shrink:0}}

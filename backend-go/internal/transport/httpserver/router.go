@@ -8,6 +8,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
+	"github.com/xmz14/lll/backend-go/internal/modules/treasures"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"net"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 )
 
 type Server struct {
+	treasures       *treasures.Store
 	shutdown        func()
 	teacher         *teacher.Service
 	generation      *generation.Service
@@ -33,6 +35,7 @@ type Server struct {
 	mu          sync.RWMutex
 }
 type Dependencies struct {
+	Treasures       *treasures.Store
 	Lifecycle       *teacher.Lifecycle
 	Tools           *teacher.LearningTools
 	Teacher         *teacher.Service
@@ -49,11 +52,17 @@ func New(deps Dependencies) *Server {
 	if deps.Cache == nil {
 		deps.Cache = projects.NewIndex()
 	}
-	return &Server{lifecycle: deps.Lifecycle, tools: deps.Tools, teacher: deps.Teacher, generation: deps.Generation, sourceProcessor: deps.SourceProcessor, broadcaster: deps.Broadcaster, cache: deps.Cache}
+	if deps.Treasures == nil {
+		deps.Treasures = treasures.New(paths.WORKSPACE)
+	}
+	return &Server{treasures: deps.Treasures, lifecycle: deps.Lifecycle, tools: deps.Tools, teacher: deps.Teacher, generation: deps.Generation, sourceProcessor: deps.SourceProcessor, broadcaster: deps.Broadcaster, cache: deps.Cache}
 }
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/treasures", s.handleTreasures)
+	mux.HandleFunc("POST /api/treasures/rewards/{rewardId}/seen", s.handleTreasureSeen)
+	mux.HandleFunc("GET /api/treasures/rewards/{rewardId}/source", s.handleTreasureSource)
 	mux.HandleFunc("GET /api/settings/teacher", s.handleGetTeacherSettings)
 	mux.HandleFunc("PUT /api/settings/teacher", s.handlePutTeacherSettings)
 	mux.HandleFunc("GET /api/projects/{id}/notes", s.handleGetNotes)

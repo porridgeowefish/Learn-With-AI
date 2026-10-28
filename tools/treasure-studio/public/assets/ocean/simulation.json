@@ -1,0 +1,15 @@
+{
+  "generator": "Blender 5.1.2",
+  "modifier": "Ocean spectral simulation",
+  "frames": 32,
+  "tileSize": 256,
+  "columns": 8,
+  "rows": 4,
+  "stepSeconds": 0.25,
+  "periodSeconds": 8,
+  "windVelocity": 9,
+  "spatialSize": 40,
+  "heightDecode": "(r - 0.5) * 3",
+  "slopeDecode": "(gb - 0.5) / 3",
+  "loop": "Ping-pong interpolation avoids discontinuous loop endpoints"
+}

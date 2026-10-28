@@ -26,7 +26,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
     return index < 0 ? '' : `[资料${index + 1}](#source-${id})`;
   });
   return (
-    <article data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
+    <article id={`message-${message.id}`} data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
       {teacher && <div className={s.speaker}>教师</div>}
       <div className={s.messageBody} onClick={event => {
         const target = event.target;

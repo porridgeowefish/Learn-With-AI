@@ -33,6 +33,7 @@ Learn-With-AI is a desktop study workspace for moving from reading an explanatio
 | Keep useful explanations | Automatic notes, editable review guides, version history and text annotations |
 | Test your understanding | Generated quizzes with objective-question scoring, answers and explanations |
 | Explain it yourself | Teach-back practice: explain a concept and let the tutor ask follow-up questions |
+| Collect small discoveries | Start with an empty collection, receive a random gem after your first completed exchange, then discover 50 gems and shells through learning. View owned treasures in 3D; deleting their source conversation keeps the collection |
 
 Learning files stay on your computer. You choose the model connection, including OpenAI- and Anthropic-compatible APIs. Local-first describes storage and local processing; model generation can use a remote service.
 

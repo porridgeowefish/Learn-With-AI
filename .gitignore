@@ -67,3 +67,6 @@ frontend/playwright-report/
 *.spec.ts
 *.spec.tsx
 /frontend/src/test/
+
+# Blender authoring caches are regenerated locally; runtime GLBs are published.
+/tools/treasure-studio/sources/

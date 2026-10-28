@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { FEYNMAN_FINISH, feynmanKeys, streamFeynman, useCreateFeynmanSession, useFeynmanSessions, type FeynmanMessage } from '../api/feynman';
@@ -20,13 +21,26 @@ export function FeynmanView({ slug }: { slug: string }) {
   const [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const {search}=useLocation();
+  const requestedSession=new URLSearchParams(search).get('session');
+  const requestedMessage=new URLSearchParams(search).get('message');
+  const located=useRef('');
+  const requestedIndex=list.findIndex(s=>s.sessionId===requestedSession);
   const current = index === null ? list.length - 1 : index;
   const session = list[current];
   const latest = current === list.length - 1;
 
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => { setIndex(null); setLive(null); setError(''); setInput(''); }, [slug]);
-  useEffect(() => { endRef.current?.scrollIntoView?.({ block: 'end' }); }, [session?.messages.length, live?.text]);
+  useEffect(() => { if(requestedIndex>=0){setIndex(requestedIndex);located.current='';} }, [requestedIndex,search]);
+  useEffect(() => {
+    if(requestedMessage && located.current!==requestedMessage){
+      const element=document.getElementById('message-'+requestedMessage);
+      if(element){element.scrollIntoView?.({block:'center'});located.current=requestedMessage;}
+      return;
+    }
+    if(!requestedMessage || live)endRef.current?.scrollIntoView?.({ block: 'end' });
+  }, [session?.messages.length, session?.sessionId, live?.text, requestedMessage]);
 
   const run = async (sessionId: string, content: string) => {
     const next = new AbortController();
@@ -109,7 +123,7 @@ export function FeynmanView({ slug }: { slug: string }) {
 }
 
 function Bubble({ message }: { message: FeynmanMessage }) {
-  if (message.role === 'learner') return <div className={s.learner}><MarkdownView source={message.content} /></div>;
+  if (message.role === 'learner') return <div id={'message-'+message.id} className={s.learner}><MarkdownView source={message.content} /></div>;
   return <div className={s.teacher}>
     <span className={s.speaker}>教师（新手视角）</span>
     <MarkdownView source={message.content} />

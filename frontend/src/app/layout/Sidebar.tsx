@@ -24,6 +24,7 @@ import { UpdateNotice } from './UpdateNotice';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: '主页', icon: 'zap' },
+  { to: '/collection', label: '我的收藏', icon: 'circle' },
   { to: '/usage', label: 'Token 用量', icon: 'clock' },
   { to: '/preferences', label: '学习偏好', icon: 'brain' },
 

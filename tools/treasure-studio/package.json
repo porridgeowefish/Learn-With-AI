@@ -1,0 +1,20 @@
+{
+  "name": "lll-treasure-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5198 --strictPort",
+    "build": "vite build",
+    "assets": "node scripts/export-assets.mjs",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "three": "0.180.0",
+    "three-mesh-bvh": "^0.9.16"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "vite": "5.4.21"
+  }
+}

@@ -13,6 +13,10 @@ const PreferencesPage = lazy(() => import('@/features/preferences/PreferencesPag
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 
 
+const CollectionPage=lazy(()=>import('@/features/treasures').then(m=>({default:m.CollectionPage})));
+const TreasureDisplay=lazy(()=>import('@/features/treasures').then(m=>({default:m.TreasureDisplay})));
+const TreasureFAQ=lazy(()=>import('@/features/treasures').then(m=>({default:m.TreasureFAQ})));
+
 function PageFallback() {
   return <div style={{ padding: 24, color: 'var(--muted)' }}>加载中…</div>;
 }
@@ -36,6 +40,9 @@ export const routes: RouteObject[] = [
         path: 'project/:id/:zone?',
         element: withShell(<ProjectPage />),
       },
+      {path:'collection',element:withShell(<CollectionPage/>)},
+      {path:'collection/faq',element:withShell(<TreasureFAQ/>)},
+      {path:'collection/:itemId',element:withShell(<TreasureDisplay/>)},
       { path: 'usage', element: withShell(<UsagePage />) },
       {
         path: 'preferences',

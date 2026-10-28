@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#eae6dc"><title>潮汐藏室 · Tidal Cabinet</title><link rel="icon" href="data:,"></head>
+<body>
+ <div id="app">
+  <header class="masthead">
+   <a class="brand" href="./"><span class="brand-mark">◌</span><span>潮汐藏室<small>TIDAL CABINET</small></span></a>
+   <div class="header-note">把一片海，和每一次发现，收藏起来。</div>
+   <div class="header-actions"><span id="status" role="status">正在准备展台</span><button id="immersive" aria-label="进入沉浸模式">沉浸 ↗</button></div>
+  </header>
+  <aside class="collection">
+   <div class="section-heading"><span class="eyebrow">THE COLLECTION</span><span class="count">50 件藏品</span></div>
+   <h1>小小的宝物，<br><em>辽阔的世界。</em></h1>
+   <div class="kind-tabs" role="group" aria-label="藏品类别"><button class="active" data-kind="shell">贝壳 <span>25</span></button><button data-kind="gem">宝石 <span>25</span></button></div>
+   <label class="search"><span>⌕</span><input id="search" type="search" placeholder="寻找一件宝物…" aria-label="搜索藏品"></label>
+   <div id="tier-tabs" role="group" aria-label="收藏级别"></div>
+   <div id="catalog" class="catalog" aria-label="宝物目录"></div>
+   <div class="collection-foot">每一件，都是独立的三维藏品。<br><span>拖动旋转 · 滚轮缩放 · 双击复位</span></div>
+  </aside>
+  <main class="stage" id="stage">
+   <canvas id="scene" aria-label="实时3D海滩与宝物展台" tabindex="0"></canvas>
+   <div class="scene-heading"><span id="beach-eyebrow" class="eyebrow"></span><h2 id="beach-title"></h2><p id="beach-subtitle"></p></div>
+   <div class="view-tabs"><button id="display-mode" class="active">宝物展台</button><button id="ocean-mode">动态海滩</button><button id="studio-mode">材质检查</button></div>
+   <div class="loading" id="loading">正在打开藏品…</div>
+   <section class="asset-caption" id="asset-caption">
+    <span id="asset-tier" class="eyebrow"></span><h2 id="asset-name"></h2><p id="asset-english"></p>
+    <a id="download" download>下载 3D 素材 ↓</a>
+   </section>
+   <div class="stage-tools">
+    <button id="rotate" class="active" aria-pressed="true">自动旋转</button><button id="pause" aria-pressed="false">暂停海浪</button><button id="reset">复位</button>
+   </div>
+   <div class="settings">
+    <label>浪高 <input id="wave" aria-label="浪高" type="range" min="0" max="1.8" step=".05" value=".7"></label>
+    <label>画质 <select id="quality"><option value="1">流畅</option><option value="1.5" selected>精细</option><option value="2">超清</option></select></label>
+    <button id="inspect" aria-expanded="false">素材信息</button>
+   </div>
+   <div id="diagnostics" hidden></div>
+   <div id="fatal" hidden role="alert"><h2>3D 展台暂时无法启动</h2><p></p><button onclick="location.reload()">重新加载</button></div>
+   <button id="exit-immersive" hidden>退出沉浸 · Esc</button>
+  </main>
+  <footer class="beach-strip"><div class="beach-intro"><span class="eyebrow">SIX SHORES</span><strong>换一片海</strong><span>实时波浪与光影</span></div><div id="beaches"></div></footer>
+ </div>
+ <script type="module" src="/src/main.js"></script>
+</body></html>

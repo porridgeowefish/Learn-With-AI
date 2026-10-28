@@ -7,6 +7,7 @@ export const HEALTH_POLL_INTERVAL_MS = 30_000;
 // SSE event names emitted by backend-go/internal/httpx/sse.go.
 export const SSE_EVENTS = {
   hello: 'hello',
+  treasureAwarded: 'treasure-awarded',
   annotationUpdated: 'annotation-updated',
   teacherNoteUpdated: 'teacher-note-updated',
   learningAssetUpdated: 'learning-asset-updated',

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAsset, useAssets, usePracticeRounds, useSaveAsset } from '../api/learningWorkspace';
 import { PracticeReader } from './PracticeReader';
 import { GenerationControl } from './GenerationControl';
@@ -12,7 +13,8 @@ type AssetKey = 'review' | 'practice';
 type AssetView = AssetKey | 'notes' | 'feynman';
 const savedView=(slug:string):AssetView=>{let saved:string|null=null;try{saved=localStorage.getItem(`lll.assets.view.${slug}`);}catch{/* storage unavailable */}return saved==='practice'||saved==='notes'||saved==='feynman'?saved:'review';};
 export function AssetsView({slug}:{slug:string}) {
- const [view,setViewState]=useState<AssetView>(()=>savedView(slug));
+ const {search}=useLocation();
+ const [view,setViewState]=useState<AssetView>(()=>new URLSearchParams(location.search).get('view')==='feynman'?'feynman':savedView(slug));
  const setView=(next:AssetView)=>{setViewState(next);try{localStorage.setItem(`lll.assets.view.${slug}`,next);}catch{/* storage unavailable */}};
  const key:AssetKey=view==='practice'?'practice':'review';
  const [editing,setEditing]=useState(false);
@@ -32,7 +34,7 @@ export function AssetsView({slug}:{slug:string}) {
  const practiceVersion=selectedRound?.versionId??asset.data?.meta.currentVersionId??'';
  const roundResult=results.data?.[practiceVersion];
  useEffect(()=>{if(!editing)setDraft(asset.data?.content??'');},[asset.data?.content,editing]);
- useEffect(()=>{setViewState(savedView(slug));setEditing(false);setDraft('');setRoundId(null);},[slug]);
+ useEffect(()=>{setViewState(new URLSearchParams(search).get('view')==='feynman'?'feynman':savedView(slug));setEditing(false);setDraft('');setRoundId(null);},[slug,search]);
  useEffect(()=>setRoundId(null),[asset.data?.meta.currentVersionId]);
  const commit=()=>{if(!asset.data)return;save.mutate({baseEditRevision:asset.data.meta.editRevision,content:draft},{onSuccess:()=>setEditing(false)});};
  return <section className={s.assets}>

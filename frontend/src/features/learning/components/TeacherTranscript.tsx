@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SearchIcon } from '@/shared/primitive/Icons';
 import type { ConversationMessage } from '../api/learningWorkspace';
 import type { TeacherSession } from '../teacher/useTeacherSession';
@@ -14,7 +15,10 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
   const sessionRef = useRef(session); sessionRef.current = session;
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  const follow = useRef(true);
+  const {search}=useLocation();
+  const requestedMessage=new URLSearchParams(search).get('message');
+  const follow = useRef(!requestedMessage);
+  const located=useRef('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState('');
   const copyTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -26,6 +30,12 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
   const last = conversation.data?.messages.at(-1);
   const quickReply = !live && !conversation.data?.queue?.length && last?.role === 'teacher' && last.status === 'completed' ? last : null;
 
+  useEffect(()=>{
+    if(!requestedMessage||located.current===requestedMessage)return;
+    const element=document.getElementById('message-'+requestedMessage);
+    if(element){located.current=requestedMessage;follow.current=false;element.scrollIntoView({block:'center'});}
+    else if(conversation.hasPrevious&&!conversation.isLoadingPrevious)void conversation.loadPrevious();
+  },[requestedMessage,conversation.data,conversation.hasPrevious,conversation.isLoadingPrevious]);
   useEffect(() => {
     if (live?.teacherId) setExpanded(current => current['streaming-teacher'] ? { ...current, [live.teacherId!]: true, 'streaming-teacher': false } : current);
   }, [live?.teacherId]);
@@ -33,7 +43,7 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
   useEffect(() => { if (turnKey) follow.current = true; }, [turnKey]);
   useEffect(() => {
     if (!ready) return;
-    follow.current = true;
+    follow.current = !requestedMessage;
     const scroll = () => { if (viewport.current && follow.current) viewport.current.scrollTop = viewport.current.scrollHeight; };
     scroll();
     const frame = requestAnimationFrame(scroll);

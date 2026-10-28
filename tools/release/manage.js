@@ -17,7 +17,8 @@ if (action === 'build-desktop') {
   }
 } else if (action === 'build') {
   fs.mkdirSync(path.dirname(binary), { recursive: true });
-  const result = spawnSync('go', ['build', '-o', binary, './backend-go/cmd/lll'], { cwd: root, stdio: 'inherit', windowsHide: true });
+  const version = require('../../package.json').version + '-dev';
+  const result = spawnSync('go', ['build', '-ldflags', `-X main.Version=${version}`, '-o', binary, './backend-go/cmd/lll'], { cwd: root, stdio: 'inherit', windowsHide: true });
   process.exitCode = result.status ?? 1;
 } else if (action === 'start') {
   const child = spawn(binary, process.argv.slice(3), { cwd: root, stdio: 'inherit' });

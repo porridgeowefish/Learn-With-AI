@@ -43,7 +43,21 @@ function main(input) {
     assert.match(metadata, /Shortcut:2/);
     assert.match(metadata, /Dialog:/);
     assert.match(metadata, /Upgrade:/);
-    assert.match(metadata, /Media:1/);
+    // WiX splits larger payloads into several cabinets. Every cabinet must be
+    // embedded and present in the MSI, so installation needs no sidecar files.
+    const media = JSON.parse(ps(
+      `$i=New-Object -ComObject WindowsInstaller.Installer;$d=$i.OpenDatabase('${path.resolve(input).replaceAll("'", "''")}',0);$v=$d.OpenView('SELECT DiskId, LastSequence, Cabinet FROM Media ORDER BY DiskId');$v.Execute();$rows=@();while($r=$v.Fetch()){$rows+=@{disk=$r.IntegerData(1);last=$r.IntegerData(2);cabinet=$r.StringData(3)}};$v=$d.OpenView('SELECT Name FROM _Streams');$v.Execute();$streams=@();while($r=$v.Fetch()){$streams+=$r.StringData(1)};@{media=@($rows);streams=@($streams)}|ConvertTo-Json -Depth 4 -Compress`,
+    ));
+    assert(media.media.length > 0, 'Installer has no payload cabinets');
+    let lastSequence = 0;
+    for (const [index, cabinet] of media.media.entries()) {
+      assert.equal(cabinet.disk, index + 1, 'Missing MSI media disk');
+      assert(cabinet.last > lastSequence, 'Invalid cabinet file sequence');
+      assert.match(cabinet.cabinet, /^#.+/, 'External cabinet would be missing from the single-file installer');
+      assert(media.streams.includes(cabinet.cabinet.slice(1)), 'Embedded cabinet stream missing');
+      lastSequence = cabinet.last;
+    }
+    assert.equal(lastSequence, Number(metadata.match(/File:(\d+)/)[1]), 'Cabinets do not cover every packaged file');
     const dialogs = ps(
       `$i=New-Object -ComObject WindowsInstaller.Installer;$d=$i.OpenDatabase('${path.resolve(input).replaceAll("'", "''")}',0);$v=$d.OpenView('SELECT Dialog FROM Dialog');$v.Execute();while($r=$v.Fetch()){Write-Output $r.StringData(1)}`,
     );
