@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/xmz14/lll/backend-go/internal/platform/netproxy"
 )
 
 const resource = "https://api.openai.com/v1"
@@ -31,7 +33,7 @@ const scopes = "openid profile email offline_access resource.invoke chatgpt.toke
 var mu sync.Mutex
 var pending *attempt
 var lastError string
-var client = &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+var client = &http.Client{Timeout: 20 * time.Second, Transport: netproxy.Transport(), CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 
 type record struct {
 	HostID       string    `json:"hostId"`
@@ -213,6 +215,14 @@ func Start() (string, error) {
 			http.Error(w, "Incomplete sign-in callback", 400)
 			return
 		}
+		if a.clientID == "" {
+			if err := retainIssuedClientID(a, issued); err != nil {
+				finish(a, err.Error())
+				http.Error(w, "Sign-in failed. Return to LLL and retry.", 400)
+				go srv.Close()
+				return
+			}
+		}
 		if err := complete(req.Context(), a, issued, code); err != nil {
 			finish(a, err.Error())
 			http.Error(w, "Sign-in failed. Return to LLL and retry.", 400)
@@ -253,6 +263,26 @@ func finish(a *attempt, message string) {
 		pending = nil
 		lastError = message
 	}
+}
+
+// A successful dynamic-registration callback returns the issued client ID.
+// Retain it before token exchange so a network or policy failure can retry
+// with the same registration and a fresh authorization code.
+func retainIssuedClientID(a *attempt, issued string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if pending != a {
+		return errors.New("sign-in attempt is no longer active")
+	}
+	r, err := read()
+	if err != nil {
+		return err
+	}
+	if r.ClientID != "" && r.ClientID != issued {
+		return errors.New("client registration mismatch")
+	}
+	r.ClientID = issued
+	return write(r)
 }
 func exchange(ctx context.Context, form url.Values) (tokenResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", authBase+"/api/accounts/oauth/token", strings.NewReader(form.Encode()))

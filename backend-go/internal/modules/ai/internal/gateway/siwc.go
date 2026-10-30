@@ -13,11 +13,12 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
+	"github.com/xmz14/lll/backend-go/internal/platform/netproxy"
 	"github.com/xmz14/lll/backend-go/internal/platform/siwc"
 )
 
 var siwcAccessToken = siwc.AccessToken
-var siwcHTTPClient = http.DefaultClient
+var siwcHTTPClient = &http.Client{Transport: netproxy.Transport()}
 
 func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	token, err := siwcAccessToken(ctx)

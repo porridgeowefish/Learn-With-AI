@@ -8,7 +8,7 @@ on:
       version:
         description: Release version (numeric major.minor.patch)
         required: true
-        default: '0.8.2'
+        default: '0.8.3'
       publish:
         description: Publish GitHub Release v<version> from this commit after all smokes pass
         type: boolean
