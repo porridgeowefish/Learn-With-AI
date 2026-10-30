@@ -119,11 +119,14 @@ func (s *Service) observe(slug string, cfg notestore.AutoNotesSettings) error {
 	}
 	if cfg.ProviderID == "" {
 		if ai, err := ai.LoadConfig(); err == nil && ai != nil {
-			if binding, ok := ai.Bindings["notes"]; ok {
+			if binding, ok := ai.Bindings["notes"]; ok && binding.ProviderID != "" {
 				cfg.ProviderID = binding.ProviderID
 				if cfg.Model == "" {
 					cfg.Model = binding.Model
 				}
+			} else if teacher := ai.Resolve("teacher"); teacher != nil {
+				cfg.ProviderID = teacher.ID
+				cfg.Model = teacher.Model
 			}
 		}
 	}

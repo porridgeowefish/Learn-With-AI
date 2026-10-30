@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/platform/siwc"
 )
 
 type catalogModel struct {
@@ -54,6 +55,21 @@ func (s *Server) handleModelCatalog(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		provider = *found
+	}
+	if provider.Kind == "siwc" {
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		ids, err := siwc.CurrentModelCatalog(ctx)
+		if err != nil {
+			httpx.Error(w, 502, "ChatGPT model catalog unavailable")
+			return
+		}
+		models := make([]catalogModel, 0, len(ids))
+		for _, id := range ids {
+			models = append(models, catalogModel{ID: id})
+		}
+		httpx.WriteJSON(w, 200, map[string]any{"models": models, "source": "provider", "verifiedAt": time.Now().UTC().Format(time.RFC3339)})
+		return
 	}
 	endpoint, err := url.Parse(strings.TrimRight(strings.TrimSpace(provider.BaseURL), "/"))
 	if err != nil || endpoint.Hostname() == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || (provider.Kind != "openai" && provider.Kind != "anthropic") {

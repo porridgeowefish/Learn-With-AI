@@ -15,7 +15,8 @@ const (
 	ThemeLycheePaper  Theme = "lychee-paper"
 	ThemeMountainMist Theme = "mountain-mist"
 	ThemeWisteriaGray Theme = "wisteria-gray"
-	ThemeNightInk     Theme = "night-ink"
+	ThemeCodexWhite   Theme = "codex-white"
+	ThemeClaudePaper  Theme = "claude-paper"
 )
 
 type Config struct {
@@ -24,7 +25,7 @@ type Config struct {
 
 func ValidTheme(theme Theme) bool {
 	switch theme {
-	case ThemeLycheePaper, ThemeMountainMist, ThemeWisteriaGray, ThemeNightInk:
+	case ThemeLycheePaper, ThemeMountainMist, ThemeWisteriaGray, ThemeCodexWhite, ThemeClaudePaper:
 		return true
 	default:
 		return false

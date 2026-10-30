@@ -338,87 +338,27 @@ func (u *updater) prepare() {
 	u.preparedPath, u.preparedVersion, u.phase = path, version, "ready"
 }
 
-// handler serves GET /api/system/update and POST /api/system/update/install.
-// Install requests must come from the app's own page (same Origin, JSON body),
-// so another website cannot trigger an update through the loopback port.
-func (u *updater) handler(origin string, closeApp func()) http.Handler {
+// handler reports new releases and sends users to GitHub for installation.
+// Former install endpoints stay unavailable for older frontend bundles.
+func (u *updater) handler(_ string, _ func()) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/system/update", func(w http.ResponseWriter, r *http.Request) {
 		u.mu.Lock()
 		busy := u.phase == "downloading" || u.phase == "ready" || u.phase == "installing"
 		info := u.withLastResult(u.info)
-		info.Current, info.CanInstall = u.current, runtime.GOOS == "windows"
+		info.Current, info.CanInstall = u.current, false
 		u.mu.Unlock()
 		if !busy {
 			info = u.check(r.Context(), r.URL.Query().Get("force") == "1")
 		}
+		info.CanInstall = false
 		writeJSON(w, http.StatusOK, info)
 	})
 	mux.HandleFunc("POST /api/system/update/prepare", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Origin") != origin || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "请从应用页面开始更新"})
-			return
-		}
-		if runtime.GOOS != "windows" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请从 GitHub 下载适合当前系统的安装包"})
-			return
-		}
-		u.mu.Lock()
-		if u.phase == "downloading" || u.phase == "ready" || u.phase == "installing" {
-			u.mu.Unlock()
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "更新已在准备或安装中"})
-			return
-		}
-		u.phase, u.updateError, u.downloaded, u.total = "downloading", "", 0, 0
-		u.mu.Unlock()
-		go u.prepare()
-		writeJSON(w, http.StatusAccepted, map[string]string{"phase": "downloading"})
+		http.Error(w, "Download the latest release from GitHub", http.StatusGone)
 	})
 	mux.HandleFunc("POST /api/system/update/install", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Origin") != origin || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "update must be started from Learn-With-AI"})
-			return
-		}
-		u.mu.Lock()
-		busy := u.installed || u.phase != "ready"
-		msi, version := u.preparedPath, u.preparedVersion
-		expected := u.preparedSum
-		if !busy {
-			u.installed, u.phase = true, "installing"
-		}
-		u.mu.Unlock()
-		if busy {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "请先下载并校验更新，再重启安装"})
-			return
-		}
-		var err error
-		// Recheck the staged bytes immediately before executing the helper.
-		file, statErr := os.Open(msi)
-		if statErr != nil {
-			err = errors.New("更新安装包已丢失，请重新下载")
-		} else {
-			hash := sha256.New()
-			_, copyErr := io.Copy(hash, io.LimitReader(file, (512<<20)+1))
-			closeErr := file.Close()
-			if copyErr != nil || closeErr != nil || hex.EncodeToString(hash.Sum(nil)) != expected {
-				err = errors.New("更新安装包校验失败，请重新下载")
-			}
-		}
-		if err == nil {
-			_ = os.Remove(u.statusPath())
-			err = u.launch(msi, version, u.statusPath())
-		}
-		if err != nil {
-			u.mu.Lock()
-			u.installed = false
-			u.phase, u.updateError = "failed", err.Error()
-			u.mu.Unlock()
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-			return
-		}
-		writeJSON(w, http.StatusAccepted, map[string]string{"version": version})
-		// The installer helper waits for this process before replacing files.
-		go func() { time.Sleep(800 * time.Millisecond); closeApp() }()
+		http.Error(w, "Download the latest release from GitHub", http.StatusGone)
 	})
 	return mux
 }

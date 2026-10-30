@@ -1,6 +1,6 @@
 .sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
+  width: 100%;
+  min-width: 0;
   background: var(--card);
   border-right: 1px solid var(--border);
   display: flex;
@@ -366,3 +366,17 @@
 .utilities { display: flex; align-items: center; justify-content: space-between; }
 .utilities a, .utilities button { color: var(--muted); font: inherit; }
 .utilities button { background: transparent; border: 0; cursor: pointer; }
+
+/* Navigation stays readable at the default 280px width. */
+.brand { font-size: 1.25rem; gap: 10px; }
+.brand img { width: 30px; height: 30px; }
+.head, .foot { font-size: .92rem; }
+.section, .subSection { font-size: .92rem; padding-block: 14px 7px; }
+.link, .folderName, .folderInput, .menu button { font-size: 1.08rem; line-height: 1.5; }
+.link { gap: 10px; padding: 9px 10px; }
+.muted { font-size: 1.03rem; line-height: 1.6; }
+.saving, .saveError { font-size: .86rem; }
+.projectType, .count, .menuLabel { font-size: .78rem; }
+.iconBtn { width: 30px; height: 30px; }
+.chevronBtn { width: 26px; height: 26px; }
+.menuBtn { width: 28px; height: 28px; }

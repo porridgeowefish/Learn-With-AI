@@ -11,7 +11,7 @@ export interface AskFrame {
 
 export interface AskProvider {
   id: string;
-  kind: 'openai' | 'anthropic';
+  kind: 'openai' | 'anthropic' | 'siwc';
   name?: string;
   baseURL: string;
   apiKey: string;

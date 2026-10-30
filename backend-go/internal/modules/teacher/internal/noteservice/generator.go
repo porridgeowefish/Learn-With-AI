@@ -28,7 +28,7 @@ func Generate(ctx context.Context, provider, model string, turns []notestore.Not
 	if model == "" {
 		model = p.Model
 	}
-	if p.APIKey == "" || p.BaseURL == "" || model == "" {
+	if (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || model == "" {
 		return "", notestore.NoteUsage{}, ErrProviderNotConfigured
 	}
 	data, err := json.Marshal(turns)

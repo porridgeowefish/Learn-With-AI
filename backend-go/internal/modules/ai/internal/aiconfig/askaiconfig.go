@@ -40,7 +40,7 @@ func (c *Config) Enabled() bool {
 		return false
 	}
 	for _, p := range c.Providers {
-		if p.APIKey != "" && p.BaseURL != "" && p.Model != "" {
+		if (p.Kind == "siwc" || (p.APIKey != "" && p.BaseURL != "")) && p.Model != "" {
 			return true
 		}
 	}

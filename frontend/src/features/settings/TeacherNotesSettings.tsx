@@ -20,6 +20,13 @@ export function TeacherNotesSettings() {
     save.reset();
     setDraft(current => current ? { ...current, ...patch } : current);
   };
+  const toggle = (enabled: boolean) => {
+    if (!draft) return;
+    const next = { ...draft, enabled };
+    setDraft(next);
+    save.reset();
+    save.mutate(next, { onSuccess: () => { dirty.current = false; } });
+  };
   if (query.isError) return <section className={s.card} role="alert">自动笔记配置读取失败。</section>;
   if (!draft) return <section className={s.card} aria-busy="true">加载自动笔记配置…</section>;
 
@@ -33,12 +40,14 @@ export function TeacherNotesSettings() {
         </div>
         <label className={s.toggle}>
           <input type="checkbox" role="switch" checked={draft.enabled} disabled={save.isPending}
-            onChange={event => update({ enabled: event.target.checked })} />
+            onChange={event => toggle(event.target.checked)} />
           <span className={s.track} aria-hidden="true" />
           <span>开启自动笔记</span>
         </label>
       </header>
 
+      <details className={s.advanced}>
+        <summary>高级设置：记录间隔与专用模型</summary>
       <div className={s.fields}>
         <div className={s.field}>
           <label htmlFor={`${id}-interval`}>记录间隔</label>
@@ -55,13 +64,13 @@ export function TeacherNotesSettings() {
           </p>
         </div>
         <div className={s.field}>
-          <label htmlFor={`${id}-provider`}>笔记 API 连接</label>
+          <label htmlFor={`${id}-provider`}>笔记连接</label>
           <select id={`${id}-provider`} className={s.input} value={draft.providerId} disabled={save.isPending}
             onChange={event => update({ providerId: event.target.value, model: '' })}>
             <option value="">跟随当前教师连接</option>
             {ai.data?.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.id}</option>)}
           </select>
-          <p className={s.hint}>由教师直接调用 API 记录，不启动助教。</p>
+          <p className={s.hint}>默认跟随当前学习模型。</p>
         </div>
         {draft.providerId && <div className={s.field}>
           <label htmlFor={`${id}-model`}>笔记模型</label>
@@ -70,13 +79,14 @@ export function TeacherNotesSettings() {
           <p className={s.hint}>留空时使用该连接的默认模型。</p>
         </div>}
       </div>
+      <Button variant="outline" size="sm" loading={save.isPending} disabled={!validInterval}
+        onClick={() => save.mutate(draft, { onSuccess: () => { dirty.current = false; } })}>保存高级设置</Button>
+      </details>
 
       <footer className={s.footer}>
         <p className={save.isError ? s.error : s.hint} role="status" aria-live="polite">
           {save.isError ? `保存失败：${(save.error as Error).message}` : save.isSuccess ? '自动笔记配置已保存。' : '笔记保存在各项目的「资产 → 笔记」中。'}
         </p>
-        <Button variant="primary" size="sm" loading={save.isPending} disabled={!validInterval}
-          onClick={() => save.mutate(draft, { onSuccess: () => { dirty.current = false; } })}>保存自动笔记</Button>
       </footer>
     </section>
   );

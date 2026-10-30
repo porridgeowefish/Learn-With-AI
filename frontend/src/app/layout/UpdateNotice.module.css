@@ -4,16 +4,16 @@
   padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--accent-medium);
   background: var(--surface-tint);
-  font-size: 12px; line-height: 1.5; color: var(--fg);
+  font-size: 14px; line-height: 1.5; color: var(--fg);
 }
-.card strong { font-size: 13px; }
+.card strong { font-size: 15px; }
 .actions { display: flex; gap: 10px; align-items: center; }
 .actions { white-space: nowrap; }
-.actions a:not(.primary) { color: var(--muted); font-size: 12px; }
+.actions a:not(.primary) { color: var(--muted); font-size: 14px; }
 .actions .primary {
   border: 0; border-radius: 7px; padding: 5px 12px; cursor: pointer;
   background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; text-decoration: none;
 }
 .actions .primary:hover { background: var(--accent-ink); }
 .error { color: var(--pink); }
-.version { color: var(--muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+.version { color: var(--muted); font-size: 13px; font-family: 'JetBrains Mono', monospace; }

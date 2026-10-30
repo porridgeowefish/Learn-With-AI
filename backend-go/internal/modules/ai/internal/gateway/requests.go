@@ -106,6 +106,9 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 
 // StreamProvider uses the same protocol implementation for configured and explicit connections.
 func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+	if p.Kind == "siwc" {
+		return streamSIWC(ctx, p, in, emit)
+	}
 	if p.Kind == "anthropic" {
 		return streamAnthropic(ctx, p, in, emit)
 	}
@@ -114,6 +117,15 @@ func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emi
 
 // CompleteProvider shares request mapping and transport with streaming calls.
 func CompleteProvider(ctx context.Context, p askaiconfig.Provider, in Request) (string, error) {
+	if p.Kind == "siwc" {
+		var out strings.Builder
+		err := streamSIWC(ctx, p, in, func(event Event) {
+			if event.Type == "text-delta" {
+				out.WriteString(event.Delta)
+			}
+		})
+		return out.String(), err
+	}
 	p.Thinking = false
 	body := openAIRequest(p, in, false)
 	endpoint := strings.TrimRight(p.BaseURL, "/") + "/chat/completions"

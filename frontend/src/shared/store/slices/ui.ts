@@ -9,11 +9,13 @@ import { STORAGE_KEYS } from '@/shared/lib/constants';
 
 interface UiState {
   sidebarCollapsed: boolean;
+  sidebarWidth: number;
   summaryPanelCollapsed: boolean;
   drawerOpen: boolean;
   createProjectModalOpen: boolean;
   collapsedFolderIds: string[];
   setSidebarCollapsed: (v: boolean) => void;
+  setSidebarWidth: (v: number) => void;
   setSummaryPanelCollapsed: (v: boolean) => void;
   setDrawerOpen: (v: boolean) => void;
   toggleDrawer: () => void;
@@ -26,11 +28,13 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
+      sidebarWidth: 280,
       summaryPanelCollapsed: false,
       drawerOpen: false,
       createProjectModalOpen: false,
       collapsedFolderIds: [],
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      setSidebarWidth: (v) => set({ sidebarWidth: Math.max(220, Math.min(440, Math.round(v))) }),
       setSummaryPanelCollapsed: (v) => set({ summaryPanelCollapsed: v }),
       setDrawerOpen: (v) => set({ drawerOpen: v }),
       toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
@@ -49,6 +53,7 @@ export const useUiStore = create<UiState>()(
       // modals and drawers should always start closed.
       partialize: (s) => ({
         sidebarCollapsed: s.sidebarCollapsed,
+        sidebarWidth: s.sidebarWidth,
         summaryPanelCollapsed: s.summaryPanelCollapsed,
         collapsedFolderIds: s.collapsedFolderIds,
       }),

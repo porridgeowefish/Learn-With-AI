@@ -149,7 +149,7 @@ export function Sidebar() {
         <div className={s.section}>快捷入口</div>
         {QUICK_LINKS.map((q) => (
           <Link key={q.to} to={q.to} className={s.link}>
-            <Icon name={q.icon} size={15} className={s.linkIcon} />
+            <Icon name={q.icon} size={19} className={s.linkIcon} />
             {q.label}
           </Link>
         ))}

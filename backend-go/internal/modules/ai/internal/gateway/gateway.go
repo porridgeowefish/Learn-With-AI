@@ -96,7 +96,7 @@ func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) erro
 	if p != nil && in.Model != "" {
 		p.Model = in.Model
 	}
-	if p == nil || p.APIKey == "" || p.BaseURL == "" || p.Model == "" {
+	if p == nil || (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || p.Model == "" {
 		return errors.New("teacher provider is not configured")
 	}
 	return StreamProvider(ctx, *p, in, emit)

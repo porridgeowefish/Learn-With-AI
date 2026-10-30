@@ -273,7 +273,7 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 		id = in.ProviderID
 	}
 	p := cfg.FindExact(id)
-	if p == nil || p.APIKey == "" || p.BaseURL == "" || (p.Kind != "openai" && p.Kind != "anthropic") {
+	if p == nil || (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || (p.Kind != "openai" && p.Kind != "anthropic" && p.Kind != "siwc") {
 		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	chosen := *p

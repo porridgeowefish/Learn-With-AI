@@ -18,7 +18,7 @@
     <script>
       (() => {
         const key = 'lll.ui.theme';
-        const allowed = ['lychee-paper', 'mountain-mist', 'wisteria-gray', 'night-ink'];
+        const allowed = ['lychee-paper', 'mountain-mist', 'wisteria-gray', 'codex-white', 'claude-paper'];
         const stored = localStorage.getItem(key);
         const preference = allowed.includes(stored) ? stored : 'lychee-paper';
         document.documentElement.dataset.theme = preference;

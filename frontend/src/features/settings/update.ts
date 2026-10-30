@@ -53,20 +53,6 @@ export function useCheckUpdate() {
   });
 }
 
-export function useInstallUpdate() {
-  return useMutation({
-    mutationFn: () => http.post<{ version: string }>('/api/system/update/install', {}),
-  });
-}
-
-export function usePrepareUpdate() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: () => http.post('/api/system/update/prepare', {}),
-    onSuccess: () => { client.setQueryData<UpdateInfo | null>(updateKey, info => info ? { ...info, phase: 'downloading', error: undefined } : info); void client.invalidateQueries({ queryKey: updateKey }); },
-  });
-}
-
 // msiexec success codes: 0 and 3010 (success, reboot suggested).
 export function failedAttempt(info: UpdateInfo | null | undefined): UpdateAttempt | null {
   const last = info?.lastResult;

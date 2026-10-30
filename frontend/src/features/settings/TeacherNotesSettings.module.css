@@ -18,6 +18,9 @@
 .toggle input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 3px; }
 .toggle input:disabled ~ span { opacity: .6; }
 .fields { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 18px 28px; }
+.advanced { margin-top: 16px; font-size: .8rem; color: var(--muted); }
+.advanced summary { cursor: pointer; }
+.advanced > button { margin-top: 16px; }
 .field { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .field > label { font-size: .78rem; font-weight: 600; }
 .input { width: 100%; min-width: 0; height: 36px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--fg); font: inherit; font-size: .82rem; }

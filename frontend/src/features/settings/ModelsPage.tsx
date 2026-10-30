@@ -5,6 +5,7 @@ import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
 import { Modal } from '@/shared/primitive/Modal';
 import { SecretInput } from '@/shared/primitive/SecretInput';
+import { SIWCConnection } from './SIWCConnection';
 import s from './ModelsPage.module.css';
 
 const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: config.providers.map(p => ({ ...p })),
@@ -39,6 +40,7 @@ export function ModelsPage() {
   const [discovered, setDiscovered] = useState<string[]>([]);
   const [catalogBusy, setCatalogBusy] = useState(false);
   const [catalogMessage, setCatalogMessage] = useState('');
+  const [mode, setMode] = useState<'login' | 'api'>('login');
   editorRef.current = editor;
   useEffect(() => { if (settings.data && !dirtyRef.current) setDraft(copyConfig(settings.data)); }, [settings.data]);
   const editConfig = (change: (current: AskConfig) => AskConfig) => {
@@ -113,10 +115,14 @@ export function ModelsPage() {
   const modelIds = [...new Set([...(preset?.models.map(m => m.id) ?? []), ...discovered, ...(editor?.provider.model ? [editor.provider.model] : [])])];
   const options = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
   return <section className={s.section} aria-labelledby="api-connections-title">
-    <header className={s.header} data-tour="model-connections"><h2 id="api-connections-title">API 模型</h2><div className={s.actions}>
-      <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加连接</Button>
+    <header className={s.header} data-tour="model-connections"><h2 id="api-connections-title">模型连接</h2><div className={s.actions}>
+      {mode === 'api' && <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button>}
       <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>
+    <div className={s.actions} role="group" aria-label="连接方式"><Button size="sm" variant={mode === 'login' ? 'primary' : 'outline'} onClick={() => setMode('login')}>登录连接</Button><Button size="sm" variant={mode === 'api' ? 'primary' : 'outline'} onClick={() => setMode('api')}>API 连接</Button></div>
+    {mode === 'login' && <SIWCConnection config={draft} save={next => persist(next)} />}
+    <div className={s.bindings}><label>当前学习模型<select value={draft.bindings?.teacher?.providerId || draft.default} onChange={event => setBinding('teacher', event.target.value)}><option value="">选择连接</option>{options}</select></label><p className={s.saveStatus}>教师、Ask AI、复习稿与练习默认使用此连接。</p></div>
+    <div className={s.apiMode} hidden={mode !== 'api'}>
     <div className={s.trial}>
       <div><a href="https://console.cloud.tencent.com/tokenhub/models" target="_blank" rel="noreferrer">领取腾讯云免费体验额度</a><p>领取后创建 API Key，在这里添加连接；额度与有效期以控制台为准。</p></div>
       <Button size="sm" disabled={save.isPending} onClick={() => openEditor(undefined, PROVIDER_PRESETS.find(item => item.id === 'tencent-tokenhub')!)}>配置 TokenHub 试用</Button>
@@ -135,14 +141,15 @@ export function ModelsPage() {
     {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
     {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">
-      {!draft.providers.length && <p className={s.empty}>添加 API 连接后即可开始学习。</p>}
-      {draft.providers.map(provider => <button key={provider.id} type="button" className={s.preview} aria-label={`编辑 ${provider.name || provider.model || '未命名连接'}`} disabled={save.isPending} onClick={() => openEditor(provider)}>
+      {!draft.providers.some(provider => provider.kind !== 'siwc') && <p className={s.empty}>添加 API 连接后即可开始学习。</p>}
+      {draft.providers.filter(provider => provider.kind !== 'siwc').map(provider => <button key={provider.id} type="button" className={s.preview} aria-label={`编辑 ${provider.name || provider.model || '未命名连接'}`} disabled={save.isPending} onClick={() => openEditor(provider)}>
         <span className={`${s.connectionIcon} ${detected.get(provider.id) === JSON.stringify(provider) ? s.detected : ''}`} title={detected.get(provider.id) === JSON.stringify(provider) ? '已检测' : '尚未检测'}><Icon name="link" /></span>
         <span className={s.previewText}><strong>{provider.name || provider.model || '未命名连接'}</strong><small>{provider.model}</small></span><Icon name="pen" size={14} />
       </button>)}
     </div>
-    <div className={s.bindings}>
-      {PURPOSES.map(([key, label]) => {
+    </div>
+    <details className={s.planNotes}><summary>高级设置：按用途单独指定连接</summary><div className={s.bindings}>
+      {PURPOSES.filter(([key]) => key !== 'teacher').map(([key, label]) => {
         const binding = draft.bindings?.[key];
         const value = binding?.providerId ?? (key === 'teacher' ? draft.default : key === 'documentStructure' ? draft.bindings?.ocr?.providerId ?? '' : '');
         const missing = value && !draft.providers.some(p => p.id === value);
@@ -154,7 +161,7 @@ export function ModelsPage() {
         </select></label>{binding?.providerId && <label className={s.modelOverride}>模型覆盖<ModelSelect key={binding.providerId} label={`${label}模型覆盖`} value={binding.model ?? ''} models={bindingModels} disabled={save.isPending} onChange={model => setBinding(key, binding.providerId, model)} /></label>}</div>;
       })}
       <label>搜索引擎<select value={draft.searchEngine} disabled={save.isPending} onChange={event => editConfig(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
-    </div>
+    </div></details>
     <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="选择提供方和模型，填写 Key。" className={s.connectionModal}
       footer={<><Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => closeEditor(true)}>取消</Button><Button size="sm" variant="primary" loading={save.isPending} disabled={!editor?.provider.model.trim() || !editor.provider.baseURL.trim()} onClick={saveEditor}>保存连接</Button></>}>
       {editor && <>

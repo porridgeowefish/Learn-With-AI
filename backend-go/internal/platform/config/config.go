@@ -110,8 +110,8 @@ func (c *Config) Validate() error {
 	}
 	seen := map[string]bool{}
 	for i, p := range c.AI.Providers {
-		if p.Kind != "openai" && p.Kind != "anthropic" {
-			return fmt.Errorf("ai.providers[%d].kind %q is not one of openai|anthropic", i, p.Kind)
+		if p.Kind != "openai" && p.Kind != "anthropic" && p.Kind != "siwc" {
+			return fmt.Errorf("ai.providers[%d].kind %q is not one of openai|anthropic|siwc", i, p.Kind)
 		}
 		if p.ID == "" {
 			return fmt.Errorf("ai.providers[%d].id is required", i)
@@ -122,7 +122,7 @@ func (c *Config) Validate() error {
 		seen[p.ID] = true
 	}
 	switch c.UI.Theme {
-	case "lychee-paper", "mountain-mist", "wisteria-gray", "night-ink":
+	case "lychee-paper", "mountain-mist", "wisteria-gray", "codex-white", "claude-paper":
 	default:
 		return fmt.Errorf("ui.theme %q is not a supported theme", c.UI.Theme)
 	}
@@ -248,6 +248,10 @@ func Load(opts Options) (Config, Provenance, error) {
 
 	applyEnv(&cfg, prov)
 	applyFlags(&cfg, opts, prov)
+	if cfg.UI.Theme == "night-ink" {
+		cfg.UI.Theme = "lychee-paper"
+		warnf(&cfg, "config: retired night-ink theme uses lychee-paper")
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return cfg, prov, err

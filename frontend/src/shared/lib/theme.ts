@@ -1,6 +1,6 @@
 export const THEME_STORAGE_KEY = 'lll.ui.theme';
 
-export const themes = ['lychee-paper', 'mountain-mist', 'wisteria-gray', 'night-ink'] as const;
+export const themes = ['lychee-paper', 'mountain-mist', 'wisteria-gray', 'codex-white', 'claude-paper'] as const;
 export type ThemePreference = (typeof themes)[number];
 
 export function isThemePreference(value: unknown): value is ThemePreference {

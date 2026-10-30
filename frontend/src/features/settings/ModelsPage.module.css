@@ -1,4 +1,6 @@
 .section { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.apiMode { display:flex; flex-direction:column; gap:12px; }
+.apiMode[hidden] { display:none; }
 .setupGuide { border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-size:.8rem; line-height:1.8; color:var(--muted); }
 .setupGuide summary { cursor:pointer; color:var(--fg); font-weight:600; }
 .setupGuide ol, .editorGuide { padding-left:22px; margin:10px 0; }
@@ -46,4 +48,6 @@
 .planNotes summary { cursor: pointer; }
 .planNotes p { margin: 8px 0; }
 .planNotes a { display: block; }
+.siwcModel { display:flex; flex-direction:column; gap:5px; max-width:340px; margin:12px 0; color:var(--muted); font-size:.76rem; }
+.siwcModel select { min-height:36px; border:1px solid var(--border); border-radius:6px; padding:7px 9px; background:var(--card); color:var(--fg); }
 @media (max-width: 560px) { .formGrid, .bindings { grid-template-columns: minmax(0, 1fr); } .header { align-items: flex-start; flex-wrap: wrap; } .card { padding: 12px; } }

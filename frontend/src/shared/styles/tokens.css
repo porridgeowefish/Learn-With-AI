@@ -96,36 +96,68 @@
   --shadow-color: 38 73 98;
 }
 
-:root[data-theme='night-ink'] {
-  color-scheme: dark;
-  --bg: #202521;
-  --fg: #ebeee8;
-  --card: #292f2a;
-  --border: #465047;
-  --muted: #b7bdb4;
-  --accent: #a7b99f;
-  --accent2: #bdcbb7;
-  --accent-ink: #c9d7c2;
-  --on-accent: #1d261d;
-  --orange: #d6a26e;
-  --sky: #9ab9c7;
-  --pink: #d68d8a;
-  --surface-raised: #303731;
-  --surface-sunken: #191e1a;
-  --surface-tint: #323a32;
-  --surface-translucent: rgba(41, 47, 42, 0.82);
-  --accent-soft: rgba(167, 185, 159, 0.10);
-  --accent-medium: rgba(167, 185, 159, 0.20);
-  --ink-soft: rgba(235, 238, 232, 0.09);
-  --overlay: rgba(7, 10, 8, 0.65);
-  --code-bg: #121612;
-  --code-fg: #e5eae2;
-  --heat-0: #313832;
-  --heat-1: #465347;
-  --heat-2: #607361;
-  --heat-3: #819680;
-  --heat-4: #a7b99f;
-  --shadow-color: 5 8 6;
+:root[data-theme='codex-white'] {
+  color-scheme: light;
+  --bg: #f8f9f8;
+  --fg: #202321;
+  --card: #ffffff;
+  --border: #e1e5e2;
+  --muted: #626b66;
+  --accent: #202321;
+  --accent2: #343a36;
+  --accent-ink: #202321;
+  --on-accent: #ffffff;
+  --orange: #9d623b;
+  --sky: #517b90;
+  --pink: #a35b63;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f0f2f0;
+  --surface-tint: #f1f3f2;
+  --surface-translucent: rgba(255, 255, 255, 0.84);
+  --accent-soft: rgba(32, 35, 33, 0.07);
+  --accent-medium: rgba(32, 35, 33, 0.15);
+  --ink-soft: rgba(32, 35, 33, 0.07);
+  --overlay: rgba(32, 35, 33, 0.42);
+  --code-bg: #202321;
+  --code-fg: #f2f5f2;
+  --heat-0: #e9ece9;
+  --heat-1: #d8e0da;
+  --heat-2: #b8c9bc;
+  --heat-3: #8aa793;
+  --heat-4: #557960;
+  --shadow-color: 32 35 33;
+}
+
+:root[data-theme='claude-paper'] {
+  color-scheme: light;
+  --bg: #faf9f5;
+  --fg: #302c28;
+  --card: #fffdf8;
+  --border: #e8e6dc;
+  --muted: #6e6962;
+  --accent: #b65f43;
+  --accent2: #9e4e37;
+  --accent-ink: #9e4e37;
+  --on-accent: #ffffff;
+  --orange: #a96339;
+  --sky: #5d7f99;
+  --pink: #ae6162;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f1eee6;
+  --surface-tint: #f7eee7;
+  --surface-translucent: rgba(255, 253, 248, 0.82);
+  --accent-soft: rgba(182, 95, 67, 0.08);
+  --accent-medium: rgba(182, 95, 67, 0.17);
+  --ink-soft: rgba(48, 44, 40, 0.08);
+  --overlay: rgba(48, 44, 40, 0.42);
+  --code-bg: #2b2825;
+  --code-fg: #f6f1e9;
+  --heat-0: #ece7df;
+  --heat-1: #ead8ca;
+  --heat-2: #dcb6a2;
+  --heat-3: #c68d71;
+  --heat-4: #a85e45;
+  --shadow-color: 48 44 40;
 }
 
 :root {
@@ -137,7 +169,7 @@
   --shadow: 0 2px 8px rgb(var(--shadow-color) / 0.08);
   --shadow-md: 0 6px 18px rgb(var(--shadow-color) / 0.10);
   --shadow-lg: 0 18px 44px rgb(var(--shadow-color) / 0.18);
-  --sidebar-w: 176px;
+  --sidebar-w: 280px;
   --header-h: 44px;
   --workspace-header-h: 52px;
 }
