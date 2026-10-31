@@ -5,6 +5,7 @@ import { useSSE } from '@/app/hooks/useSSE';
 import { useActivityRefresh } from '@/app/hooks/useActivityRefresh';
 import { TreasureNotifications } from '@/features/treasures';
 import { ScreenGuide } from './ScreenGuide';
+import { RegionPinTool } from './RegionPinTool';
 import { Sidebar } from './Sidebar';
 import { useUiStore } from '@/shared/store';
 import s from './AppShell.module.css';
@@ -32,6 +33,6 @@ export function AppShell() {
     onPointerDown={event => { resizing.current = true; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }}
     onPointerMove={event => { if (resizing.current) setSidebarWidth(Math.min(event.clientX, window.innerWidth - 360)); }}
     onPointerUp={() => { resizing.current = false; }} onLostPointerCapture={() => { resizing.current = false; }} /></div>
-  <main className={s.main}><Outlet/></main>
+  <main className={s.main}>{typeof (window as Window & { lllCaptureWindow?: unknown }).lllCaptureWindow === 'function' && <div className={s.topTools}><RegionPinTool/></div>}<Outlet/></main>
  </div><ScreenGuide/><TreasureNotifications/></div>;
 }

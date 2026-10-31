@@ -138,6 +138,11 @@ func RunWindow(engine *Engine, smokeResult string) error {
 	}); err != nil {
 		return err
 	}
+	if err := view.Bind("lllCaptureWindow", func() (windowCapture, error) {
+		return captureWindowForPage(uintptr(view.Window()))
+	}); err != nil {
+		return err
+	}
 	// Untrusted links never receive a filesystem or arbitrary process bridge.
 	origin, _ := json.Marshal(engine.URL)
 	view.Init(fmt.Sprintf(`(()=>{const origin=%s;document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(!a)return;let u;try{u=new URL(a.href,location.href)}catch{return}if(u.origin!==origin){event.preventDefault();event.stopImmediatePropagation();if(u.protocol==='https:'||u.protocol==='http:')window.lllOpenExternal(u.href).catch(()=>{});}else if(a.target==='_blank'&&!a.download){event.preventDefault();location.href=u.href}},true);window.open=(url)=>{const u=new URL(url,location.href);if(u.origin===origin){location.href=u.href}else if(u.protocol==='https:'||u.protocol==='http:'){window.lllOpenExternal(u.href).catch(()=>{})}return null}})();`, origin))
@@ -197,7 +202,7 @@ func RunWindow(engine *Engine, smokeResult string) error {
 			return err
 		}
 		// Timers only: requestAnimationFrame is suspended while a window is occluded (CI desktops).
-		view.Init(`window.addEventListener('DOMContentLoaded',()=>{const deadline=Date.now()+40000;const state=()=>{const nav=document.querySelector('aside[aria-label="应用导航"]');const root=document.getElementById('root');const main=root&&root.querySelector('main');return {nav:!!nav,navHeight:nav?nav.getBoundingClientRect().height:0,brand:!!root&&root.textContent.includes('Learn-With-AI'),heading:!!(main&&main.querySelector('h1')),mainHeight:main?main.getBoundingClientRect().height:0,visibility:document.visibilityState,textLength:root?root.textContent.length:0,title:document.title,url:location.href};};const check=()=>{const s=state();if(s.nav&&s.navHeight>0&&s.brand&&s.heading&&s.mainHeight>0){setTimeout(()=>window.lllSmokeReady(JSON.stringify({ok:true,...s})),300);}else if(Date.now()<deadline){setTimeout(check,100);}else{window.lllSmokeReady(JSON.stringify({ok:false,...s}));}};check();});`)
+		view.Init(`window.addEventListener('DOMContentLoaded',()=>{const deadline=Date.now()+40000;const state=()=>{const nav=document.querySelector('aside[aria-label="应用导航"]');const root=document.getElementById('root');const main=root&&root.querySelector('main');return {nav:!!nav,navHeight:nav?nav.getBoundingClientRect().height:0,brand:!!root&&root.textContent.includes('Learn-With-AI'),heading:!!(main&&main.querySelector('h1')),mainHeight:main?main.getBoundingClientRect().height:0,visibility:document.visibilityState,textLength:root?root.textContent.length:0,title:document.title,url:location.href};};const check=()=>{const s=state();if(s.nav&&s.navHeight>0&&s.brand&&s.heading&&s.mainHeight>0){setTimeout(()=>window.lllCaptureWindow().then(c=>window.lllSmokeReady(JSON.stringify({ok:c.dataUrl?.startsWith('data:image/png;base64,')&&c.dataUrl.length>1000&&c.viewport?.width>0&&c.viewport?.height>0,...s,captureViewport:c.viewport}))).catch(e=>window.lllSmokeReady(JSON.stringify({ok:false,...s,captureError:String(e)}))),300);}else if(Date.now()<deadline){setTimeout(check,100);}else{window.lllSmokeReady(JSON.stringify({ok:false,...s}));}};check();});`)
 		go func() {
 			select {
 			case <-timer.C:
