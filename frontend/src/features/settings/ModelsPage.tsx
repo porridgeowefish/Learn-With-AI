@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { discoverModels, useAskAiSettings, useProbeAskAi, useSaveAskAiSettings, type AskConfig, type AskProvider } from './askAi';
-import { applyProviderPreset, CODING_PLAN_LINKS, presetForProvider, PROVIDER_PRESETS, type ProviderPreset } from './providerPresets';
+import { applyProviderPreset, presetForProvider, PROVIDER_PRESETS } from './providerPresets';
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
 import { Modal } from '@/shared/primitive/Modal';
@@ -13,6 +13,12 @@ const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: co
 });
 const PURPOSES = [ ['teacher', '教师'], ['annotationAskAI', 'Ask AI'], ['review', '复习稿'], ['practice', '练习'],
   ['disciplineMap', '学科地图'], ['documentStructure', '文档公式识别'] ] as const;
+const API_SOURCES = [
+  { id: 'tencent-tokenhub', label: '腾讯云 TokenHub' },
+  { id: 'openai', label: 'OpenAI' },
+  { id: 'deepseek', label: 'DeepSeek' },
+  { id: 'gemini', label: 'Google Gemini' },
+] as const;
 interface Editor { token: number; provider: AskProvider; original: string; isNew: boolean; presetId: string }
 function ModelSelect({ value, models, label, disabled, onChange }: { value: string; models: string[]; label: string; disabled?: boolean; onChange: (model: string) => void }) {
   const [custom, setCustom] = useState(false);
@@ -47,8 +53,8 @@ export function ModelsPage() {
     dirtyRef.current = true; revision.current++; setDirty(true); save.reset();
     setDraft(current => current ? change(current) : current);
   };
-  const openEditor = (provider?: AskProvider, initialPreset: ProviderPreset = PROVIDER_PRESETS.find(item => item.id === 'tencent-tokenhub')!) => {
-    const value = provider ? { ...provider } : applyProviderPreset({ id: crypto.randomUUID(), kind: 'openai', baseURL: '', apiKey: '', model: '' }, initialPreset);
+  const openEditor = (provider?: AskProvider) => {
+    const value = provider ? { ...provider } : { id: crypto.randomUUID(), kind: 'openai' as const, baseURL: '', apiKey: '', model: '' };
     const next = { token: ++token.current, provider: value, original: JSON.stringify(value), isNew: !provider, presetId: presetForProvider(value)?.id ?? 'custom' };
     editorRef.current = next; setEditor(next); setDiscard(false); setProbeResult(null); setDiscovered([]); setCatalogMessage(''); setCatalogBusy(false); probe.reset(); save.reset();
   };
@@ -115,29 +121,14 @@ export function ModelsPage() {
   const modelIds = [...new Set([...(preset?.models.map(m => m.id) ?? []), ...discovered, ...(editor?.provider.model ? [editor.provider.model] : [])])];
   const options = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
   return <section className={s.section} aria-labelledby="api-connections-title">
-    <header className={s.header} data-tour="model-connections"><h2 id="api-connections-title">模型连接</h2><div className={s.actions}>
-      {mode === 'api' && <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button>}
+    <header className={s.header} data-tour="model-connections"><div><h2 id="api-connections-title">AI 连接</h2><p className={s.intro}>在这里连接学习使用的 AI。已有 API Key 时，添加 API 连接即可。</p></div><div className={s.actions}>
       <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>
     <div className={s.actions} role="group" aria-label="连接方式"><Button size="sm" variant={mode === 'login' ? 'primary' : 'outline'} onClick={() => setMode('login')}>登录连接</Button><Button size="sm" variant={mode === 'api' ? 'primary' : 'outline'} onClick={() => setMode('api')}>API 连接</Button></div>
     {mode === 'login' && <SIWCConnection config={draft} save={next => persist(next)} />}
     <div className={s.bindings}><label>当前学习模型<select value={draft.bindings?.teacher?.providerId || draft.default} onChange={event => setBinding('teacher', event.target.value)}><option value="">选择连接</option>{options}</select></label><p className={s.saveStatus}>教师、Ask AI、复习稿与练习默认使用此连接。</p></div>
     <div className={s.apiMode} hidden={mode !== 'api'}>
-    <div className={s.trial}>
-      <div><a href="https://console.cloud.tencent.com/tokenhub/models" target="_blank" rel="noreferrer">领取腾讯云免费体验额度</a><p>领取后创建 API Key，在这里添加连接；额度与有效期以控制台为准。</p></div>
-      <Button size="sm" disabled={save.isPending} onClick={() => openEditor(undefined, PROVIDER_PRESETS.find(item => item.id === 'tencent-tokenhub')!)}>配置 TokenHub 试用</Button>
-    </div>
-    <details className={s.setupGuide} open={!draft.providers.length}>
-      <summary>第一次配置？按这五步完成</summary>
-      <ol>
-        <li><strong>领取额度。</strong>打开上方腾讯云模型广场，登录并按控制台要求开通服务，在“新用户福利”领取体验额度，记下有额度的模型。</li>
-        <li><strong>复制密钥。</strong><a href="https://console.cloud.tencent.com/tokenhub/apikey" target="_blank" rel="noreferrer">打开 Key 管理</a>，创建普通 API Key 并复制。免费体验使用普通 API Key。</li>
-        <li><strong>添加连接。</strong>点击“配置 TokenHub 试用”，从模型下拉框选刚才有额度的模型，把复制的密钥粘贴到 API Key；接口地址会自动填好。</li>
-        <li><strong>检测并保存。</strong>点击“探测连接”，看到“已连通”后点击“保存连接”。失败时检查 Key 是否完整、该模型是否已开通、额度是否可用。</li>
-        <li><strong>用于学习。</strong>在下面“教师”中选这个连接，再点击“保存配置”。复习稿、练习和 Ask AI 默认跟随教师。回到项目即可提问。</li>
-      </ol>
-      <p>其他提供方：点击“添加连接”→选择提供方→选择模型→通过“获取 Key”打开对应平台复制密钥→检测并保存。新增第一个连接会自动成为教师默认；已有连接时需在下方手动切换教师。</p>
-    </details>
+    <div className={s.apiSetup}><div><h3>配置 API</h3><p>选择你已有的 API 服务商，填写 API Key 和模型，检测后保存。第一个连接会自动用于学习。</p></div><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button></div>
     {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
     {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">
@@ -147,6 +138,7 @@ export function ModelsPage() {
         <span className={s.previewText}><strong>{provider.name || provider.model || '未命名连接'}</strong><small>{provider.model}</small></span><Icon name="pen" size={14} />
       </button>)}
     </div>
+    <div className={s.apiSources}><h3>获取 API Key</h3><p>还没有 API Key？到服务商网站开通并复制，再回到上方添加连接。腾讯云 TokenHub 是其中一个入口，也可以使用其他服务商。</p><div className={s.sourceLinks}>{API_SOURCES.map(source => { const provider = PROVIDER_PRESETS.find(item => item.id === source.id); return provider && <a key={source.id} href={provider.keyURL} target="_blank" rel="noreferrer">{source.label}<span aria-hidden="true">↗</span></a>; })}</div></div>
     </div>
     <details className={s.planNotes}><summary>高级设置：按用途单独指定连接</summary><div className={s.bindings}>
       {PURPOSES.filter(([key]) => key !== 'teacher').map(([key, label]) => {
@@ -162,19 +154,14 @@ export function ModelsPage() {
       })}
       <label>搜索引擎<select value={draft.searchEngine} disabled={save.isPending} onChange={event => editConfig(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
     </div></details>
-    <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="选择提供方和模型，填写 Key。" className={s.connectionModal}
+    <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="填写已有 API Key，选择模型并检测连接。" className={s.connectionModal}
       footer={<><Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => closeEditor(true)}>取消</Button><Button size="sm" variant="primary" loading={save.isPending} disabled={!editor?.provider.model.trim() || !editor.provider.baseURL.trim()} onClick={saveEditor}>保存连接</Button></>}>
       {editor && <>
-        <ol className={s.editorGuide}>
-          <li>{preset?.id === 'tencent-tokenhub' ? <>先在<a href="https://console.cloud.tencent.com/tokenhub/models" target="_blank" rel="noreferrer">模型广场</a>领取额度，然后<a href={preset.keyURL} target="_blank" rel="noreferrer">创建普通 API Key</a>并复制。</> : <>在提供方平台开通服务，通过下方“获取 Key”创建并复制 API Key。</>}</li>
-          <li>下拉选择已开通的模型，把密钥粘贴到 API Key。提供方的接口地址已经预填。</li>
-          <li>点击“探测连接”，成功后“保存连接”；随后在配置页选择教师连接并“保存配置”。</li>
-        </ol>
         <div className={s.formGrid}>
         <label className={s.wide}>提供方<select value={editor.presetId} onChange={event => {
           const selected = PROVIDER_PRESETS.find(item => item.id === event.target.value); setDiscovered([]); setCatalogBusy(false);
           if (selected) patch(applyProviderPreset(editor.provider, selected), selected.id); else patch({}, 'custom');
-        }}>{(['套餐', '官方', '聚合 / 中转'] as const).map(group => <optgroup key={group} label={group}>{PROVIDER_PRESETS.filter(p => p.group === group).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}<option value="custom">自行配置</option></select></label>
+        }}><option value="custom">选择服务商或自行配置</option>{(['套餐', '官方', '聚合 / 中转'] as const).map(group => <optgroup key={group} label={group}>{PROVIDER_PRESETS.filter(p => p.group === group).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}</select></label>
         {preset ? <label className={s.wide}>模型<ModelSelect key={`${editor.token}-${preset.id}`} label="模型" value={editor.provider.model} models={modelIds} onChange={model => { const known = preset.models.find(m => m.id === model); patch({ model, contextWindowTokens: known?.contextWindowTokens }); }} /><small>直接选择已开通的模型。填好 Key 后，“获取模型列表”可补充该账号的模型。</small></label> : <>
           <label>显示名称<input value={editor.provider.name ?? ''} onChange={event => patch({ name: event.target.value })} /></label>
           <label>接口协议<select value={editor.provider.kind} onChange={event => patch({ kind: event.target.value as AskProvider['kind'] })}><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option></select></label>
@@ -184,7 +171,7 @@ export function ModelsPage() {
         </>}
         <label className={s.wide}>API Key<SecretInput value={editor.provider.apiKey} onChange={value => patch({ apiKey: value, apiKeyEnv: '' })} />{editor.provider.apiKeyEnv && !editor.provider.apiKey && <small>已使用环境变量密钥，留空保留。</small>}</label>
         <div className={`${s.flags} ${s.wide}`}><label><input type="checkbox" checked={!!editor.provider.reasoning} onChange={event => patch({ reasoning: event.target.checked })} />显示思考摘要</label>{editor.provider.kind === 'anthropic' && <label><input type="checkbox" checked={!!editor.provider.thinking} onChange={event => patch({ thinking: event.target.checked })} />启用思考</label>}</div>
-      </div><div className={s.links}>{preset && <><a href={preset.keyURL} target="_blank" rel="noreferrer">获取 Key</a><a href={preset.docsURL} target="_blank" rel="noreferrer">官方文档</a>{preset.planURL && <a href={preset.planURL} target="_blank" rel="noreferrer">套餐</a>}</>}{preset?.note && <p>{preset.note}</p>}</div>
+      </div>{preset?.note && <p className={s.presetNote}>{preset.note}</p>}
       <div className={s.cardFooter}><div className={s.actions}><Button size="sm" variant="outline" loading={probe.isPending} onClick={probeEditor}>探测连接</Button><Button size="sm" variant="ghost" loading={catalogBusy} onClick={() => { void loadModels(); }}>获取模型列表</Button></div>
         {!editor.isNew && <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => { editConfig(current => ({ ...current, providers: current.providers.filter(p => p.id !== editor.provider.id) })); closeEditor(true); }}>删除</Button>}
       </div>{probeResult && <p role="status" className={probeResult.ok ? s.connected : s.error}>{probeResult.ok ? '已连通' : probeResult.error || '连接失败'}</p>}{catalogMessage && <p className={s.saveStatus} role="status">{catalogMessage}</p>}
@@ -192,6 +179,5 @@ export function ModelsPage() {
       {discard && <div className={s.discard} role="alert"><span>放弃未保存的修改？</span><Button size="sm" variant="ghost" onClick={() => setDiscard(false)}>继续编辑</Button><Button size="sm" onClick={() => closeEditor(true)}>放弃修改</Button></div>}
       </>}
     </Modal>
-    <details className={s.planNotes}><summary>套餐说明</summary>{CODING_PLAN_LINKS.map(item => <a key={item.id} href={item.docsURL} target="_blank" rel="noreferrer">{item.name}：{item.note}</a>)}</details>
   </section>;
 }

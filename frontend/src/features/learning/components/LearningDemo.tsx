@@ -58,7 +58,7 @@ export function LearningDemo({ onClose, onStart, onConfigure }: { onClose: () =>
           <details className={s.resource} open><summary>一阶优化 → 梯度下降</summary><p>目标：理解目标函数、梯度和学习率的关系。</p><ul><li>方向：局部变化与负梯度</li><li>步长：下降、振荡与发散</li><li>边界：凸性、驻点与停止条件</li></ul></details>
           <details className={s.resource}><summary>接下来可探索：随机梯度与动量</summary><p>当完整梯度计算昂贵时，如何使用采样？如何利用过去的更新信息？这些是后续主题，本次示例尚未讲解。</p></details>
           <p className={s.note}>你已经体验了从提问到复习、练习、笔记和资料的过程。创建自己的系统学习项目，或先建一张学科地图。</p>
-          {onConfigure && <div className={s.annotation}><p>还没有 API？统一配置里提供腾讯云 TokenHub 免费体验入口，可领取额度后添加连接。</p><Button size="sm" onClick={onConfigure}>去配置试用</Button></div>}
+          {onConfigure && <div className={s.annotation}><p>还没有 AI 连接？可在设置里添加已有的 API Key，也可查看不同服务商的获取入口。</p><Button size="sm" onClick={onConfigure}>设置 AI 连接</Button></div>}
         </section>}
       </div>
     </div>

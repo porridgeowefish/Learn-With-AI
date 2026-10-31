@@ -138,8 +138,33 @@ func RunWindow(engine *Engine, smokeResult string) error {
 	}); err != nil {
 		return err
 	}
-	if err := view.Bind("lllCaptureWindow", func() (windowCapture, error) {
-		return captureWindowForPage(uintptr(view.Window()))
+	if err := view.Bind("lllCaptureRegion", func(request captureRequest) error {
+		if request.ID == 0 {
+			return errors.New("capture request ID is required")
+		}
+		// WebView2 invokes bound functions on its UI thread. PrintWindow is
+		// synchronous and may wait for that same thread to paint, so run it
+		// separately and deliver only the selected pixels back to the page.
+		hwnd := uintptr(view.Window())
+		go func() {
+			shot, captureErr := captureRegionForPage(hwnd, request)
+			reply := struct {
+				ID uint64 `json:"id"`
+				windowCapture
+				Error string `json:"error,omitempty"`
+			}{ID: request.ID, windowCapture: shot}
+			if captureErr != nil {
+				reply.Error = captureErr.Error()
+			}
+			data, err := json.Marshal(reply)
+			if err != nil {
+				return
+			}
+			view.Dispatch(func() {
+				view.Eval("window.dispatchEvent(new CustomEvent('lll-region-capture-result',{detail:" + string(data) + "}));")
+			})
+		}()
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -202,7 +227,7 @@ func RunWindow(engine *Engine, smokeResult string) error {
 			return err
 		}
 		// Timers only: requestAnimationFrame is suspended while a window is occluded (CI desktops).
-		view.Init(`window.addEventListener('DOMContentLoaded',()=>{const deadline=Date.now()+40000;const state=()=>{const nav=document.querySelector('aside[aria-label="应用导航"]');const root=document.getElementById('root');const main=root&&root.querySelector('main');return {nav:!!nav,navHeight:nav?nav.getBoundingClientRect().height:0,brand:!!root&&root.textContent.includes('Learn-With-AI'),heading:!!(main&&main.querySelector('h1')),mainHeight:main?main.getBoundingClientRect().height:0,visibility:document.visibilityState,textLength:root?root.textContent.length:0,title:document.title,url:location.href};};const check=()=>{const s=state();if(s.nav&&s.navHeight>0&&s.brand&&s.heading&&s.mainHeight>0){setTimeout(()=>window.lllCaptureWindow().then(c=>window.lllSmokeReady(JSON.stringify({ok:c.dataUrl?.startsWith('data:image/png;base64,')&&c.dataUrl.length>1000&&c.viewport?.width>0&&c.viewport?.height>0,...s,captureViewport:c.viewport}))).catch(e=>window.lllSmokeReady(JSON.stringify({ok:false,...s,captureError:String(e)}))),300);}else if(Date.now()<deadline){setTimeout(check,100);}else{window.lllSmokeReady(JSON.stringify({ok:false,...s}));}};check();});`)
+		view.Init(`window.addEventListener('DOMContentLoaded',()=>{const deadline=Date.now()+40000;const state=()=>{const nav=document.querySelector('aside[aria-label="应用导航"]');const root=document.getElementById('root');const main=root&&root.querySelector('main');return {nav:!!nav,navHeight:nav?nav.getBoundingClientRect().height:0,brand:!!root&&root.textContent.includes('Learn-With-AI'),heading:!!(main&&main.querySelector('h1')),mainHeight:main?main.getBoundingClientRect().height:0,visibility:document.visibilityState,textLength:root?root.textContent.length:0,title:document.title,url:location.href};};const check=()=>{const s=state();if(s.nav&&s.navHeight>0&&s.brand&&s.heading&&s.mainHeight>0){setTimeout(()=>{const id=987654;const done=event=>{const c=event.detail;if(c.id!==id)return;window.removeEventListener('lll-region-capture-result',done);window.lllSmokeReady(JSON.stringify({ok:!c.error&&c.dataUrl?.startsWith('data:image/png;base64,')&&c.dataUrl.length>100&&c.width>0&&c.height>0,...s,captureSize:{width:c.width,height:c.height},captureError:c.error}));};window.addEventListener('lll-region-capture-result',done);window.lllCaptureRegion({id,x:8,y:8,width:Math.min(120,innerWidth-8),height:Math.min(80,innerHeight-8),viewportWidth:innerWidth,viewportHeight:innerHeight}).catch(e=>{window.removeEventListener('lll-region-capture-result',done);window.lllSmokeReady(JSON.stringify({ok:false,...s,captureError:String(e)}));});},300);}else if(Date.now()<deadline){setTimeout(check,100);}else{window.lllSmokeReady(JSON.stringify({ok:false,...s}));}};check();});`)
 		go func() {
 			select {
 			case <-timer.C:

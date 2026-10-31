@@ -47,7 +47,45 @@ func decodeMapOutput(text string) (MapProjection, *MapValidationIssue) {
 		}
 		return out, issue
 	}
+	repairGeneratedConceptOwnership(&out)
 	return out, inspectNewMap(&out)
+}
+
+// Model output often repeats a shared concept under two topics. Keep its first
+// owner and record later mentions as reuse; scope ownership remains unique.
+func repairGeneratedConceptOwnership(out *MapProjection) {
+	owned := map[string]int{}
+	for i := range out.Topics.Topics {
+		topic := &out.Topics.Topics[i]
+		kept := make([]string, 0, len(topic.OwnedConcepts))
+		for _, concept := range topic.OwnedConcepts {
+			concept = strings.TrimSpace(concept)
+			key := strings.ToLower(concept)
+			if key == "" {
+				continue
+			}
+			if owner, exists := owned[key]; exists {
+				if owner == i {
+					continue
+				}
+				topic.ReusedConcepts = append(topic.ReusedConcepts, concept)
+				continue
+			}
+			owned[key] = i
+			kept = append(kept, concept)
+		}
+		if len(kept) == 0 && strings.TrimSpace(topic.Title) != "" {
+			candidate := strings.TrimSpace(topic.Title)
+			if _, exists := owned[strings.ToLower(candidate)]; exists {
+				candidate = strings.TrimSpace(topic.ChapterTitle) + " · " + candidate
+			}
+			if _, exists := owned[strings.ToLower(candidate)]; !exists {
+				owned[strings.ToLower(candidate)] = i
+				kept = append(kept, candidate)
+			}
+		}
+		topic.OwnedConcepts = kept
+	}
 }
 
 func candidatePath(root, id string) string {

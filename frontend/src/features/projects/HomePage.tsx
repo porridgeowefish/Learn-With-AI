@@ -51,7 +51,6 @@ export function HomePage() {
             </p>
           </div>
           <div className={s.headerActions}>
-          <Button onClick={() => tour.step > 0 ? tour.resume() : tour.start()}>{tour.step > 0 ? '继续屏幕向导' : '屏幕向导'}</Button>
           <Button ref={replayButton} onClick={event => openDemo(event.currentTarget)}>体验示例</Button>
           <Button data-tour="create-project" variant="primary" iconLeft={<Icon name="plus" size={14} />} onClick={openModal}>
             新建项目
@@ -59,9 +58,9 @@ export function HomePage() {
           </div>
         </header>
 
-        {!tour.dismissed && <section className={s.onboarding} aria-label="新用户引导">
+        {!tour.dismissed && !tour.active && <section className={s.onboarding} aria-label="新用户引导">
           <div><h2>从第一次配置，到第一次学会</h2><p>让屏幕向导带你找到每一步的实际入口：连接模型、写偏好、创建项目，再到提问、复习和附件。</p></div>
-          <div className={s.onboardingActions}><Button variant="primary" onClick={tour.start}>开始屏幕向导</Button><Button variant="ghost" onClick={tour.pause}>稍后再说</Button></div>
+          <div className={s.onboardingActions}><Button variant="primary" onClick={tour.start}>开始屏幕向导</Button><Button variant="ghost" onClick={tour.dismiss}>不再显示</Button></div>
         </section>}
 
         <LearningRhythm projects={projects} />

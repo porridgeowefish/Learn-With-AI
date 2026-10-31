@@ -33,6 +33,6 @@ export function AppShell() {
     onPointerDown={event => { resizing.current = true; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }}
     onPointerMove={event => { if (resizing.current) setSidebarWidth(Math.min(event.clientX, window.innerWidth - 360)); }}
     onPointerUp={() => { resizing.current = false; }} onLostPointerCapture={() => { resizing.current = false; }} /></div>
-  <main className={s.main}>{typeof (window as Window & { lllCaptureWindow?: unknown }).lllCaptureWindow === 'function' && <div className={s.topTools}><RegionPinTool/></div>}<Outlet/></main>
+  <main className={s.main}><Outlet/>{typeof (window as Window & { lllCaptureRegion?: unknown }).lllCaptureRegion === 'function' && <RegionPinTool routeKey={location.pathname}/>}</main>
  </div><ScreenGuide/><TreasureNotifications/></div>;
 }

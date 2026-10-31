@@ -32,7 +32,7 @@ Learn-With-AI is a desktop study workspace for moving from reading an explanatio
 | Work with scanned pages | Local OCR where supported by the operating system; check formulas against the original |
 | Keep useful explanations | Automatic notes, editable review guides, version history and text annotations |
 | Test your understanding | Generated quizzes with objective-question scoring, answers and explanations |
-| Keep a formula in view while reading an explanation | In the Windows app, use the top-right crop icon to pin a temporary image card; closing or restarting clears it |
+| Keep a formula in view while reading an explanation | In the Windows app's Teacher view, use the crop icon beside Additional Information to capture any visible app area; resize or move the temporary card, then close it when done |
 | Explain it yourself | Teach-back practice: explain a concept and let the tutor ask follow-up questions |
 | Collect small discoveries | Start with an empty collection, receive a random gem after your first completed exchange, then discover 50 gems and shells through learning. View owned treasures in 3D; deleting their source conversation keeps the collection |
 

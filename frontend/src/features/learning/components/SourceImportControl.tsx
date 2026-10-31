@@ -6,7 +6,7 @@ const extensions = ['pdf', 'md', 'markdown', 'txt', 'pptx', 'docx', 'xlsx', 'csv
 const fileTypes = extensions.map(extension => `.${extension}`).join(',');
 interface ImportResult { name: string; message: string; failed: boolean }
 
-export function SourceImportControl({ slug, compact = false }: { slug: string; compact?: boolean }) {
+export function SourceImportControl({ slug, compact = false, onBusyChange }: { slug: string; compact?: boolean; onBusyChange?: (busy: boolean) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const upload = useUploadSource(slug);
   const [busy, setBusy] = useState(false);
@@ -18,6 +18,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
     event.target.value = '';
     if (!files.length || busy) return;
     setBusy(true);
+    onBusyChange?.(true);
     setResults([]);
     const completed: ImportResult[] = [];
     for (const [index, file] of files.entries()) {
@@ -41,6 +42,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
     }
     setProgress('');
     setBusy(false);
+    onBusyChange?.(false);
   };
 
   const failed = results.filter(result => result.failed).length;

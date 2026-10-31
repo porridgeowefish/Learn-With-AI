@@ -65,6 +65,7 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
         </nav>
         <div className={s.headerActions}>
           <CollectionShortcut/>
+          {active === 'teacher' && <div data-region-pin-slot />}
           {active === 'teacher' && <ConversationInstructions key={`instructions-${project.slug}`} slug={project.slug} />}
           {active === 'sources' && <SourceImportControl key={`sources-${project.slug}`} slug={project.slug} compact />}
           {active === 'teacher' && <a href={conversationExportURL(project.slug)} download aria-label="导出全部对话" title="导出全部对话为 Markdown"><DownloadIcon /><span>导出对话</span></a>}
