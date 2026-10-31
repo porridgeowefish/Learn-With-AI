@@ -71,9 +71,9 @@ func Start(options Options) (*Engine, error) {
 	os.Setenv("LEARN_WITH_AI_SERVER_PORT", strconv.Itoa(port))
 	app := bootstrap.Build()
 	engine := &Engine{URL: fmt.Sprintf("http://127.0.0.1:%d", port), Workspace: paths.WORKSPACE, Done: make(chan struct{}), app: app, instance: instance}
-	// Desktop-only routes (update check and in-app install) sit in front of the
+	// Desktop-only update check routes sit in front of the
 	// shared application server.
-	updates := newUpdater(options.Version, paths.WORKSPACE).handler(engine.URL, func() { engine.Close() })
+	updates := newUpdater(options.Version).handler()
 	mux := http.NewServeMux()
 	mux.Handle("/api/system/update", updates)
 	mux.Handle("/api/system/update/", updates)

@@ -1,6 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { repoRoot, targets, validateVersion } = require('./package-layout');
 const archive = require('./archive');
@@ -113,8 +112,6 @@ function main() {
       } else console.log('macOS .app prepared; .pkg compilation requires the native macOS CI job');
     }
   }
-  const all = fs.readdirSync(output).filter(file=>/\.(?:zip|tar\.gz|msi|deb|pkg)$/.test(file)).sort();
-  fs.writeFileSync(safeOutput(path.join(output,'SHA256SUMS')),all.map(file=>`${crypto.createHash('sha256').update(fs.readFileSync(safeOutput(path.join(output,file)))).digest('hex')}  ${file}`).join('\n')+'\n');
   for (const file of files) console.log(`Installer: ${file}`);
 }
 module.exports = { buildLinux, buildMacApp };

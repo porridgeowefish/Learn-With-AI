@@ -1,6 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { repoRoot, targets, packagePaths, validateVersion } = require('./package-layout');
 const archive = require('./archive');
@@ -24,7 +23,6 @@ function main() {
     }
   fs.mkdirSync(releaseRoot, { recursive: true });
   if (fs.lstatSync(releaseRoot).isSymbolicLink()) throw new Error('Linked release directory forbidden');
-  const checksums = [];
   for (const target of selected) {
     const [goos, arch] = target.split('/');
     const prefix = `learn-with-ai-${version}-${goos}-${arch}`;
@@ -68,10 +66,8 @@ function main() {
     if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error('Linked archive output forbidden');
     if (goos === 'windows') archive.zip(staging, prefix, output);
     else archive.tarGzip(staging, prefix, output, goos === 'darwin' ? ['learn-with-ai', 'libexec/lll-vision-ocr', 'libexec/lll-speech'] : ['learn-with-ai']);
-    checksums.push(`${crypto.createHash('sha256').update(fs.readFileSync(output)).digest('hex')}  ${filename}`);
     console.log(`Packaged ${filename}`);
   }
-  fs.writeFileSync(path.join(releaseRoot, 'SHA256SUMS'), checksums.join('\n') + '\n');
   if (process.argv.includes('--installers')) {
     const installerTargets = selected.filter(target => !target.startsWith('windows/') || process.platform === 'win32');
     if (installerTargets.length) run(process.execPath, [path.join(__dirname, 'build-installers.js'), '--version', version, '--targets', installerTargets.join(',')]);

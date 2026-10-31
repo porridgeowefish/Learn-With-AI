@@ -81,11 +81,11 @@ Learn-With-AI 是适用于 Windows、macOS 和 Linux 的本地优先 AI 学习�
 
 双击 MSI，按向导阅读许可并安装。程序固定安装到 `%LOCALAPPDATA%\Programs\learn-with-ai`，仅当前用户使用，无需管理员权限。Windows 窗口依赖 [Microsoft WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)；缺少时，安装程序会提示安装。当前包尚未代码签名，系统可能显示 SmartScreen 提示，请先核对下载来源。
 
-应用启动时会检查新版本；可点击侧栏「立即更新」，或在「设置 → 版本与数据」手动检查。下载会按 Release 的 `SHA256SUMS` 校验。也可以运行新版本 MSI，在确认升级或覆盖后替换程序文件。
+应用启动时会检查新版本；发现更新后，侧栏和「设置 → 版本与数据」会引导你前往 GitHub 下载。退出旧应用后运行新版本 MSI，按向导确认升级或覆盖。
 
 同版本 MSI 提供修复或删除；降级会被拒绝。关闭应用窗口会隐藏到托盘，右键托盘图标可退出。
 
-卸载可通过 Windows「设置 → 应用 → 已安装的应用」，或再次运行同版本 MSI 选择删除。卸载仅移除程序及快捷方式，学习数据保留。每个 Release 都提供 `SHA256SUMS`；Windows 可用 `Get-FileHash` 核对下载文件。
+卸载可通过 Windows「设置 → 应用 → 已安装的应用」，或再次运行同版本 MSI 选择删除。卸载仅移除程序及快捷方式，学习数据保留。
 
 </details>
 
