@@ -138,6 +138,14 @@ func New(slug string) (*Store, error) {
 	if !workspace.ValidateSlug(slug) {
 		return nil, errors.New("invalid project slug")
 	}
+	root, err := workspace.ProjectRootForSlug(slug)
+	if err != nil {
+		return nil, err
+	}
+	value, _ := locks.LoadOrStore(root, &sync.Mutex{})
+	mu := value.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 	state, err := workspace.ReadProjectState(slug)
 	if err != nil {
 		return nil, err
@@ -145,21 +153,14 @@ func New(slug string) (*Store, error) {
 	if state.ProjectType != workspace.ProjectTypeSystemLearning {
 		return nil, errors.New("teacher conversation requires system-learning project")
 	}
-	root, err := workspace.ProjectRootForSlug(slug)
-	if err != nil {
-		return nil, err
-	}
-	value, _ := locks.LoadOrStore(root, &sync.Mutex{})
-	s := &Store{slug: slug, root: root, mu: value.(*sync.Mutex)}
-	if err := s.ensure(); err != nil {
+	s := &Store{slug: slug, root: root, mu: mu}
+	if err := s.ensureLocked(); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func (s *Store) ensure() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Store) ensureLocked() error {
 	convDir := filepath.Join(s.root, "conversation")
 	if err := os.MkdirAll(convDir, 0o755); err != nil {
 		return err
