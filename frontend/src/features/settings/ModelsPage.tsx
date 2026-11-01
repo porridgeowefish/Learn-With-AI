@@ -18,7 +18,10 @@ const API_SOURCES = [
   { id: 'openai', label: 'OpenAI' },
   { id: 'deepseek', label: 'DeepSeek' },
   { id: 'gemini', label: 'Google Gemini' },
+  { id: 'claude', label: 'Claude' },
+  { id: 'groq', label: 'Groq' },
 ] as const;
+const SIMPLE_PRESET_IDS = API_SOURCES.map(source => source.id);
 interface Editor { token: number; provider: AskProvider; original: string; isNew: boolean; presetId: string }
 function ModelSelect({ value, models, label, disabled, onChange }: { value: string; models: string[]; label: string; disabled?: boolean; onChange: (model: string) => void }) {
   const [custom, setCustom] = useState(false);
@@ -54,7 +57,7 @@ export function ModelsPage() {
     setDraft(current => current ? change(current) : current);
   };
   const openEditor = (provider?: AskProvider) => {
-    const value = provider ? { ...provider } : { id: crypto.randomUUID(), kind: 'openai' as const, baseURL: '', apiKey: '', model: '' };
+    const value = provider ? { ...provider } : applyProviderPreset({ id: crypto.randomUUID(), kind: 'openai', baseURL: '', apiKey: '', model: '' }, PROVIDER_PRESETS.find(preset => preset.id === 'tencent-tokenhub')!);
     const next = { token: ++token.current, provider: value, original: JSON.stringify(value), isNew: !provider, presetId: presetForProvider(value)?.id ?? 'custom' };
     editorRef.current = next; setEditor(next); setDiscard(false); setProbeResult(null); setDiscovered([]); setCatalogMessage(''); setCatalogBusy(false); probe.reset(); save.reset();
   };
@@ -121,14 +124,14 @@ export function ModelsPage() {
   const modelIds = [...new Set([...(preset?.models.map(m => m.id) ?? []), ...discovered, ...(editor?.provider.model ? [editor.provider.model] : [])])];
   const options = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
   return <section className={s.section} aria-labelledby="api-connections-title">
-    <header className={s.header} data-tour="model-connections"><div><h2 id="api-connections-title">AI 连接</h2><p className={s.intro}>在这里连接学习使用的 AI。已有 API Key 时，添加 API 连接即可。</p></div><div className={s.actions}>
+    <header className={s.header} data-tour="model-connections"><div><h2 id="api-connections-title">AI 连接</h2><p className={s.intro}>选择服务商，粘贴 API Key，再检测连接。</p></div><div className={s.actions}>
       <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>
     <div className={s.actions} role="group" aria-label="连接方式"><Button size="sm" variant={mode === 'login' ? 'primary' : 'outline'} onClick={() => setMode('login')}>登录连接</Button><Button size="sm" variant={mode === 'api' ? 'primary' : 'outline'} onClick={() => setMode('api')}>API 连接</Button></div>
     {mode === 'login' && <SIWCConnection config={draft} save={next => persist(next)} />}
     <div className={s.bindings}><label>当前学习模型<select value={draft.bindings?.teacher?.providerId || draft.default} onChange={event => setBinding('teacher', event.target.value)}><option value="">选择连接</option>{options}</select></label><p className={s.saveStatus}>教师、Ask AI、复习稿与练习默认使用此连接。</p></div>
     <div className={s.apiMode} hidden={mode !== 'api'}>
-    <div className={s.apiSetup}><div><h3>配置 API</h3><p>选择你已有的 API 服务商，填写 API Key 和模型，检测后保存。第一个连接会自动用于学习。</p></div><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button></div>
+    <div className={s.apiSetup}><div><h3>配置 API</h3><p>选择服务商、模型并填写 Key。地址和协议会自动配置；第一个连接会自动用于学习。</p></div><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button></div>
     {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
     {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">
@@ -138,7 +141,7 @@ export function ModelsPage() {
         <span className={s.previewText}><strong>{provider.name || provider.model || '未命名连接'}</strong><small>{provider.model}</small></span><Icon name="pen" size={14} />
       </button>)}
     </div>
-    <div className={s.apiSources}><h3>获取 API Key</h3><p>还没有 API Key？到服务商网站开通并复制，再回到上方添加连接。腾讯云 TokenHub 是其中一个入口，也可以使用其他服务商。</p><div className={s.sourceLinks}>{API_SOURCES.map(source => { const provider = PROVIDER_PRESETS.find(item => item.id === source.id); return provider && <a key={source.id} href={provider.keyURL} target="_blank" rel="noreferrer">{source.label}<span aria-hidden="true">↗</span></a>; })}</div></div>
+    <div className={s.apiSources}><h3>获取 API Key</h3><p>从你使用的服务商获取 Key，再回到上方添加连接。</p><div className={s.sourceLinks}>{API_SOURCES.map(source => { const provider = PROVIDER_PRESETS.find(item => item.id === source.id); return provider && <a key={source.id} href={provider.keyURL} target="_blank" rel="noreferrer">{source.label}<span aria-hidden="true">↗</span></a>; })}</div></div>
     </div>
     <details className={s.planNotes}><summary>高级设置：按用途单独指定连接</summary><div className={s.bindings}>
       {PURPOSES.filter(([key]) => key !== 'teacher').map(([key, label]) => {
@@ -154,15 +157,15 @@ export function ModelsPage() {
       })}
       <label>搜索引擎<select value={draft.searchEngine} disabled={save.isPending} onChange={event => editConfig(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
     </div></details>
-    <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="填写已有 API Key，选择模型并检测连接。" className={s.connectionModal}
+    <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="选择来源、模型，填写 API Key。" className={s.connectionModal}
       footer={<><Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => closeEditor(true)}>取消</Button><Button size="sm" variant="primary" loading={save.isPending} disabled={!editor?.provider.model.trim() || !editor.provider.baseURL.trim()} onClick={saveEditor}>保存连接</Button></>}>
       {editor && <>
         <div className={s.formGrid}>
-        <label className={s.wide}>提供方<select value={editor.presetId} onChange={event => {
+        <label className={s.wide}>服务商<select value={editor.presetId} onChange={event => {
           const selected = PROVIDER_PRESETS.find(item => item.id === event.target.value); setDiscovered([]); setCatalogBusy(false);
           if (selected) patch(applyProviderPreset(editor.provider, selected), selected.id); else patch({}, 'custom');
-        }}><option value="custom">选择服务商或自行配置</option>{(['套餐', '官方', '聚合 / 中转'] as const).map(group => <optgroup key={group} label={group}>{PROVIDER_PRESETS.filter(p => p.group === group).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}</select></label>
-        {preset ? <label className={s.wide}>模型<ModelSelect key={`${editor.token}-${preset.id}`} label="模型" value={editor.provider.model} models={modelIds} onChange={model => { const known = preset.models.find(m => m.id === model); patch({ model, contextWindowTokens: known?.contextWindowTokens }); }} /><small>直接选择已开通的模型。填好 Key 后，“获取模型列表”可补充该账号的模型。</small></label> : <>
+        }}>{SIMPLE_PRESET_IDS.map(id => { const source = API_SOURCES.find(item => item.id === id)!; return <option key={id} value={id}>{source.label}</option>; })}{editor.presetId !== 'custom' && !SIMPLE_PRESET_IDS.includes(editor.presetId as typeof SIMPLE_PRESET_IDS[number]) && <option value={editor.presetId}>{preset?.name}</option>}<option value="custom">其他来源（高级配置）</option></select></label>
+        {preset ? <label className={s.wide}>模型<ModelSelect key={`${editor.token}-${preset.id}`} label="模型" value={editor.provider.model} models={modelIds} onChange={model => { const known = preset.models.find(m => m.id === model); patch({ model, contextWindowTokens: known?.contextWindowTokens }); }} /><small>选择账号已开通的模型；不确定时先用默认项检测连接。</small></label> : <>
           <label>显示名称<input value={editor.provider.name ?? ''} onChange={event => patch({ name: event.target.value })} /></label>
           <label>接口协议<select value={editor.provider.kind} onChange={event => patch({ kind: event.target.value as AskProvider['kind'] })}><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option></select></label>
           <label className={s.wide}>模型名称<input list="connection-models" value={editor.provider.model} onChange={event => patch({ model: event.target.value })} /><datalist id="connection-models">{discovered.map(id => <option key={id} value={id} />)}</datalist></label>
@@ -170,9 +173,9 @@ export function ModelsPage() {
           <label className={s.wide}>上下文 Token<input type="number" min={16384} step={1024} value={editor.provider.contextWindowTokens ?? ''} placeholder="留空使用安全估计" onChange={event => patch({ contextWindowTokens: event.target.value ? Number(event.target.value) : undefined })} /></label>
         </>}
         <label className={s.wide}>API Key<SecretInput value={editor.provider.apiKey} onChange={value => patch({ apiKey: value, apiKeyEnv: '' })} />{editor.provider.apiKeyEnv && !editor.provider.apiKey && <small>已使用环境变量密钥，留空保留。</small>}</label>
-        <div className={`${s.flags} ${s.wide}`}><label><input type="checkbox" checked={!!editor.provider.reasoning} onChange={event => patch({ reasoning: event.target.checked })} />显示思考摘要</label>{editor.provider.kind === 'anthropic' && <label><input type="checkbox" checked={!!editor.provider.thinking} onChange={event => patch({ thinking: event.target.checked })} />启用思考</label>}</div>
+        <details className={s.wide}><summary>高级选项</summary><p className={s.presetNote}>不同服务商使用不同地址和协议，已为所选来源自动填写。其他来源可自行配置。</p><div className={s.flags}><label><input type="checkbox" checked={!!editor.provider.reasoning} onChange={event => patch({ reasoning: event.target.checked })} />显示思考摘要</label>{editor.provider.kind === 'anthropic' && <label><input type="checkbox" checked={!!editor.provider.thinking} onChange={event => patch({ thinking: event.target.checked })} />启用思考</label>}</div><Button size="sm" variant="ghost" loading={catalogBusy} onClick={() => { void loadModels(); }}>获取模型列表</Button></details>
       </div>{preset?.note && <p className={s.presetNote}>{preset.note}</p>}
-      <div className={s.cardFooter}><div className={s.actions}><Button size="sm" variant="outline" loading={probe.isPending} onClick={probeEditor}>探测连接</Button><Button size="sm" variant="ghost" loading={catalogBusy} onClick={() => { void loadModels(); }}>获取模型列表</Button></div>
+      <div className={s.cardFooter}><div className={s.actions}><Button size="sm" variant="outline" loading={probe.isPending} onClick={probeEditor}>探测连接</Button></div>
         {!editor.isNew && <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => { editConfig(current => ({ ...current, providers: current.providers.filter(p => p.id !== editor.provider.id) })); closeEditor(true); }}>删除</Button>}
       </div>{probeResult && <p role="status" className={probeResult.ok ? s.connected : s.error}>{probeResult.ok ? '已连通' : probeResult.error || '连接失败'}</p>}{catalogMessage && <p className={s.saveStatus} role="status">{catalogMessage}</p>}
       {save.isError && <p className={s.error} role="alert">保存失败，输入已保留，请重试。</p>}

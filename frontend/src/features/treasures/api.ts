@@ -6,7 +6,8 @@ export interface Collection { catalog:TreasureItem[]; rewards:TreasureReward[] }
 export interface TreasureSource { available:boolean; url:string; content:string }
 export const collectionKey=['treasures'] as const;
 export const tierNames=['常见','少见','稀有','史诗','传说'];
-export const tierColors=['#90998b','#6f9676','#568dac','#9a7cac','#bb963c'];
+export const tierColors=['#586873','#247d4e','#176fa5','#8746ae','#9e670c'];
+export const tierTextColor=(tier:number)=>`color-mix(in srgb, ${tierColors[tier-1]} 90%, var(--fg))`;
 export const thumbnail=(id:string)=>`/treasures/assets/thumbs/${id}.webp`;
 export function useCollection(){return useQuery({queryKey:collectionKey,queryFn:()=>http.get<Collection>('/api/treasures'),staleTime:5000});}
 export const readSource=(id:string)=>http.get<TreasureSource>(`/api/treasures/rewards/${encodeURIComponent(id)}/source`);

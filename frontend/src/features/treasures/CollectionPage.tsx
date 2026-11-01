@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { readSource, thumbnail, tierColors, tierNames, useCollection, type TreasureReward } from './api';
+import { readSource, thumbnail, tierNames, tierTextColor, useCollection, type TreasureReward } from './api';
+import { chanceText, itemChance } from './rarity';
 import s from './Treasures.module.css';
 export function SourceLink({reward}:{reward:TreasureReward}){
  const navigate=useNavigate();const [checking,setChecking]=useState(false);const source=useQuery({queryKey:['treasure-source',reward.id],queryFn:()=>readSource(reward.id),staleTime:0});
@@ -10,8 +11,9 @@ export function SourceLink({reward}:{reward:TreasureReward}){
 }
 export function CollectionPage(){
  const query=useCollection();const [kind,setKind]=useState('all'),[tier,setTier]=useState(0),[search,setSearch]=useState(''),[selected,setSelected]=useState('');
+ const catalog=query.data?.catalog??[];
  const counts=useMemo(()=>{const result=new Map<string,number>();for(const r of query.data?.rewards??[])result.set(r.itemId,(result.get(r.itemId)??0)+1);return result;},[query.data]);
- const items=(query.data?.catalog??[]).filter(i=>(kind==='all'||i.kind===kind)&&(!tier||i.tier===tier)&&`${i.name} ${i.english}`.toLowerCase().includes(search.trim().toLowerCase()));
+ const items=catalog.filter(i=>(kind==='all'||i.kind===kind)&&(!tier||i.tier===tier)&&`${i.name} ${i.english}`.toLowerCase().includes(search.trim().toLowerCase()));
  useEffect(()=>{if(items.length&&!items.some(i=>i.id===selected))setSelected(items.find(i=>counts.has(i.id))?.id??items[0].id);},[items,selected,counts]);
  const chosen=items.find(i=>i.id===selected);const owned=chosen?counts.get(chosen.id)??0:0;const history=(query.data?.rewards??[]).filter(r=>r.itemId===chosen?.id).slice().reverse();
  if(query.isLoading)return <div className={s.loading}>正在打开你的收藏…</div>;
@@ -27,12 +29,12 @@ export function CollectionPage(){
    <figcaption><span className={s.newtonSignature}>Isaac Newton</span><span className={s.newtonCredit}>艾萨克·牛顿<span aria-hidden="true"> · </span><a href="https://www.fitzmuseum.cam.ac.uk/index.php/explore-our-collection/highlights/context/stories-and-histories/sir-isaac-newton" target="_blank" rel="noopener noreferrer">引文出处 ↗</a></span></figcaption>
   </figure>
   </header>
-  <div className={s.filters}><nav aria-label="藏品种类">{[['all','全部'],['gem','宝石'],['shell','贝壳']].map(([key,label])=><button className={kind===key?s.tabActive:''} key={key} onClick={()=>setKind(key)} aria-pressed={kind===key}>{label}</button>)}</nav><input aria-label="搜索藏品" placeholder="⌕  搜索藏品" value={search} onChange={e=>setSearch(e.target.value)}/><div className={s.tierFilters}>{['全部',...tierNames].map((name,i)=><button key={name} aria-pressed={tier===i} className={tier===i?s.filterActive:''} onClick={()=>setTier(i)}>{name}</button>)}</div></div>
+  <div className={s.filters}><nav aria-label="藏品种类">{[['all','全部'],['gem','宝石'],['shell','贝壳']].map(([key,label])=><button className={kind===key?s.tabActive:''} key={key} onClick={()=>setKind(key)} aria-pressed={kind===key}>{label}</button>)}</nav><input aria-label="搜索藏品" placeholder="⌕  搜索藏品" value={search} onChange={e=>setSearch(e.target.value)}/><div className={s.tierFilters}>{['全部',...tierNames].map((name,i)=><button key={name} aria-pressed={tier===i} className={tier===i?s.filterActive:''} style={tier===i||!i?undefined:{color:tierTextColor(i)}} onClick={()=>setTier(i)}>{name}</button>)}</div></div>
   {!counts.size&&<div className={s.firstDiscovery}>你的第一件宝物，或许就在下一次理解中。与教师讨论，也可以把学到的内容讲给教师听。<Link to="/">去学习 →</Link></div>}
   <div className={s.collectionBody}><div className={s.grid}>{items.map(item=>{const count=counts.get(item.id)??0;return <button key={item.id} className={`${s.specimen} ${selected===item.id?s.selected:''} ${count?'':s.locked}`} onClick={()=>setSelected(item.id)} aria-pressed={selected===item.id} aria-label={`${item.name} · ${count?'已收藏 '+count+' 件':'尚未发现'}`}>
-   {!count&&<span className={s.lock} aria-hidden="true"><svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="2" y="7" width="10" height="8" rx="2" stroke="currentColor"/><path d="M4 7V4a3 3 0 016 0v3" stroke="currentColor"/></svg></span>}<img src={thumbnail(item.id)} alt="" loading="lazy"/><span className={s.tier} style={{color:tierColors[item.tier-1]}}>● {tierNames[item.tier-1]}</span><strong>{item.name}</strong><span>{count?`× ${count}`:'尚未发现'}</span>
+   {!count&&<span className={s.lock} aria-hidden="true"><svg width="14" height="16" viewBox="0 0 14 16" fill="none"><rect x="2" y="7" width="10" height="8" rx="2" stroke="currentColor"/><path d="M4 7V4a3 3 0 016 0v3" stroke="currentColor"/></svg></span>}<img src={thumbnail(item.id)} alt="" loading="lazy"/><span className={s.tierLabel} style={{color:tierTextColor(item.tier)}}>◆ {tierNames[item.tier-1]}</span><strong>{item.name}</strong><span>抽中率 {chanceText(itemChance(item,catalog))}</span><span>{count?`× ${count}`:'尚未发现'}</span>
   </button>;})}{!items.length&&<p>没有找到这件藏品，试试其他名字或筛选条件。</p>}</div>
-  {chosen&&<aside className={s.detail}><div className={`${s.detailImage} ${owned?'':s.locked}`}><img src={thumbnail(chosen.id)} alt={chosen.name}/></div><h2>{chosen.name} <small style={{color:tierColors[chosen.tier-1]}}>● {tierNames[chosen.tier-1]}</small></h2><p className={s.english}>{chosen.english}</p>{owned?<><p>已拥有 <b>{owned}</b> 件</p><Link className={s.primary} to={`/collection/${chosen.id}`}>✧ 展示这件宝物</Link><h3>发现的记忆</h3>{history.map(r=><SourceLink key={r.id} reward={r}/>)}</>:<div className={s.waiting}><h3>尚未发现</h3><p>在提问、讨论和讲解中，等待属于你的相遇。</p><Link to="/collection/faq">了解如何获得 →</Link></div>}</aside>}
+  {chosen&&<aside className={s.detail}><div className={`${s.detailImage} ${owned?'':s.locked}`}><img src={thumbnail(chosen.id)} alt={chosen.name}/></div><h2>{chosen.name}</h2><p className={s.detailRarity} style={{color:tierTextColor(chosen.tier)}}>◆ {tierNames[chosen.tier-1]} · {chosen.kind==='gem'?'宝石':'贝壳'}</p><p className={s.english}>{chosen.english}</p><p className={s.detailChance}>获得宝物时，抽中这一件的概率约为 <b>{chanceText(itemChance(chosen,catalog))}</b></p>{owned?<><p>已拥有 <b>{owned}</b> 件</p><Link className={s.primary} to={`/collection/${chosen.id}`}>✧ 展示这件宝物</Link><h3>发现的记忆</h3>{history.map(r=><SourceLink key={r.id} reward={r}/>)}</>:<div className={s.waiting}><h3>尚未发现</h3><p>在提问、讨论和讲解中，等待属于你的相遇。</p><Link to="/collection/faq">了解如何获得 →</Link></div>}</aside>}
   </div>
  </section>;
 }
