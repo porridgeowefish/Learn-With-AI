@@ -29,7 +29,7 @@
 .sidePanel[data-collapsed="true"] { display: none; }
 .collapseButton { position: absolute; z-index: 25; top: 18px; left: calc(min(var(--sidebar-w), 280px) - 14px); width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; background: var(--card); color: var(--fg); cursor: pointer; }
 .sidePanel[data-collapsed="true"] ~ .main { padding-left: 0; }
-.resizeHandle { position: absolute; right: 0; top: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; }
+.resizeHandle { position: absolute; right: -7px; top: 0; bottom: 0; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }
 .menuButton, .closeMenu, .backdrop { display: none; }
 @media (max-width: 760px) {
  .collapseButton,.resizeHandle { display: none; }

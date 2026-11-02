@@ -59,6 +59,7 @@ export function SIWCConnection({ config, save }: { config: AskConfig; save: (nex
   return <div className={s.card}>
     <strong>用 ChatGPT 套餐登录</strong>
     <p className={s.saveStatus}>在 OpenAI 页面授权后，LLL 使用你套餐中允许的模型；令牌仅保存在本机。</p>
+    <p className={s.saveStatus}>当前支持文字对话、本地资料工具，以及配置后使用的联网搜索。图片和文件先提取文字供对话使用；支持思考摘要的 GPT 模型如返回摘要，会显示在对话中。具体能力取决于所选模型和套餐。</p>
     {status.data?.connected ? <>
       <p className={s.connected}>已连接 {status.data.email || 'ChatGPT 账户'}</p>
       <label className={s.siwcModel}>当前模型<select value={active?.model ?? ''} onChange={event => chooseModel(event.target.value)} disabled={models.isLoading || busy}>

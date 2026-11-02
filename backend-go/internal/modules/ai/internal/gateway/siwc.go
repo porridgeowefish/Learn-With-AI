@@ -48,6 +48,9 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 		input = append(input, map[string]any{"role": role, "content": m.Content})
 	}
 	body := map[string]any{"model": p.Model, "input": input, "store": false, "stream": true}
+	if supportsSIWCReasoningSummary(p.Model) {
+		body["reasoning"] = map[string]any{"summary": "auto"}
+	}
 	if in.System != "" {
 		body["instructions"] = in.System
 	}
@@ -120,6 +123,8 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 		switch frame.Type {
 		case "response.output_text.delta":
 			emit(Event{Type: "text-delta", Delta: frame.Delta})
+		case "response.reasoning_summary_text.delta":
+			emit(Event{Type: "reasoning-summary-delta", Delta: frame.Delta})
 		case "response.output_item.done":
 			if frame.Item.Type == "function_call" {
 				emitSIWCCall(frame.Item.CallID, frame.Item.Name, frame.Item.Arguments, seenCalls, emit)
@@ -150,6 +155,12 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 		return errors.New("ChatGPT stream ended before response.completed")
 	}
 	return nil
+}
+func supportsSIWCReasoningSummary(model string) bool {
+	if strings.Contains(model, "-chat") || strings.Contains(model, "realtime") {
+		return false
+	}
+	return strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6") || strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4")
 }
 func emitSIWCCall(id, name, args string, seen map[string]bool, emit func(Event)) {
 	if id == "" || seen[id] {

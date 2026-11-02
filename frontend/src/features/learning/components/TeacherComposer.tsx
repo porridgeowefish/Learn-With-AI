@@ -38,8 +38,15 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     const content = text.trim() || (media.attachments.some(a => a.kind === 'source') ? '请结合附件继续讲解。' : '');
     if (!content && !media.attachments.length && !retry?.attachments.length) return;
     const snapshot = version.current;
+    const selectedProviderId = providerId || undefined;
     const sameFailure = failed && failed.content === content && failed.attachments.map(a => a.attachmentId).join() === media.attachments.map(a => a.attachmentId).join();
-    const item = retry ?? (sameFailure ? failed : { operationId: crypto.randomUUID(), content, attachments: media.attachments, providerId: providerId || undefined });
+    const previous = retry ?? (sameFailure ? failed : undefined);
+    const item = previous && previous.providerId === selectedProviderId ? previous : {
+      operationId: crypto.randomUUID(),
+      content: previous?.content ?? content,
+      attachments: previous?.attachments ?? media.attachments,
+      providerId: selectedProviderId,
+    };
     submitting.current = true; submittingVersion.current = snapshot; pendingOperation.current = item.operationId; setPending(true);
     let accepted = false;
     const release = () => { if (pendingOperation.current === item.operationId) { submitting.current = false; if (mounted.current) setPending(false); } };
