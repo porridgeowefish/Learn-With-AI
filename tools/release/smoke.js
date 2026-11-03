@@ -9,6 +9,10 @@ async function smoke(binary) {
   require('./temporary-root').prepareTemporaryRoot();
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'learn-with-ai-smoke-'));
   const workspace = path.join(scratch, 'workspace');
+  // Upgrades can encounter old asset directories without a project state file.
+  const orphan = path.join(workspace, 'projects', 'orphan', 'assets');
+  fs.mkdirSync(orphan, { recursive: true });
+  fs.writeFileSync(path.join(orphan, 'keep.txt'), 'existing');
   const socket = net.createServer();
   await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
   const port = socket.address().port;
@@ -33,6 +37,8 @@ async function smoke(binary) {
     }
     assert(health?.ok, `Portable server did not start: ${log}`);
     assert.equal(path.resolve(health.workspace), path.resolve(workspace));
+    assert.equal(fs.readFileSync(path.join(orphan, 'keep.txt'), 'utf8'), 'existing');
+    assert(!fs.existsSync(path.join(orphan, '..', 'state.json')));
     const index = await fetch(base);
     assert.equal(index.status, 200);
     assert.match(await index.text(), /Learn-With-AI/);
