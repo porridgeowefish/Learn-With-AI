@@ -308,6 +308,7 @@
   color: var(--accent);
 }
 
+.workspaceSection,
 .appearance,
 .openSource {
   display: flex;
@@ -374,8 +375,8 @@
   justify-content: space-between;
 }
 
-.openSourceActions { display: flex; gap: 8px; flex-wrap: wrap; }
-.openSourceActions a, .openSourceActions button {
+.settingsActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.settingsActions a, .settingsActions button {
   padding: 6px 9px;
   color: var(--accent-ink);
   font-size: 0.74rem;
@@ -385,9 +386,9 @@
   background: var(--card);
   text-decoration: none;
 }
-.openSourceActions a:hover, .openSourceActions button:hover { border-color: var(--accent); }
-.openSourceActions button { cursor: pointer; }
-.openSourceActions button:disabled { opacity: .55; cursor: default; }
+.settingsActions a:hover, .settingsActions button:hover { border-color: var(--accent); }
+.settingsActions button { cursor: pointer; }
+.settingsActions button:disabled { opacity: .55; cursor: default; }
 
 @media (max-width: 720px) {
   .openSource { align-items: flex-start; flex-direction: column; }
@@ -406,3 +407,19 @@
 
 @media (max-width: 1180px) { .runtimeSection .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .scroll { padding: 18px 14px 72px; gap: 22px; } .runtimeSection .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.workspaceActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.importPanel { display: grid; gap: 8px; padding: 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 7%, transparent); font-size: .8rem; overflow-wrap: anywhere; min-width: 0; }
+.importPanel[data-dragging="true"] { background: color-mix(in srgb, var(--accent) 21%, transparent); }
+.dropButton { display: grid; justify-items: center; gap: 5px; width: 100%; padding: 20px 8px; background: transparent; border: 0; color: var(--fg); font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.dropButton span { color: var(--muted); }
+.dropButton:focus-visible { outline: 2px solid var(--accent); }
+.workspaceSection { min-width: 0; }
+.workspaceHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.workspaceHeader > div:first-child { min-width: 0; }
+.workspaceHeader > .settingsActions { flex-shrink: 0; }
+.workspaceSection h2 { margin: 0; font-size: 1rem; line-height: 1.5; }
+.workspaceSection p { margin: 4px 0 0; font-size: .8rem; line-height: 1.65; color: var(--muted); overflow-wrap: anywhere; }
+.dropButton { min-height: 104px; align-content: center; }
+@media (max-width: 700px) {
+  .workspaceHeader { flex-direction: column; align-items: flex-start; gap: 8px; }
+}

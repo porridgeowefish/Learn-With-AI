@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useHealth } from '@/app/api/health';
+import { Button } from '@/shared/primitive/Button';
 import s from './SettingsPage.module.css';
 
-type Directory = { path: string; parent: string; destination: string; children: string[] };
+type Directory = { path: string; destination: string };
 type Conflict = { kind: string; locations: { source: string; projectTitle: string; projectSlug: string; chapter?: string; title: string; topicId?: string }[] };
+
+const initialConflictLimit = 5;
 
 function post(action: string, body?: BodyInit, signal?: AbortSignal, operation?: string) {
   return fetch('/api/workspace/' + action, {
@@ -16,29 +19,34 @@ function post(action: string, body?: BodyInit, signal?: AbortSignal, operation?:
 export function WorkspaceSettings() {
   const health = useHealth();
   const client = useQueryClient();
-  const [parent, setParent] = useState('');
-  const [preview, setPreview] = useState('');
+  const [opened, setOpened] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [retry, setRetry] = useState(false);
+
   const [dir, setDir] = useState<Directory>();
   const [file, setFile] = useState<File>();
   const [busy, setBusy] = useState('');
   const [status, setStatus] = useState({ section: '', text: '' });
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [showAllConflicts, setShowAllConflicts] = useState(false);
+  const remainingConflicts = conflicts.length - initialConflictLimit;
+  const visibleConflicts = showAllConflicts ? conflicts : conflicts.slice(0, initialConflictLimit);
   const active = useRef<AbortController | null>(null);
   const operationId = useRef<string>();
   const input = useRef<HTMLInputElement>(null);
 
-  async function run(action: 'move' | 'preview' | 'directories' | 'export' | 'import', path?: string) {
+  async function run(action: 'move' | 'directories' | 'export' | 'import', selectedFile?: File) {
     if (active.current) return;
     const controller = new AbortController();
     active.current = controller;
-    const section = action === 'move' || action === 'preview' || action === 'directories' ? 'move' : 'transfer';
+    const section = action === 'move' || action === 'directories' ? 'move' : 'transfer';
     const message = (text: string) => setStatus({ section, text });
     setBusy(action);
-    message('处理中…');
+    message(action === 'import' ? '正在检查并导入学习记录…' : action === 'export' ? '正在打包学习记录…' : action === 'move' ? '正在迁移学习记录…' : '');
     try {
-      const body = action === 'move' ? JSON.stringify({ parent: parent.trim() }) : (action === 'directories' || action === 'preview') ? JSON.stringify({ path }) : action === 'import' ? file : undefined;
+      const body = action === 'move' ? JSON.stringify({ parent: dir?.path }) : (action === 'directories') ? JSON.stringify({ pick: true }) : action === 'import' ? selectedFile : undefined;
       operationId.current = action === 'import' ? crypto.randomUUID() : undefined;
-      const response = await post(action === 'preview' ? 'directories' : action, body, controller.signal, operationId.current);
+      const response = await post(action, body, controller.signal, operationId.current);
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
         if (action === 'import' && response.status === 409 && problem.cancelled) {
@@ -47,6 +55,8 @@ export function WorkspaceSettings() {
           return;
         }
         if (action === 'import' && response.status === 409 && problem.conflicts?.length) {
+          setRetry(true);
+          setShowAllConflicts(false);
           setConflicts(problem.conflicts);
           message('整包未导入。请处理以下重名记录后重新检查。');
           return;
@@ -61,22 +71,21 @@ export function WorkspaceSettings() {
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 60000);
         message('已生成 ZIP，可在下载中查看。');
-      } else if (action === 'preview') {
-        setPreview((await response.json()).destination);
-        message('');
       } else if (action === 'directories') {
-        setDir(await response.json());
-        message('');
+        const result = await response.json();
+        setDir(result.cancelled ? undefined : result);
       } else if (action === 'move') {
         const result = await response.json();
         message('已迁移至 ' + result.path + '。请重新打开应用。');
         setDir(undefined);
+        void health.refetch?.();
       } else {
-        clearSelection();
+        setRetry(false);
         message('导入完成。项目列表已更新。');
         void client.invalidateQueries();
       }
     } catch (err) {
+      if (action === 'import') setRetry(true);
       message(controller.signal.aborted ? '已请求取消，请刷新项目列表核对结果。' : String(err instanceof Error ? err.message : err));
     } finally {
       operationId.current = undefined;
@@ -102,33 +111,54 @@ export function WorkspaceSettings() {
   function clearSelection() {
     setFile(undefined);
     setConflicts([]);
-    if (input.current) input.current.value = '';
+
+  }
+  function select(files: FileList | null) {
+    if (active.current || !files?.length) return;
+    clearSelection();
+    setRetry(false);
+    if (files.length !== 1 || !/\.zip$/i.test(files[0].name)) {
+      setStatus({section: 'transfer', text: '请一次选择一个 ZIP 文件。'});
+      return;
+    }
+    const archive = files[0];
+    setFile(archive);
+    void run('import', archive);
   }
   return <>
-    <section className={s.appearance} aria-labelledby="workspace-location">
-      <h2 id="workspace-location">更改存储位置</h2>
-      <p>当前位置 <code>{health.data?.workspace || '…'}</code></p>
-      <label>新位置的父目录 <input value={parent} disabled={!!busy} placeholder="输入或选择绝对路径" onChange={e => { setParent(e.target.value); setPreview(''); }} /></label>
-      <div className={s.openSourceActions}><button disabled={!!busy} onClick={() => run('directories', parent.trim())}>浏览目录</button></div>
-      {dir && <fieldset disabled={!!busy}><legend>选择父目录</legend><p>{dir.path}</p>
-        <select aria-label="子目录" value="" onChange={e => run('directories', e.target.value)}><option value="">进入子目录…</option>{dir.children.map(child => <option key={child} value={child}>{child}</option>)}</select>
-        <div className={s.openSourceActions}><button disabled={dir.path === dir.parent} onClick={() => run('directories', dir.parent)}>上一级</button>
-          <button onClick={() => { setParent(dir.path); setPreview(dir.destination); setDir(undefined); }}>使用此目录</button><button onClick={() => setDir(undefined)}>关闭</button></div>
-      </fieldset>}
-      {preview && <p>预计新位置 <code>{preview}</code>。迁移前若目录被占用，将使用下一个可用编号。</p>}
-      <div className={s.openSourceActions}><button disabled={!!busy || !parent.trim()} onClick={() => preview ? run('move') : run('preview', parent.trim())}>{preview ? '确认迁移' : '预览新位置'}</button></div>
-      {status.section === 'move' && <p role="status">{status.text}</p>}
+    <section className={s.workspaceSection} aria-labelledby="workspace-location">
+      <header className={s.workspaceHeader}><div><h2 id="workspace-location">更改存储位置</h2><p>当前位置 · {health.data?.workspace || '…'}</p></div>
+      <div className={s.settingsActions}><button type="button" disabled={!!busy} onClick={() => run('directories')}>选择文件夹</button></div></header>
+      {dir && <><p>迁移至 <strong>{dir.destination}</strong>。若目录已被占用，将使用下一个可用编号。</p>
+        <div className={s.workspaceActions}><Button size="sm" variant="primary" disabled={!!busy} onClick={() => run('move')}>确认迁移</Button><Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setDir(undefined)}>取消</Button></div></>}
+      {status.section === 'move' && status.text && <p role="status">{status.text}</p>}
     </section>
-    <section className={s.appearance} aria-labelledby="workspace-transfer">
-      <h2 id="workspace-transfer">导入与导出</h2>
-      <p>导出的 ZIP 含有学习正文、对话与个人记录，请确认分享对象。导入会把整包记录合并到当前位置。</p>
-      <div className={s.openSourceActions}><button disabled={!!busy} onClick={() => run('export')}>导出学习记录</button></div>
-      <label>选择学习记录 ZIP <input ref={input} disabled={!!busy} type="file" accept=".zip,application/zip" onChange={e => { setFile(e.target.files?.[0]); setConflicts([]); setStatus({ section: '', text: '' }); }} /></label>
-      <div className={s.openSourceActions}><button disabled={!!busy || !file} onClick={() => run('import')}>{conflicts.length ? '重新检查' : '导入学习记录'}</button>
-        {file && <button disabled={!!busy && busy !== 'import'} onClick={cancelImport}>取消导入</button>}</div>
-      {status.section === 'transfer' && <p role="status">{status.text}</p>}
-      {conflicts.map((c,i) => <div key={i}><strong>{c.kind === 'project' ? '项目' : '小项目'}重名 · {c.locations[0]?.title}</strong>
-        <ul>{c.locations.map((l,j) => <li key={j}>{l.source === 'incoming' ? '导入包' : '当前工作区'} · {l.projectTitle} ({l.projectSlug}){l.topicId && ' / ' + [l.chapter, l.title, l.topicId].filter(Boolean).join(' / ')}</li>)}</ul></div>)}
+    <section className={s.workspaceSection} aria-labelledby="workspace-transfer">
+      <header className={s.workspaceHeader}><div><h2 id="workspace-transfer">导入与导出</h2>
+        <p>用 ZIP 转移学习记录。个人偏好和 API 配置仅保存在本机。</p></div>
+      <div className={s.settingsActions}><button type="button" disabled={!!busy} onClick={() => { if (!opened) setStatus({section:'',text:''}); setOpened(true); }}>导入学习记录</button>
+        <button type="button" disabled={!!busy} onClick={() => {setOpened(false); void run('export');}}>导出学习记录</button></div></header>
+      {opened && <div className={s.importPanel} data-dragging={dragging}
+        onDragOver={e => {e.preventDefault(); if (!busy) setDragging(true);}}
+        onDragLeave={e => {if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);}}
+        onDrop={e => {e.preventDefault(); setDragging(false); select(e.dataTransfer.files);}}>
+        <input hidden aria-label="选择学习记录 ZIP" ref={input} type="file" accept=".zip,application/zip" onChange={e => { select(e.target.files); e.target.value = ''; }} />
+        <button className={s.dropButton} disabled={!!busy} onClick={() => input.current?.click()}>
+          <strong>{dragging ? '松开以导入 ZIP' : file?.name || '将学习记录 ZIP 拖到这里'}</strong>
+          <span>{file ? '选择其他文件' : '或点击选择文件，选好后自动导入'}</span>
+        </button>
+        {status.section === 'transfer' && <p role="status">{status.text}</p>}
+        {visibleConflicts.map((c,i) => <div key={i}><strong>{c.kind === 'project' ? '项目' : '小项目'}重名 · {c.locations[0]?.title}</strong>
+          <ul>{c.locations.map((l,j) => <li key={j}>{l.source === 'incoming' ? '导入包' : '当前工作区'} · {l.projectTitle} ({l.projectSlug}){l.topicId && ' / ' + [l.chapter, l.title, l.topicId].filter(Boolean).join(' / ')}</li>)}</ul></div>)}
+        {remainingConflicts > 0 && <div className={s.settingsActions}>
+          <button type="button" aria-expanded={showAllConflicts} onClick={() => setShowAllConflicts(!showAllConflicts)}>
+            {showAllConflicts ? '收起' : `还有 ${remainingConflicts} 条冲突，展开全部`}
+          </button>
+        </div>}
+        <div className={s.workspaceActions}>{retry && file && <Button size="sm" disabled={!!busy} onClick={() => { setConflicts([]); void run('import',file); }}>重新检查</Button>}
+          <Button size="sm" variant="ghost" disabled={!!busy && busy !== 'import'} onClick={() => { if (busy === 'import') void cancelImport(); else { clearSelection(); setOpened(false); setStatus({section:'',text:''}); } }}>{busy === 'import' ? '取消导入' : '关闭'}</Button></div>
+      </div>}
+      {!opened && status.section === 'transfer' && <p role="status">{status.text}</p>}
     </section>
   </>;
 }

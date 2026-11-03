@@ -4,7 +4,6 @@ import { WorkspaceSettings } from './WorkspaceSettings';
 import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
-import { useHealth } from '@/app/api/health';
 import { useUpdateInfo } from './update';
 import s from './SettingsPage.module.css';
 
@@ -61,7 +60,6 @@ function AppearanceSection() {
 }
 
 function VersionAndDataSection() {
-  const { data: health } = useHealth();
   const { data: info } = useUpdateInfo();
   const current = info;
   const status = current?.available ? `发现新版本 ${current.latest}` : '';
@@ -73,10 +71,10 @@ function VersionAndDataSection() {
           {current ? <>当前版本 <strong>{current.current}</strong>{status && <> · {status}</>}</> : '前往 GitHub 下载最新版本。macOS 下载对应芯片的安装包，安装后重新打开应用。'}
         </p>
         <p>
-          学习数据目录 <code>{health?.workspace ?? '…'}</code>。项目、笔记、资料、偏好与 API 配置都保存在这里，升级和卸载都不会删除。
+          升级和卸载都会保留本机的学习记录。
         </p>
       </div>
-        <div className={s.openSourceActions}>
+        <div className={s.settingsActions}>
           <a href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest" target="_blank" rel="noreferrer">GitHub 下载与安装指引</a>
         </div>
     </section>
@@ -91,7 +89,7 @@ function OpenSourceSection() {
         <h2 id="open-source-title">开源与反馈</h2>
         <p>Learn-With-AI 欢迎问题反馈和代码贡献。</p>
       </div>
-      <div className={s.openSourceActions}>
+      <div className={s.settingsActions}>
         <a href={`${repo}/issues`} target="_blank" rel="noreferrer">报告问题</a>
         <a href={`${repo}/blob/main/CONTRIBUTING.md`} target="_blank" rel="noreferrer">贡献代码</a>
         <a href={repo} target="_blank" rel="noreferrer">查看源码</a>

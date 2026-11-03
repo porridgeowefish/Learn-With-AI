@@ -60,6 +60,7 @@ frontend/playwright-report/
 !/docs/images/
 /tests/
 /frontend/e2e/
+/frontend/design/tests/
 *_test.go
 *.test.js
 *.test.ts

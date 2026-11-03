@@ -1,7 +1,7 @@
 {
   "name": "learn-with-ai-frontend",
   "private": true,
-  "version": "0.8.8",
+  "version": "0.8.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "lint": "eslint src --ext .ts,.tsx",
-    "format": "prettier --write src"
+    "format": "prettier --write src",
+    "design": "vite --config design/vite.config.mjs",
+    "design:build": "vite build --config design/vite.config.mjs",
+    "design:check": "node design/check.mjs",
+    "design:serve": "vite preview --config design/vite.config.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -50,6 +54,7 @@
     "@vitejs/plugin-react": "^4.3.3",
     "@vitest/coverage-v8": "^2.1.4",
     "eslint": "^9.39.5",
+    "fflate": "^0.8.3",
     "jsdom": "^25.0.1",
     "msw": "^2.6.0",
     "prettier": "^3.3.3",

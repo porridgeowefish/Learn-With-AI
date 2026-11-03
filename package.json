@@ -1,6 +1,6 @@
 {
   "name": "learn-with-ai",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "private": true,
   "description": "learn-with-ai — local learning workbench",
   "scripts": {
@@ -22,7 +22,11 @@
     "release:tools": "node tools/release/restore-windows-tools.js",
     "release:test": "node --test tools/release/build-release.test.js tools/release/build-installers.test.js tools/release/linux-installer-smoke.test.js tools/release/windows-msi.test.js tools/release/windows-resources.test.js tools/release/msi-smoke.test.js",
     "build:desktop": "node tools/release/manage.js build-desktop",
-    "desktop:icon": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/release/build-icon.ps1"
+    "desktop:icon": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/release/build-icon.ps1",
+    "design": "npm --prefix frontend run design",
+    "design:build": "npm --prefix frontend run design:build",
+    "design:check": "npm --prefix frontend run design:check",
+    "design:serve": "npm --prefix frontend run design:serve"
   },
   "engines": {
     "go": ">=1.26"

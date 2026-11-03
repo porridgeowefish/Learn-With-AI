@@ -105,6 +105,8 @@ folders, health). Zustand slices own client state (ui, project, session, connect
 A single useSSE() hook is mounted at <AppShell />. Do not open EventSource
 instances from individual pages.
 
+前端设计预览复用产品组件。改动页面、接口或交互时，同步 frontend/design 中的样例与模拟行为，运行 npm run design:check，并用预览入口验收。学习者确认的设计决定按日期追加到 frontend/design/README.md。
+
 ## 5. Windows 参数编码
 
 git-bash 调用原生 Windows exe 时，中文不要经 argv 传递。使用 UTF-8 文件或 stdin。

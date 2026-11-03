@@ -151,7 +151,7 @@ func Export(ctx context.Context, root string, out io.Writer) error {
 			return e
 		}
 		p := filepath.ToSlash(rel)
-		if skipOperational(p) {
+		if p == "preferences.md" || skipOperational(p) {
 			if d.IsDir() {
 				return fs.SkipDir
 			}
@@ -200,8 +200,13 @@ func Export(ctx context.Context, root string, out io.Writer) error {
 		if e != nil {
 			return e
 		}
-		if _, e = projectRecord(p, data); e != nil {
+		originalSize := int64(len(data))
+		projected, e := projectRecord(p, data)
+		if e != nil {
 			return fmt.Errorf("%s: %w", p, e)
+		}
+		if generationInput(p) {
+			data = projected
 		}
 		if _, e = w.Write(data); e != nil {
 			return e
@@ -211,7 +216,7 @@ func Export(ctx context.Context, root string, out io.Writer) error {
 		if e != nil {
 			return e
 		}
-		if n != info.Size() || !after.ModTime().Equal(info.ModTime()) {
+		if originalSize != info.Size() || !after.ModTime().Equal(info.ModTime()) {
 			return fmt.Errorf("changed during export: %s", p)
 		}
 		m.Files = append(m.Files, record{p, k, n, digest(data), true})
@@ -295,6 +300,9 @@ func readArchive(ctx context.Context, zipPath, stage string) error {
 		}
 		if digest(b) != r.SHA {
 			return fmt.Errorf("checksum mismatch: %s", r.Path)
+		}
+		if r.Path == "preferences.md" {
+			continue // Legacy ZIP member has passed the integrity checks.
 		}
 		b, e = projectRecord(r.Path, b)
 		if e != nil {

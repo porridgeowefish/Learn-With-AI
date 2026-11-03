@@ -1,17 +1,13 @@
 import { Link } from 'react-router-dom';
 import s from './LearningProgress.module.css';
 
-/** Fixed difficulty signals. The teacher prompt defines each label verbatim;
- * a click sends the label as the learner's own explicit statement. */
-export const QUICK_SIGNALS = ['懂了，考我一下', '举个例子', '太难，退一步', '太简单，快一点'] as const;
-
 export interface LearningProgressValue { goal: string; taught: number; total: number; achieved: boolean; replies: string[] }
 
 /** Model-suggested replies are optional: invalid entries are dropped without
  * invalidating the progress itself. */
 function readReplies(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  const seen = new Set<string>(QUICK_SIGNALS);
+  const seen = new Set<string>();
   const replies: string[] = [];
   for (const item of value) {
     if (typeof item !== 'string') continue;
@@ -33,6 +29,17 @@ export function readLearningProgress(source: string): LearningProgressValue | un
     return { goal: p.goal.trim(), taught: p.taught, total: p.total, achieved: p.achieved && p.taught === p.total, replies: readReplies(p.replies) };
   } catch { return; }
 }
+// New answers keep suggestions separate from progress. Older answers embed them.
+const replyFooter = /(?:^|\n)```suggested-replies[^\S\r\n]*(?:\r?\n|$)/;
+
+export function readSuggestedReplies(source: string): string[] {
+  const footer = replyFooter.exec(source);
+  if (!footer) return readLearningProgress(source)?.replies ?? [];
+  const payload = source.slice(footer.index + footer[0].length).match(/^([\s\S]{1,2000}?)\r?\n```\s*$/);
+  if (!payload) return [];
+  try { return readReplies(JSON.parse(payload[1])); } catch { return []; }
+}
+
 export function withoutLearningProgress(source: string) {
   return source.replace(/(?:^|\n)```learning-progress[^\n]*\n[\s\S]*?(?:\n```|$)/g, '').trimEnd();
 }
@@ -40,7 +47,7 @@ export function withoutLearningProgress(source: string) {
 /** Historical metadata becomes ordinary prose; current answers supply their own first line. */
 export function teacherMarkdown(source: string) {
   const progress = readLearningProgress(source);
-  const body = withoutLearningProgress(source);
+  const body = withoutLearningProgress(source.split(replyFooter, 1)[0]);
   if (!progress || /^\s*进度[：:]/.test(body)) return body;
   const goal = progress.goal.replace(/[\r\n]/g, ' ').replace(/([\\`*_{}[\]<>])/g, '\\$1');
   return `进度：${progress.taught}/${progress.total} · ${goal}\n\n${body}`;
@@ -61,15 +68,16 @@ export function LearningProgress({ value, slug }: { value?: LearningProgressValu
   </div>;
 }
 
-/** Shortcut replies below the latest teacher answer: four fixed difficulty
- * signals plus the model's suggestions. Clicking sends immediately. */
-export function QuickReplies({ suggestions, disabled, onSend }: { suggestions: string[]; disabled?: boolean; onSend: (text: string) => void }) {
+const chartReply = '结合交互图表理解';
+const shortcuts = ['举个例子', '太难，退一步', '太简单，快一点', chartReply];
+
+export function QuickReplies({ onSend }: { onSend: (text: string) => void }) {
   return <div className={s.quick} aria-label="快捷回复">
-    <div className={s.quickRow} role="group" aria-label="难度信号">
-      {QUICK_SIGNALS.map(label => <button key={label} type="button" className={s.signal} disabled={disabled} onClick={() => onSend(label)}>{label}</button>)}
+    <div className={s.quickRow} role="group" aria-label="建议回复">
+      {shortcuts.map(text => <button key={text} type="button" className={s.suggestion} onClick={() => onSend(text)}>
+        {text === chartReply && <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 2v11h12M4 10l3-4 3 2 4-5" /></svg>}
+        {text}
+      </button>)}
     </div>
-    {suggestions.length > 0 && <div className={s.quickRow} role="group" aria-label="建议回复">
-      {suggestions.map(text => <button key={text} type="button" className={s.suggestion} disabled={disabled} onClick={() => onSend(text)}>{text}</button>)}
-    </div>}
   </div>;
 }

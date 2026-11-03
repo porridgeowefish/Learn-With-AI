@@ -20,7 +20,7 @@ const transaction = ".workspace-import"
 
 var ErrImportRecovery = errors.New("导入事务需要恢复，请重新打开应用")
 
-var globalRecords = []string{"projects/folders.json", "preferences.md", "treasures/ledger.json"}
+var globalRecords = []string{"projects/folders.json", "treasures/ledger.json"}
 
 func loadJSON(p string, v any) error {
 	b, e := os.ReadFile(p)
@@ -83,7 +83,35 @@ func entries(root string) ([]ProjectEntry, map[string]bool, error) {
 	}
 	return list, ids, nil
 }
+func generationInput(p string) bool {
+	matched, _ := path.Match("projects/*/generation/inputs/*/input.json", p)
+	return matched
+}
+
 func sanitize(p string, v map[string]any) error {
+	if generationInput(p) {
+		delete(v, "preferencesHash")
+		messages, _ := v["messages"].([]any)
+		for _, item := range messages {
+			message, _ := item.(map[string]any)
+			for _, key := range []string{"Content", "content"} {
+				text, ok := message[key].(string)
+				if !ok {
+					continue
+				}
+				var payload map[string]json.RawMessage
+				if json.Unmarshal([]byte(text), &payload) != nil || payload["learnerPreferences"] == nil {
+					continue
+				}
+				delete(payload, "learnerPreferences")
+				encoded, err := json.Marshal(payload)
+				if err != nil {
+					return err
+				}
+				message[key] = string(encoded)
+			}
+		}
+	}
 	// Persisted identifiers and relative storage pointers may be used to construct
 	// filesystem paths later, including on an OS different from the exporter.
 	var check func(any) error
@@ -191,6 +219,9 @@ type change struct {
 }
 
 func validChange(p string) bool {
+	if p == "preferences.md" {
+		return true // Recover legacy transaction journals.
+	}
 	for _, s := range globalRecords {
 		if s == p {
 			return true

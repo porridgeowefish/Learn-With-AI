@@ -72,6 +72,7 @@ run('go vet', 'go', ['vet', './backend-go/...', './tools/...']);
 run('go build', 'go', ['build', './...']);
 run('archcheck', 'go', ['run', './tools/archcheck', '-repo', '.', '-report', `${artifacts}/architecture/dependency-report.json`]);
 run('Go tests (short)', 'go', ['test', '-short', '-count=1', '-timeout', '600s', './backend-go/...', './tools/...']);
+run('design preview contract', 'node', ['frontend/design/check.mjs']);
 run('frontend lint', 'npm', ['--prefix', 'frontend', 'run', 'lint']);
 run('frontend tests', 'npm', ['--prefix', 'frontend', 'run', 'test']);
 

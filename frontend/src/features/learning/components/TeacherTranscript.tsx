@@ -5,7 +5,7 @@ import type { ConversationMessage } from '../api/learningWorkspace';
 import type { TeacherSession } from '../teacher/useTeacherSession';
 import { projectTeacherMessages } from '../teacher/sessionState';
 import { TeacherMessage, messageMarkdown } from './TeacherMessage';
-import { QuickReplies, readLearningProgress } from './LearningProgress';
+import { QuickReplies, teacherMarkdown } from './LearningProgress';
 import s from './TeacherView.module.css';
 
 export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
@@ -58,12 +58,12 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
   useEffect(() => () => clearTimeout(copyTimer.current), []);
   const copy = useCallback(async (message: ConversationMessage) => {
     try {
-      await navigator.clipboard.writeText(messageMarkdown(message));
+      await navigator.clipboard.writeText(teacherMarkdown(messageMarkdown(message)));
       setCopied(message.id); clearTimeout(copyTimer.current); copyTimer.current = setTimeout(() => setCopied(''), 1600);
     } catch { sessionRef.current.reportError('复制失败：浏览器未授权剪贴板访问'); }
   }, []);
   const download = useCallback((message: ConversationMessage) => {
-    const url = URL.createObjectURL(new Blob([messageMarkdown(message)], { type: 'text/markdown;charset=utf-8' }));
+    const url = URL.createObjectURL(new Blob([teacherMarkdown(messageMarkdown(message))], { type: 'text/markdown;charset=utf-8' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = `teacher-message-${message.id}.md`; anchor.click(); URL.revokeObjectURL(url);
   }, []);
   const regenerate = useCallback(() => { void sessionRef.current.regenerate(); }, []);
@@ -91,7 +91,7 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
     })}
     {live?.reading && <div className={s.searches} role="status">{live.reading.operation === 'search' ? '正在查找资料' : '正在查阅'}{live.reading.sourceId && <> · {sourceNames.get(live.reading.sourceId) ?? '资料'}</>}{live.reading.displayRange && <> · {live.reading.displayRange}</>}</div>}
     {!!live?.searches.length && <div className={s.searches} role="status">{live.searches.map((search, index) => <span key={index} className={s.searchChip} data-failed={search.failed || undefined}><SearchIcon size={12} />已搜索：{search.query}{typeof search.count === 'number' ? ` · ${search.count} 条结果` : search.failed ? ' · 暂不可用' : ' · 检索中…'}</span>)}</div>}
-    {quickReply && <QuickReplies suggestions={readLearningProgress(messageMarkdown(quickReply))?.replies ?? []} onSend={onSend} />}
+    {quickReply && <QuickReplies onSend={onSend} />}
     {session.error && <div className={s.error} role="alert">{session.error}{session.live && session.connection === 'disconnected' && <button type="button" onClick={() => void session.reconnect()}>重新连接</button>}</div>}
     <div className={s.streamAnchor} aria-hidden="true" />
   </div></div>;

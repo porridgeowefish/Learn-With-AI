@@ -1,31 +1,15 @@
 package workspaceservice
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/treasures"
 )
 
 func mergeGlobal(p string, old, in []byte, current, incoming []ProjectEntry) ([]byte, error) {
 	switch p {
-	case "preferences.md":
-		if len(old) > preferences.MaxBytes || len(in) > preferences.MaxBytes {
-			return nil, errors.New("preferences exceed 256 KiB")
-		}
-		if len(old) == 0 || bytes.Equal(old, in) {
-			return in, nil
-		}
-		if len(in) == 0 || bytes.Contains(append(append([]byte("\n\n"), old...), []byte("\n\n")...), append(append([]byte("\n\n"), in...), []byte("\n\n")...)) {
-			return old, nil
-		}
-		if len(old)+len(in)+2 > preferences.MaxBytes {
-			return nil, errors.New("combined preferences exceed 256 KiB")
-		}
-		return bytes.Join([][]byte{old, in}, []byte("\n\n")), nil
 	case "projects/folders.json":
 		var local, added projects.Layout
 		if len(old) > 0 {

@@ -34,3 +34,11 @@ memory、models 是兼容重定向，不是独立产品页面。
 - [调试约束与浏览器验证](../docs/harness-skill/rules/debugging.md)
 
 工程知识和自动化测试在维护者工作区本地保存，不 force-add。浏览器与运行验证记录在对应 Harness 迭代中。
+
+## 设计预览
+
+在仓库根目录运行 `npm run design`，打开 http://127.0.0.1:5188/settings。此入口使用产品自己的组件、路由、样式和主题。浏览器服务工作线程拦截数据请求，项目、对话与设置来自本地样例。首次安装依赖使用 `npm --prefix frontend ci`。
+
+独立静态包通过 `npm run design:build` 生成到 `frontend/design/dist/`。使用支持 SPA 回退的静态服务器或运行 `npm run design:serve`。请在专用本机端口或单独 HTTPS 域名部署，以隔离服务工作线程和浏览器数据。
+
+设计约定、模拟范围与同步流程见 [设计预览](design/README.md)。
