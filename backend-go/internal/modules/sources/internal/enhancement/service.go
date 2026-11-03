@@ -11,6 +11,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/render"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"os"
 	"regexp"
 	"sort"
@@ -42,10 +43,12 @@ func NotifyAutomatic(slug string, st *store.Store, sourceID string) {
 	automaticOnce.Do(func() {
 		go func() {
 			for t := range automaticQueue {
-				provider, err := ocr.ResolvePageProvider(t.providerID, t.model)
-				if err == nil {
-					automatic(t.slug, t.st, t.sourceID, provider)
-				}
+				workspacegate.Worker(context.Background(), func() {
+					provider, err := ocr.ResolvePageProvider(t.providerID, t.model)
+					if err == nil {
+						automatic(t.slug, t.st, t.sourceID, provider)
+					}
+				})
 			}
 		}()
 	})
@@ -59,7 +62,7 @@ func ConfigureEvents(event func(string, store.StructureJob)) {
 	manager.event = event
 	manager.Unlock()
 	manager.once.Do(func() { go loop() })
-	go recoverJobs()
+	go workspacegate.Worker(context.Background(), recoverJobs)
 }
 func emit(slug string, j store.StructureJob) {
 	manager.Lock()
@@ -268,7 +271,7 @@ func Cancel(slug, sourceID, jobID string) (store.StructureJob, error) {
 }
 func loop() {
 	for t := range manager.queue {
-		run(t)
+		workspacegate.Worker(context.Background(), func() { run(t) })
 	}
 }
 func run(t task) {

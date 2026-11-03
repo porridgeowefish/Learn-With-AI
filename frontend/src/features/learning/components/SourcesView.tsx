@@ -14,7 +14,7 @@ export function SourcesView({ slug }: { slug: string }) {
   const remove = usePermanentlyDeleteSource(slug);
   const [selected, setSelected] = useState<LearningSource>();
   useEffect(() => { setSelected(undefined); remove.reset?.(); }, [slug]);
-  const visible = (sources.data ?? []).filter((source) => source.status !== 'tombstoned' && source.status !== 'deleted');
+  const visible = (sources.data ?? []).filter((source) => source.status !== 'tombstoned' && source.status !== 'deleted' && (!source.originalUnavailable || source.status === 'ready' || Boolean(source.extractedBytes)));
 
   return (
     <section className={s.sources}>
@@ -29,7 +29,7 @@ export function SourcesView({ slug }: { slug: string }) {
         <div className={s.list}>
           {visible.map((source) => <article key={source.sourceId}>
             <div className={s.fileIcon}>{extension(source.displayName)}</div>
-            <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容；原文件已保留。</span>}<SourceStructureControl slug={slug} source={source}/></div>
+            <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容。</span>}{!source.originalUnavailable && <SourceStructureControl slug={slug} source={source}/>}</div>
             <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}<button type="button" className={s.danger} aria-label={`删除资料 ${source.displayName}`} onClick={() => { remove.reset?.(); setSelected(source); }}>删除</button></div>
           </article>)}
           {!sources.isLoading && !visible.length && <div className={s.empty}>尚未上传附件</div>}
@@ -48,6 +48,7 @@ function extension(name: string) {
 }
 
 function statusLabel(source: LearningSource) {
+  if (source.originalUnavailable) return '已保留解析文字';
   const failures: Record<string, string> = {
     unsupported_legacy_format: '旧版 DOC 暂不支持，请另存为 DOCX 后重新导入。',
     unsupported_format: '暂不支持此格式，请转换为支持的格式后重新导入。',
@@ -71,5 +72,5 @@ function statusLabel(source: LearningSource) {
 }
 
 function canRetry(source: LearningSource) {
-  return (source.status === 'failed' || source.status === 'opaque') && /\.(pdf|md|markdown|txt|pptx|docx|xlsx|csv)$/i.test(source.displayName);
+  return !source.originalUnavailable && (source.status === 'failed' || source.status === 'opaque') && /\.(pdf|md|markdown|txt|pptx|docx|xlsx|csv)$/i.test(source.displayName);
 }

@@ -61,7 +61,7 @@ function buildLinux(payload, output, version, arch) {
   fs.copyFileSync(path.join(__dirname, 'linux-uninstall.sh'), path.join(bundle, 'uninstall.sh'));
   fs.writeFileSync(path.join(bundle, '.learn-with-ai-files'), listFiles(path.join(bundle, 'app')).map(file=>`app/${file}`).join('\n')+'\n');
   const installArchive = safeOutput(path.join(output, `${name}-install.tar.gz`));
-  archive.tarGzip(bundle, name, installArchive, ['install.sh','uninstall.sh','app/learn-with-ai']);
+  archive.tarGzip(bundle, name, installArchive, ['install.sh','uninstall.sh','app/learn-with-ai','app/scripts/import-learning.sh']);
 
   const data = path.join(staging, 'data'), control = path.join(staging, 'control');
   copyTree(payload, path.join(data, 'opt', 'learn-with-ai'));
@@ -71,7 +71,7 @@ function buildLinux(payload, output, version, arch) {
   fs.writeFileSync(path.join(data, 'usr', 'share', 'applications', 'learn-with-ai.desktop'), '[Desktop Entry]\nType=Application\nName=Learn-With-AI\nExec=/opt/learn-with-ai/learn-with-ai\nTerminal=false\nCategories=Education;\n');
   fs.mkdirSync(control);
   fs.writeFileSync(path.join(control, 'control'), `Package: learn-with-ai\nVersion: ${version}\nArchitecture: ${arch}\nMaintainer: learn-with-ai contributors <noreply@learnwithai.local>\nSection: education\nPriority: optional\nRecommends: tesseract-ocr, tesseract-ocr-chi-sim\nDescription: Local AI learning workbench\n Go server with browser interface and built-in document parsing.\n`);
-  archive.tarGzip(data, '.', path.join(staging, 'data.tar.gz'), ['opt/learn-with-ai/learn-with-ai','usr/bin/learn-with-ai']);
+  archive.tarGzip(data, '.', path.join(staging, 'data.tar.gz'), ['opt/learn-with-ai/learn-with-ai','usr/bin/learn-with-ai','opt/learn-with-ai/scripts/import-learning.sh']);
   archive.tarGzip(control, '.', path.join(staging, 'control.tar.gz'), []);
   const deb = safeOutput(path.join(output, `${name}.deb`));
   ar(deb, [['debian-binary', Buffer.from('2.0\n')], ['control.tar.gz', fs.readFileSync(path.join(staging, 'control.tar.gz'))], ['data.tar.gz', fs.readFileSync(path.join(staging, 'data.tar.gz'))]]);
@@ -103,7 +103,7 @@ function main() {
     else {
       const app=buildMacApp(payload,output,version,arch);
       const tar=safeOutput(path.join(output,`learn-with-ai-${version}-darwin-${arch}-app.tar.gz`));
-      archive.tarGzip(path.dirname(app),`learn-with-ai-${version}-darwin-${arch}`,tar,['learn-with-ai.app/Contents/MacOS/learn-with-ai','learn-with-ai.app/Contents/MacOS/libexec/lll-vision-ocr','learn-with-ai.app/Contents/MacOS/libexec/lll-speech']);
+      archive.tarGzip(path.dirname(app),`learn-with-ai-${version}-darwin-${arch}`,tar,['learn-with-ai.app/Contents/MacOS/learn-with-ai','learn-with-ai.app/Contents/MacOS/libexec/lll-vision-ocr','learn-with-ai.app/Contents/MacOS/libexec/lll-speech','learn-with-ai.app/Contents/MacOS/scripts/import-learning.sh']);
       files.push(tar);
       if (process.platform==='darwin') {
         const pkg=safeOutput(path.join(output,`learn-with-ai-${version}-darwin-${arch}.pkg`));

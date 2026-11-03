@@ -57,6 +57,7 @@ function main() {
       const destination = path.join(staging, name.startsWith('docs/release/') ? path.basename(name) : name);
       fs.mkdirSync(path.dirname(destination), { recursive: true });
       fs.copyFileSync(path.join(repoRoot, name), destination);
+      if (name === 'scripts/import-learning.sh') fs.chmodSync(destination, 0o755);
     }
     if (goos === ({ win32: 'windows', darwin: 'darwin', linux: 'linux' })[process.platform] && arch === ({ x64: 'amd64', arm64: 'arm64' })[process.arch]) {
       run(process.execPath, [path.join(__dirname, 'smoke.js'), binary]);
@@ -65,7 +66,7 @@ function main() {
     const output = path.join(releaseRoot, filename);
     if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error('Linked archive output forbidden');
     if (goos === 'windows') archive.zip(staging, prefix, output);
-    else archive.tarGzip(staging, prefix, output, goos === 'darwin' ? ['learn-with-ai', 'libexec/lll-vision-ocr', 'libexec/lll-speech'] : ['learn-with-ai']);
+    else archive.tarGzip(staging, prefix, output, goos === 'darwin' ? ['learn-with-ai', 'scripts/import-learning.sh', 'libexec/lll-vision-ocr', 'libexec/lll-speech'] : ['learn-with-ai', 'scripts/import-learning.sh']);
     console.log(`Packaged ${filename}`);
   }
   if (process.argv.includes('--installers')) {

@@ -22,7 +22,7 @@ const feynmanPrompt = `你在 LLL 中陪学习者做费曼学习：学习者把�
 - 提问优先级：学习者讲错的地方 > 复习稿中重要但他还没讲到的部分 > 没解释清楚的术语和跳步 > 请他举例或说明适用边界。
 - 学习者讲错时，用新手式的困惑或一个反例、矛盾情境引导他自己发现，不直接给出正确答案；同一处连续两次仍没讲对，再温和地说“我好像在别处看到的说法不一样”，请他核对。
 - 不要讲课，不要给出完整答案，不要一次列出所有问题。
-- 需要图示时用带 mermaid 语言标记的代码围栏，规则同教师对话。全程中文。不要输出 learning-progress 代码围栏。
+- 用中文提问。图示只辅助澄清当前疑问。不要输出 learning-progress 代码围栏。
 
 开场：对话刚开始时，用新手身份打招呼，从复习稿里挑出 3 到 5 个你“听说过但不懂”的主题，只列名称，请学习者挑一个开始讲。
 
@@ -44,5 +44,5 @@ func FeynmanSystemPrompt(review string) string {
 		review = string(runes[:FeynmanReviewLimit])
 		note = "\n（复习稿较长，这里只提供前一部分；对未提供的部分不要判定为讲漏。）"
 	}
-	return feynmanPrompt + mathFormattingPrompt + "\n\n<复习稿>\n" + review + "\n</复习稿>" + note
+	return feynmanPrompt + diagramPrompt + mathFormattingPrompt + "\n\n<复习稿>\n" + review + "\n</复习稿>" + note
 }

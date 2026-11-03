@@ -5,6 +5,7 @@ import (
 	"errors"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
@@ -214,7 +215,7 @@ func (s *Service) loop() {
 		case <-s.notify:
 		case <-ticker.C:
 		}
-		s.dispatch()
+		workspacegate.Worker(s.ctx, s.dispatch)
 	}
 }
 func (s *Service) dispatch() {
@@ -250,7 +251,8 @@ func (s *Service) dispatch() {
 			}
 			s.busy[slug] = true
 			s.wg.Add(1)
-			go s.run(slug, store, job)
+			release := workspacegate.Continue()
+			go func() { defer release(); s.run(slug, store, job) }()
 			break
 		}
 	}

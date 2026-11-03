@@ -62,7 +62,7 @@ func init() {
 	}
 
 	if env := os.Getenv("WORKSPACE"); env != "" {
-		if err := ConfigureWorkspace(env); err != nil {
+		if err := setWorkspacePaths(env); err != nil {
 			panic("paths: configure workspace: " + err.Error())
 		}
 	} else if isTestBinary() {
@@ -79,7 +79,7 @@ func init() {
 			panic("paths: configure workspace: " + err.Error())
 		}
 	} else {
-		if err := ConfigureWorkspace(DefaultWorkspaceRoot(PROJECT_ROOT)); err != nil {
+		if err := setWorkspacePaths(DefaultWorkspaceRoot(PROJECT_ROOT)); err != nil {
 			panic("paths: configure workspace: " + err.Error())
 		}
 	}
@@ -108,6 +108,15 @@ func isTestBinary() bool {
 // changing WORKSPACE in the process environment after package initialization
 // does not update Go package variables by itself.
 func ConfigureWorkspace(root string) error {
+	if err := setWorkspacePaths(root); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(WORKSPACE, 0755); err != nil {
+		return fmt.Errorf("create workspace root: %w", err)
+	}
+	return nil
+}
+func setWorkspacePaths(root string) error {
 	if root == "" {
 		return os.ErrInvalid
 	}
@@ -116,12 +125,6 @@ func ConfigureWorkspace(root string) error {
 		return err
 	}
 	WORKSPACE = filepath.Clean(abs)
-	// The workspace root holds learner-owned files that several stores write
-	// directly (preferences.md, folders ledger, tmp diagnostics), so create it
-	// eagerly instead of relying on every writer to MkdirAll its parent.
-	if err := os.MkdirAll(WORKSPACE, 0o755); err != nil {
-		return fmt.Errorf("create workspace root: %w", err)
-	}
 	PROJECTS_ROOT = filepath.Join(WORKSPACE, "projects")
 	return nil
 }

@@ -4,6 +4,7 @@ package processing
 import (
 	"context"
 	"fmt"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"sync"
 	"time"
 
@@ -44,7 +45,7 @@ func (p *Processor) loop(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
-		p.drain(ctx)
+		workspacegate.Worker(ctx, func() { p.drain(ctx) })
 		select {
 		case <-ctx.Done():
 			return

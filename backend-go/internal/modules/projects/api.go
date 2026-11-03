@@ -51,3 +51,4 @@ func NewIndex() *Index { return projectindex.New() }
 
 var ErrLegacyFormat = workspace.ErrLegacyFormat
 var ErrInvalidLayout = workspace.ErrInvalidLayout
+var ValidateTransferState = workspace.ValidateTransferState

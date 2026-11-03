@@ -305,3 +305,34 @@ func (s *Store) Recover() error {
 	}
 	return nil
 }
+
+// SealImportedNotes prevents a receiver's auto-note worker from turning historical
+// conversation turns into new requests when the sender's note cursor was behind.
+func SealImportedNotes(root string) error {
+	p := filepath.Join(root, "assets", "notes", "state.json")
+	var state map[string]json.RawMessage
+	if e := read(p, &state); errors.Is(e, os.ErrNotExist) {
+		return nil
+	} else if e != nil {
+		return e
+	}
+	var meta struct {
+		LatestSeq uint64 `json:"latestSeq"`
+	}
+	if e := read(filepath.Join(root, "conversation", "conversation.json"), &meta); errors.Is(e, os.ErrNotExist) {
+		return nil
+	} else if e != nil {
+		return e
+	}
+	var last uint64
+	if raw := state["lastSeq"]; raw != nil {
+		if e := json.Unmarshal(raw, &last); e != nil {
+			return e
+		}
+	}
+	if meta.LatestSeq <= last {
+		return nil
+	}
+	state["lastSeq"], _ = json.Marshal(meta.LatestSeq)
+	return write(p, state)
+}

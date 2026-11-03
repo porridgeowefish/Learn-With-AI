@@ -7,6 +7,7 @@ import (
 	"errors"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	sources "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,11 +81,17 @@ func (s *Service) Start(ctx context.Context) error {
 				case <-s.notify:
 				}
 				for {
-					slug, j, ok := s.claim(run)
-					if !ok {
+					claimed := false
+					workspacegate.Worker(run, func() {
+						slug, j, ok := s.claim(run)
+						claimed = ok
+						if ok {
+							s.execute(run, slug, j)
+						}
+					})
+					if !claimed {
 						break
 					}
-					s.execute(run, slug, j)
 				}
 			}
 		}()

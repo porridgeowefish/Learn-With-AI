@@ -14,8 +14,10 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/app/bootstrap"
+	"github.com/xmz14/lll/backend-go/internal/app/workspaceservice"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+	"github.com/xmz14/lll/backend-go/internal/transport/httpserver"
 )
 
 var Version = "0.3.0-dev"
@@ -34,7 +36,7 @@ func main() {
 		return
 	}
 
-	cfg, _, err := config.Load(config.Options{Path: *configPath, WorkspaceRoot: *workspace, Port: *port})
+	cfg, instance, err := workspaceservice.OpenRuntime(config.Options{Path: *configPath, WorkspaceRoot: *workspace, Port: *port}, paths.DefaultWorkspaceRoot(paths.PROJECT_ROOT))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "config:", err)
 		os.Exit(1)
@@ -42,22 +44,9 @@ func main() {
 	for _, warning := range cfg.Warnings {
 		fmt.Println("config:", warning)
 	}
-	// Apply the resolved workspace after config loading. Package-level path
-	// variables were initialized before main, so changing only the environment
-	// here would leave stores pointing at the launch directory.
-	workspaceRoot := cfg.WorkspaceRootResolved()
-	if err := paths.ConfigureWorkspace(workspaceRoot); err != nil {
-		fmt.Fprintln(os.Stderr, "workspace:", err)
-		os.Exit(1)
-	}
-	os.Setenv("WORKSPACE", paths.WORKSPACE)
-
-	instance, err := paths.AcquireWorkspaceInstance(paths.WORKSPACE)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "instance:", err)
-		os.Exit(1)
-	}
 	defer instance.Close()
+
+	os.Setenv("WORKSPACE", paths.WORKSPACE)
 	portEnv := strconv.Itoa(cfg.Server.Port)
 	addr := net.JoinHostPort(cfg.Server.Host, portEnv)
 	listener, err := net.Listen("tcp", addr)
@@ -68,6 +57,7 @@ func main() {
 	}
 	defer listener.Close()
 	os.Setenv("LEARN_WITH_AI_SERVER_PORT", strconv.Itoa(cfg.Server.Port))
+	workspaceservice.ProducerVersion = Version
 	srv := bootstrap.Build()
 	defer srv.Server.Close()
 
@@ -102,6 +92,9 @@ func main() {
 		browserHost = "::1"
 	}
 	url := "http://" + net.JoinHostPort(browserHost, portEnv)
+	if instance.IsDefault() {
+		defer httpserver.PublishTransferEndpoint(url)()
+	}
 	if !*noBrowser {
 		if err := browser.Open(url); err != nil {
 			fmt.Println("Open browser manually:", url)

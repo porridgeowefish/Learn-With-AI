@@ -103,6 +103,7 @@ export interface BodyAnnotation {
 }
 
 export interface LearningSource {
+  originalUnavailable?: boolean;
   sourceId: string;
   displayName: string;
   status: 'stored' | 'processing' | 'ready' | 'opaque' | 'failed' | 'tombstoned' | 'deleted';

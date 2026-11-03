@@ -126,3 +126,12 @@ func ListProjectUsage() ([]ProjectUsage, error) { return usage.ListProjects() }
 func RecordTeacherUsage(slug string, record UsageRecord) error { return usage.Append(slug, record) }
 
 var ErrNotesProjectBusy = noteservice.ErrProjectBusy
+
+func PrepareImportedConversation(root string) error {
+	if e := conversation.PrepareImportedConversation(root); e != nil {
+		return e
+	}
+	return notestore.SealImportedNotes(root)
+}
+
+var IsExtractedMediaText = conversation.IsExtractedMediaText

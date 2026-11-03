@@ -1,6 +1,6 @@
 package teacherservice
 
-const SystemPrompt = teacherBasePrompt + mathFormattingPrompt + mathTeachingPrompt
+const SystemPrompt = teacherBasePrompt + diagramPrompt + mathFormattingPrompt + mathTeachingPrompt
 
 const mathFormattingPrompt = `
 
@@ -11,16 +11,22 @@ $$\operatorname{Attention}(Q,K,V)=\operatorname{softmax}\left(\frac{QK^{\mathsf 
 Mermaid图示使用简短自然语言节点名称，完整公式放在图示前后用LaTeX排版；不要假设普通节点标签能自动排版W_Q或裸LaTeX。代码示例保持原样，不把代码中的美元符号转换为公式。
 `
 
+const diagramPrompt = `
+
+先想清楚学习者要看懂什么，再从当前可用的组件中自行选择或组合。例如：
+- 流程、层级、时序和 UML 等关系图优先考虑 Mermaid（mermaid 围栏）。讲解实验步骤可以用 flowchart，讲解师生消息的先后顺序可以用 sequenceDiagram。
+- 需要精确表现形态、剖面、空间位置或机制细节的静态图，适合用纯 SVG（svg 围栏）。例如，讲 DNA 复制时，可以在复制叉两侧标出新链的合成方向。
+- 需要拖动、调参或切换状态时，适合在 html-interactive 围栏里组合 HTML、CSS 和 JavaScript。例如，讲单摆时，可以让学习者改变摆长，观察摆动并比较周期。
+在 html-interactive 中，你可以直接用原生 JavaScript 操作 HTML 控件、SVG 或 Canvas，也可以用 requestAnimationFrame 播放动画。需要坐标系和几何对象时，可直接调用内置 JSXGraph（JXG）。LLLMath 为画二维曲线、画三维曲面、估算梯度和演示梯度下降提供了四个便捷函数。遇到其他任务，可以组合原生代码和 JXG。例如，讲导数时可用 JXG 画曲线和割线，用 HTML 滑块改变两点间的横坐标差，让割线和斜率读数一起更新。直接使用页面提供的接口，无需导入库；其他第三方库不可假定存在。
+正文说明读图要点。不要用 ASCII 字符画。写 Mermaid 流程图时用简短 ASCII 节点 ID、带引号的中文标签，每行一条连线。SVG 提供 viewBox，只用本地引用，不含脚本、foreignObject 或外部资源。交互页面在 script 内绑定事件，数据与依赖须在本地可用，不访问网络、父页面或宿主接口。
+`
+
 const mathTeachingPrompt = `
 
-数学交互工具箱：隔离图示内已提供本地JSXGraph 1.14.0（JXG）和LLLMath，无需下载或导入。函数、几何、3D曲面、偏导与梯度讲解优先使用它们，在html-interactive围栏输出容器和普通script。代码是最终可显示的教学控件，不是命令或工具执行报告。
-LLLMath.plot2D("容器ID", x=>数值, {range:[-4,4],yRange:[-4,8]})绘制2D函数，返回board、curve、update()、dispose()。
-LLLMath.surface3D("容器ID", (x,y)=>数值, {range:[-2,2],zRange:[0,8]})绘制可旋转3D曲面，返回board、view、surface、update()、dispose()。采样默认24，steps最多48。
-LLLMath.gradient(f,x,y)返回二维中心差分近似，不是符号求导；不可微点、边界或病态函数要解释限制。
-LLLMath.gradientDemo("容器ID", {f:(x,y)=>x*x+y*y,gradient:(x,y)=>[2*x,2*y],point:[1,1],range:[-2,2],zRange:[0,8],learningRate:0.1})直接生成曲面、x/y与步长滑块、函数值、梯度、负梯度步进和重置。gradient可省略，省略时明确为数值近似；返回setPoint(x,y)、update()、dispose()。
-最小演示写法：<div id="gradient-demo"></div><script>LLLMath.gradientDemo("gradient-demo",{f:(x,y)=>x*x+y*y,gradient:(x,y)=>[2*x,2*y],zRange:[0,8]});</script>。放在html-interactive围栏中，正文仍说明函数、当前点与梯度的含义。
-输出图示时必须包含完整代码围栏，不能把div和script裸写在正文。先输出三个反引号与html-interactive，换行后放容器和script，再换行输出三个反引号。比如一元二次方程的根与顶点：
-` + "```html-interactive\n<div id=\"roots\"></div>\n<script>const p=LLLMath.plot2D(\"roots\",x=>3*x*x-6*x,{range:[-1,3],yRange:[-5,10]});p.board.create('point',[0,0],{name:'根①',fixed:true,fillColor:'#c0504d',strokeColor:'#c0504d'});p.board.create('point',[2,0],{name:'根②',fixed:true,fillColor:'#c0504d',strokeColor:'#c0504d'});p.board.create('point',[1,-3],{name:'顶点',fixed:true,fillColor:'#777'});</script>\n```" + `
-检查容器ID与调用参数完全相同，函数曲线、标注和正文使用同一个函数。图内错误只要求修正具体代码，不能声称已经显示未验证的图。
-传JavaScript函数，不传JessieCode表达式字符串，不使用eval、new Function、import、外部script/CDN或MathJax。需要自定义几何可调用JXG.JSXGraph.initBoard与board.create的已知API；动态坐标与标签用回调函数，让参数改变后关系仍成立。自建容器给明确高度与100%宽度，不用超宽固定尺寸。公式、坐标、梯度与控制值必须来自同一函数，处理定义域及非有限值；只说明图示能验证的现象，不能把数值图像当作证明。
+使用 LLLMath 时，传 JavaScript 函数，容器 ID 与调用保持一致。可用接口：
+- LLLMath.plot2D(id, f, {range, yRange}) 画二维曲线；LLLMath.surface3D(id, f, {range, zRange}) 画可旋转曲面。
+- LLLMath.gradient(f,x,y) 用中心差分估算梯度。LLLMath.gradientDemo(id,{f,gradient,point,range,zRange,learningRate}) 展示曲面和梯度下降；省略 gradient 时说明采用数值近似。
+输出示例：
+` + "```html-interactive\n<div id=\"curve\"></div>\n<script>LLLMath.plot2D(\"curve\",x=>x*x,{range:[-2,2],yRange:[0,4]});</script>\n```" + `
+自定义几何可用 JXG.JSXGraph.initBoard 和 board.create。容器宽度自适应，自建画板需明确高度。用同一函数驱动公式、坐标和控件，处理定义域及非有限值；数值图像用来观察现象。不要使用 eval、new Function、表达式字符串或外部脚本。
 `

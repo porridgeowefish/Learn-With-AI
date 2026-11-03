@@ -383,3 +383,71 @@ func (c *Config) WorkspaceRootResolved() string {
 	}
 	return workspaceBase()
 }
+
+// OpenRuntime selects and locks the data root before reading authoritative configuration.
+func OpenRuntime(opts Options, defaultRoot string, validate func(string) error) (Config, *paths.Lease, error) {
+	override := opts.WorkspaceRoot != "" || os.Getenv("LLL_WORKSPACE_ROOT") != "" || os.Getenv("WORKSPACE") != ""
+	if opts.WorkspaceRoot == "" {
+		opts.WorkspaceRoot = os.Getenv("LLL_WORKSPACE_ROOT")
+	}
+	if opts.WorkspaceRoot == "" {
+		opts.WorkspaceRoot = os.Getenv("WORKSPACE")
+	}
+	lease, e := paths.OpenWorkspace(override, func() (string, error) {
+		legacy := opts
+		base := defaultRoot
+		if legacy.WorkspaceRoot != "" {
+			base = legacy.WorkspaceRoot
+		}
+		if legacy.Path == "" {
+			legacy.Path = filepath.Join(base, "config.local.json")
+		}
+		cfg, prov, e := Load(legacy)
+		if e != nil {
+			return "", e
+		}
+		if !override && prov["workspace"].From == "default" {
+			return base, nil
+		}
+		selected := cfg.WorkspaceRootResolved()
+		if !override && base != selected {
+			for _, name := range []string{"projects", "preferences.md", "treasures"} {
+				path := filepath.Join(base, name)
+				if info, err := os.Stat(path); err == nil {
+					if info.IsDir() {
+						items, err := os.ReadDir(path)
+						if err != nil {
+							return "", err
+						}
+						if len(items) == 0 {
+							continue
+						}
+					}
+					return "", fmt.Errorf("legacy workspace locations conflict: %s and %s", base, selected)
+				} else if !os.IsNotExist(err) {
+					return "", err
+				}
+			}
+			if _, err := os.Stat(selected); err != nil {
+				return "", fmt.Errorf("legacy workspace unavailable: %w", err)
+			}
+		}
+		return selected, nil
+	}, validate)
+	if e != nil {
+		return Config{}, nil, e
+	}
+	opts.WorkspaceRoot = lease.Root
+	if opts.Path == "" {
+		opts.Path = filepath.Join(lease.Root, "config.local.json")
+	}
+	cfg, _, e := Load(opts)
+	if e == nil {
+		e = paths.ConfigureWorkspace(lease.Root)
+	}
+	if e != nil {
+		lease.Close()
+		return Config{}, nil, e
+	}
+	return cfg, lease, nil
+}

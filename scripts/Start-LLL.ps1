@@ -1,4 +1,4 @@
-﻿param(
+param(
   [int]$Port = 8787,
   [string]$WorkspaceRoot = '',
   [switch]$NoBrowser,
@@ -165,16 +165,13 @@ function Stop-ExistingRootServer {
 
 try {
   $repoRoot = Get-RepoRoot
-  if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    # Default learner workspace: <repo>\workspace (all runtime data lives
-    # there; see ADR-0023). Created here because Resolve-Path needs it to exist.
-    $workspaceRoot = Join-Path $repoRoot 'workspace'
-    New-Item -ItemType Directory -Force -Path $workspaceRoot | Out-Null
-  } else {
-    $workspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
+  $launchArguments = @('--no-browser', '--port', "$Port")
+  if (-not [string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
+    $resolvedWorkspace = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
+    $launchArguments += @('--workspace', "`"$resolvedWorkspace`"")
   }
   $exePath = Join-Path $repoRoot 'dist\dev\learn-with-ai.exe'
-  $tmpDir = Join-Path $workspaceRoot 'tmp\desktop-launcher'
+  $tmpDir = Join-Path $repoRoot 'trash\desktop-launcher'
   $pidFile = Join-Path $tmpDir 'lll.pid'
   $outLog = Join-Path $tmpDir 'lll.out.log'
   $errLog = Join-Path $tmpDir 'lll.err.log'
@@ -203,19 +200,13 @@ try {
     throw "Missing $exePath after build. Check $buildErrLog and $buildOutLog."
   }
 
-  $previousWorkspace = $env:WORKSPACE
-  try {
-    $env:WORKSPACE = $workspaceRoot
-    $proc = Start-Process -FilePath $exePath `
-      -ArgumentList @('--no-browser', '--port', "$Port", '--workspace', $workspaceRoot) `
-      -WorkingDirectory $repoRoot `
-      -WindowStyle Hidden `
-      -RedirectStandardOutput $outLog `
-      -RedirectStandardError $errLog `
-      -PassThru
-  } finally {
-    $env:WORKSPACE = $previousWorkspace
-  }
+  $proc = Start-Process -FilePath $exePath `
+    -ArgumentList $launchArguments `
+    -WorkingDirectory $repoRoot `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput $outLog `
+    -RedirectStandardError $errLog `
+    -PassThru
 
   Set-Content -LiteralPath $pidFile -Encoding ASCII -Value $proc.Id
 

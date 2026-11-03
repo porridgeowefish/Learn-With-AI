@@ -41,7 +41,7 @@
   "resources": [
     {
       "path": "learning-prompts/common.md",
-      "sha256": "8224c78ccf7db125782dfa6ba4c1a33c1a531fae83b97e8d878214e0d146ff22"
+      "sha256": "b043e64cc36b8803846fb98ae973de15a261e97d15b841dbeffcab17a093482e"
     },
     {
       "path": "learning-prompts/discipline-map.md",

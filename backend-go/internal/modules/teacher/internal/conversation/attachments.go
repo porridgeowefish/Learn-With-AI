@@ -170,9 +170,9 @@ func (s *Store) attachmentBlocksLocked(ids []string) ([]Block, error) {
 		text := a.Text
 		if a.Status == "empty" {
 			if a.Kind == "image" {
-				text = "[图片未提取到文字。请告知学习者：当前仅支持文字提取，未识别到文字；无法判断图片内容。]"
+				text = emptyImageText
 			} else {
-				text = "[音频未识别到语音文字。请告知学习者并邀请重新录音。]"
+				text = emptyAudioText
 			}
 		}
 		blocks = append(blocks, Block{Type: "chat-" + a.Kind, ArtifactRef: id, Name: a.Name, Source: text})
@@ -227,4 +227,11 @@ func (s *Store) pruneAttachmentsLocked(incoming int64) error {
 		return errors.New("本对话媒体附件已达到256MiB上限")
 	}
 	return nil
+}
+
+const emptyImageText = "[图片未提取到文字。请告知学习者：当前仅支持文字提取，未识别到文字；无法判断图片内容。]"
+const emptyAudioText = "[音频未识别到语音文字。请告知学习者并邀请重新录音。]"
+
+func IsExtractedMediaText(s string) bool {
+	return s != "" && s != emptyImageText && s != emptyAudioText
 }

@@ -3,6 +3,7 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,8 +15,10 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/app/bootstrap"
+	"github.com/xmz14/lll/backend-go/internal/app/workspaceservice"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+	"github.com/xmz14/lll/backend-go/internal/transport/httpserver"
 )
 
 type Options struct {
@@ -30,36 +33,21 @@ type Engine struct {
 	Done      chan struct{}
 	server    *http.Server
 	app       *bootstrap.App
-	instance  *os.File
+	instance  *paths.Lease
+	unpublish func()
 	once      sync.Once
 }
 
 func Start(options Options) (*Engine, error) {
-	root := options.Workspace
-	if root == "" {
-		root = os.Getenv("LLL_WORKSPACE_ROOT")
-	}
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		root, err = paths.DefaultUserWorkspace("windows", os.Getenv, home)
-		if err != nil {
-			return nil, err
-		}
-	}
-	cfg, _, err := config.Load(config.Options{WorkspaceRoot: root, Path: options.Config, Port: options.Port})
+	_, instance, err := workspaceservice.OpenRuntime(config.Options{WorkspaceRoot: options.Workspace, Path: options.Config, Port: options.Port}, DefaultWorkspace())
 	if err != nil {
+		var busy *paths.WorkspaceBusyError
+		if errors.As(err, &busy) {
+			return nil, &BusyError{Workspace: busy.Root, Err: err}
+		}
 		return nil, err
 	}
-	if err = paths.ConfigureWorkspace(cfg.WorkspaceRootResolved()); err != nil {
-		return nil, err
-	}
-	instance, err := paths.AcquireWorkspaceInstance(paths.WORKSPACE)
-	if err != nil {
-		return nil, &BusyError{Workspace: paths.WORKSPACE, Err: err}
-	}
+
 	// A desktop owns a private IPv4 listener, even when a maintainer's server is running.
 	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(options.Port)))
 	if err != nil {
@@ -69,8 +57,12 @@ func Start(options Options) (*Engine, error) {
 	port := listener.Addr().(*net.TCPAddr).Port
 	os.Setenv("WORKSPACE", paths.WORKSPACE)
 	os.Setenv("LEARN_WITH_AI_SERVER_PORT", strconv.Itoa(port))
+	workspaceservice.ProducerVersion = options.Version
 	app := bootstrap.Build()
 	engine := &Engine{URL: fmt.Sprintf("http://127.0.0.1:%d", port), Workspace: paths.WORKSPACE, Done: make(chan struct{}), app: app, instance: instance}
+	if instance.IsDefault() {
+		engine.unpublish = httpserver.PublishTransferEndpoint(engine.URL)
+	}
 	// Desktop-only update check routes sit in front of the
 	// shared application server.
 	updates := newUpdater(options.Version).handler()
@@ -106,7 +98,10 @@ func (engine *Engine) Close() {
 		_ = engine.server.Shutdown(ctx)
 		_ = engine.server.Close()
 		engine.app.Server.Close()
-		_ = engine.instance.Close()
+		if engine.unpublish != nil {
+			engine.unpublish()
+		}
+		engine.instance.Close()
 		close(engine.Done)
 	})
 }
@@ -131,6 +126,9 @@ func AllowedExternalURL(raw string) bool {
 // DefaultWorkspace is stable across desktop launch directories and never
 // defaults to a maintainer repository's workspace.
 func DefaultWorkspace() string {
+	if paths.BuildMode != "release" {
+		return paths.DefaultWorkspaceRoot(paths.PROJECT_ROOT)
+	}
 	if root := os.Getenv("LLL_WORKSPACE_ROOT"); root != "" {
 		return root
 	}

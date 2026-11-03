@@ -28,6 +28,7 @@ function packagePaths(goos, arch, root = repoRoot) {
     }
   }
   for (const relative of ['frontend/dist', 'learning-prompts', 'config/config.example.json', 'LICENSE', 'docs/release/README.md', 'docs/release/THIRD_PARTY_NOTICES.txt']) walk(relative);
+  walk(goos === 'windows' ? 'scripts/Import-Learning.ps1' : 'scripts/import-learning.sh');
   if (!names.includes('frontend/dist/index.html') || !names.includes('learning-prompts/review.md') || !names.includes('learning-prompts/manifest.json')) {
     throw new Error('Release resources are incomplete');
   }

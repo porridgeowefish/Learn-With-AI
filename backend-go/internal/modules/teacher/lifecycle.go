@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -327,7 +328,9 @@ func (s *Lifecycle) startTeacherRunLocked(slug string, start func(ctx context.Co
 		return nil
 	}
 	s.wg.Add(1)
+	release := workspacegate.Continue()
 	go func() {
+		defer release()
 		defer s.wg.Done()
 		responseID := ""
 		emit := func(frame StreamFrame) {

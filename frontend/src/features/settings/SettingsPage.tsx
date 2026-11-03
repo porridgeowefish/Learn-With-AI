@@ -1,5 +1,6 @@
 import { useAppearance, useUpdateAppearance } from './appearance';
 import { ModelsPage } from './ModelsPage';
+import { WorkspaceSettings } from './WorkspaceSettings';
 import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
@@ -13,6 +14,7 @@ export function SettingsPage() {
     <AppearanceSection />
     <ModelsPage />
     <TeacherNotesSettings />
+    <WorkspaceSettings />
     <VersionAndDataSection />
     <OpenSourceSection />
   </div></div>;

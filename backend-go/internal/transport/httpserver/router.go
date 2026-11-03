@@ -3,6 +3,7 @@ package httpserver
 
 import (
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 
 	"github.com/xmz14/lll/backend-go/internal/modules/generation"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
@@ -31,8 +32,9 @@ type Server struct {
 	broadcaster     *httpx.Broadcaster
 	cache           *projects.Index
 
-	chatMediaMu sync.Map
-	mu          sync.RWMutex
+	transferCancellations sync.Map
+	chatMediaMu           sync.Map
+	mu                    sync.RWMutex
 }
 type Dependencies struct {
 	Treasures       *treasures.Store
@@ -60,6 +62,11 @@ func New(deps Dependencies) *Server {
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/workspace/directories", workspaceDirectories)
+	mux.HandleFunc("POST /api/workspace/export", s.transferExport)
+	mux.HandleFunc("POST /api/workspace/import", s.transferImport)
+	mux.HandleFunc("POST /api/workspace/import/cancel", s.cancelTransferImport)
+	mux.HandleFunc("POST /api/workspace/move", s.transferMove)
 	mux.HandleFunc("GET /api/treasures", s.handleTreasures)
 	mux.HandleFunc("POST /api/treasures/rewards/{rewardId}/seen", s.handleTreasureSeen)
 	mux.HandleFunc("GET /api/treasures/rewards/{rewardId}/source", s.handleTreasureSource)
@@ -159,6 +166,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", s.broadcaster.SSEHandler(map[string]any{}))
 	mux.Handle("/", spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX))
 	return logging(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/events" && !strings.HasPrefix(r.URL.Path, "/api/workspace/") {
+			release, err := workspacegate.Enter()
+			if err != nil {
+				httpx.Error(w, 409, err.Error())
+				return
+			}
+			defer release()
+		}
 		_, pattern := mux.Handler(r)
 		if strings.HasPrefix(r.URL.Path, "/api/projects/") && pattern != "/api/" && pattern != "/" {
 			parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/projects/"), "/")

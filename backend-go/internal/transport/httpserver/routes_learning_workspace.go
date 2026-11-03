@@ -425,6 +425,10 @@ func (s *Server) handleReadSourceFile(w http.ResponseWriter, r *http.Request) {
 	fileKey := r.PathValue("fileKey")
 	var relative, mediaType string
 	if fileKey == "original" {
+		if revision.OriginalUnavailable {
+			httpx.Error(w, http.StatusGone, "source-original-excluded")
+			return
+		}
 		relative, mediaType = revision.Original.Path, revision.Original.MediaType
 	} else {
 		for _, file := range revision.DerivedFiles {

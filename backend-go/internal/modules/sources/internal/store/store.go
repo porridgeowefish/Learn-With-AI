@@ -28,6 +28,7 @@ const (
 )
 
 type Source struct {
+	OriginalUnavailable bool             `json:"originalUnavailable,omitempty"`
 	Coverage            *TextCoverage    `json:"coverage,omitempty"`
 	SchemaVersion       int              `json:"schemaVersion"`
 	SourceID            string           `json:"sourceId"`
@@ -131,15 +132,16 @@ type Privacy struct {
 }
 
 type Revision struct {
-	SchemaVersion    int       `json:"schemaVersion"`
-	RevisionID       string    `json:"revisionId"`
-	SourceID         string    `json:"sourceId"`
-	Original         FileRef   `json:"original"`
-	DerivedFiles     []FileRef `json:"derivedFiles"`
-	ParseTaskID      string    `json:"parseTaskId,omitempty"`
-	Privacy          Privacy   `json:"privacy"`
-	CreatedAt        time.Time `json:"createdAt"`
-	DerivedVersionID string    `json:"derivedVersionId,omitempty"`
+	OriginalUnavailable bool      `json:"originalUnavailable,omitempty"`
+	SchemaVersion       int       `json:"schemaVersion"`
+	RevisionID          string    `json:"revisionId"`
+	SourceID            string    `json:"sourceId"`
+	Original            FileRef   `json:"original"`
+	DerivedFiles        []FileRef `json:"derivedFiles"`
+	ParseTaskID         string    `json:"parseTaskId,omitempty"`
+	Privacy             Privacy   `json:"privacy"`
+	CreatedAt           time.Time `json:"createdAt"`
+	DerivedVersionID    string    `json:"derivedVersionId,omitempty"`
 }
 
 type Store struct {

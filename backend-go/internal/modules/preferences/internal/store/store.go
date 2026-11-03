@@ -176,6 +176,8 @@ func restoreNonEmptyBackup() (Snapshot, bool, error) {
 	return Snapshot{Path: Path(), Exists: true, Content: recovered.Content}, true, nil
 }
 
+func MigrateBackup() error { _, err := backupPath(); return err }
+
 func backupPath() (string, error) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -190,5 +192,24 @@ func backupPath() (string, error) {
 		workspaceRoot = strings.ToLower(workspaceRoot)
 	}
 	id := fmt.Sprintf("%x", sha256.Sum256([]byte(workspaceRoot)))[:16]
-	return filepath.Join(configDir, "LifeLongLearn", "backups", id, Filename), nil
+	legacy := filepath.Join(configDir, "LifeLongLearn", "backups", id, Filename)
+	m, err := filesystem.ReadMetadata(filesystem.WORKSPACE)
+	if os.IsNotExist(err) {
+		return legacy, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	current := filepath.Join(configDir, "LifeLongLearn", "backups", m.ID, Filename)
+	if _, err = os.Stat(current); os.IsNotExist(err) {
+		b, e := os.ReadFile(legacy)
+		if e == nil {
+			err = filesystem.AtomicWriteFile(current, b, 0600)
+		} else if os.IsNotExist(e) {
+			err = nil
+		} else {
+			err = e
+		}
+	}
+	return current, err
 }

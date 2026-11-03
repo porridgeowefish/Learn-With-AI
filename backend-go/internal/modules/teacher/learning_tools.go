@@ -6,6 +6,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/activity"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"strings"
 	"sync"
 	"time"
@@ -187,7 +188,9 @@ func (s *LearningTools) SummarizeAnnotation(slug, id string) error {
 		return err
 	}
 	s.annotation(slug, "summarize", id)
+	release := workspacegate.Continue()
 	go func() {
+		defer release()
 		defer s.end(slug)
 		pc, err := resolveToolProvider("", "annotationAskAI")
 		summary := ""
