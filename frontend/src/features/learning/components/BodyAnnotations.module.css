@@ -8,19 +8,19 @@
 .markdown :global(th) { background: var(--surface-sunken); font-weight: 700; }
 .markdown :global(mark[data-summary-id]) { padding: 1px 2px; color: inherit; background: color-mix(in srgb, #f1c75b 38%, transparent); border-radius: 3px; }
 .selectionBar { position: fixed; z-index: 90; display: flex; transform: translateX(-50%); padding: 4px; border: 1px solid var(--border); border-radius: 9px; background: var(--card); box-shadow: var(--shadow-lg); }
-.selectionBar button { padding: 6px 10px; border: 0; border-radius: 6px; color: var(--fg); background: transparent; font-size: 12px; }
+.selectionBar button { padding: 6px 10px; border: 0; border-radius: 6px; color: var(--fg); background: transparent; font-size: 0.8rem; }
 .selectionBar button:hover { background: var(--surface-raised); }
 .panel { width:100%; max-height:65vh; overflow:auto; background:var(--card); }
 .panel header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 5px; border: 0; }
-.panel h3 { margin: 0; font-size: 13px; font-weight: 600; }
-.panel header span { min-width: 20px; padding: 2px 6px; border-radius: 999px; color: var(--muted); background: var(--surface-raised); text-align: center; font-size: 10px; }
-.hint { margin: 0; padding: 0 16px 13px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.panel h3 { margin: 0; font-size: 0.86667rem; font-weight: 600; }
+.panel header span { min-width: 20px; padding: 2px 6px; border-radius: 999px; color: var(--muted); background: var(--surface-raised); text-align: center; font-size: 0.66667rem; }
+.hint { margin: 0; padding: 0 16px 13px; color: var(--muted); font-size: 0.73333rem; line-height: 1.5; }
 .list { border-top: 1px solid var(--border); }
-.empty { padding: 28px 16px; color: var(--muted); text-align: center; font-size: 11px; }
+.empty { padding: 28px 16px; color: var(--muted); text-align: center; font-size: 0.73333rem; }
 .item { padding: 13px 14px; border-bottom: 1px solid var(--border); }
-.item blockquote { margin: 0 0 9px; color: var(--fg); font: 12px/1.55 Georgia, 'Songti SC', serif; }
-.item > div { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 10px; }
-.item button { border: 0; color: var(--muted); background: transparent; font-size: 10px; }
+.item blockquote { margin: 0 0 9px; color: var(--fg); font: 0.8rem/1.55 Georgia, 'Songti SC', serif; }
+.item > div { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 0.66667rem; }
+.item button { border: 0; color: var(--muted); background: transparent; font-size: 0.66667rem; }
 .item button:hover { color: var(--fg); }
 @media (max-width: 1050px) { .panel { width:100%; max-height:65vh; overflow:auto; background:var(--card); } }
 

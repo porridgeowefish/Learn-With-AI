@@ -4,8 +4,8 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 | 系统 | 分发文件 | 安装与打开 |
 | --- | --- | --- |
-| Windows Intel / AMD 64 位 | learn-with-ai-0.8.13-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
-| Windows ARM64 | learn-with-ai-0.8.13-windows-arm64.msi | 同上，需要 Windows ARM64 |
+| Windows Intel / AMD 64 位 | learn-with-ai-0.8.14-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
+| Windows ARM64 | learn-with-ai-0.8.14-windows-arm64.msi | 同上，需要 Windows ARM64 |
 | macOS | darwin-…-app.tar.gz / 原生 CI 生成的 .pkg | 放进 Applications 后打开；当前 macOS 版本仍使用默认浏览器界面 |
 | Debian / Ubuntu | linux-….deb | sudo apt install ./文件名.deb；当前 Linux 版本仍使用默认浏览器界面 |
 | 其他 Linux | linux-…-install.tar.gz | 解压后运行 ./install.sh，从应用菜单打开；界面同上 |
@@ -16,11 +16,11 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 macOS可从同一页面下载对应Intel或Apple Silicon的PKG，安装后重新打开应用。
 
-MSI 会检测已安装版本。新版升级会显示版本与覆盖确认；取消时不会开始替换。重复打开同版本 MSI 会进入维护界面，可以修复或卸载；不允许降级覆盖较新版本。桌面和开始菜单的 Learn-With-AI 入口直接指向原生应用 exe，使用统一的蓝色书页与电路图标。
+MSI 会检测已安装版本。新版升级会显示版本与覆盖确认；取消时不会开始替换。重复打开同一个已安装的 MSI 只提示已经安装；卸载请从 Windows 设置的「已安装的应用」进入。安装向导取消或关闭后直接退出，不再显示结束页面；不允许降级覆盖较新版本。桌面和开始菜单的 Learn-With-AI 入口直接指向原生应用 exe，使用统一的蓝色书页与电路图标。
 
-旧版自定义 EXE 安装会单独显示迁移确认。确认后先卸载旧应用文件，再安装 MSI 版本；学习数据保留。这个首次 EXE → MSI 迁移是单向的，新安装若失败需重新运行 MSI。后续 MSI → MSI 升级由 Windows Installer 提供事务回滚。升级前请关闭旧应用。
+旧版自定义 EXE 安装会单独显示迁移确认。确认后先卸载旧应用文件，再安装 MSI 版本；学习数据保留。这个首次 EXE → MSI 迁移是单向的，新安装若失败需重新运行 MSI。后续 MSI → MSI 升级由 Windows Installer 提供事务回滚。确认安装后，安装器会停止该安装位置的后台进程；请先完成当前操作。
 
-Windows 程序固定安装到 %LOCALAPPDATA%/Programs/learn-with-ai，安装向导不提供目录选择，命令行 INSTALLFOLDER 也无法覆盖此目录。旧版曾安装到其他目录的应用升级后迁入固定目录；旧目录中的非程序文件保留。默认学习数据目录仍为 %LOCALAPPDATA%/learn-with-ai，与程序分离。可从系统「已安装的应用」或 MSI 维护界面卸载，学习项目、笔记、资料和 API 配置保留。
+Windows 程序固定安装到 %LOCALAPPDATA%/Programs/learn-with-ai，安装向导不提供目录选择，命令行 INSTALLFOLDER 也无法覆盖此目录。旧版曾安装到其他目录的应用升级后迁入固定目录；旧目录中的非程序文件保留。默认学习数据目录仍为 %LOCALAPPDATA%/learn-with-ai，与程序分离。可从系统「已安装的应用」卸载，学习项目、笔记、资料和 API 配置保留。
 
 Windows 应用使用 Microsoft Edge WebView2 Runtime。MSI 会检查该组件；若未安装，会显示明确提示。可从微软 [WebView2 官方页面](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime 后重试。缺少组件时不会转而打开普通浏览器冒充桌面应用。
 
@@ -46,7 +46,7 @@ macOS 默认数据为 ~/Library/Application Support/learn-with-ai；Linux 为 $X
 
 仓库 Start-LLL / npm run build / npm start 是快速源码验证工具，保留在仓库中，不进入公开 MSI。开发二进制统一生成到 dist/dev/，发布包位于 dist/releases/，dist/ 根目录不保留 EXE。npm run build:desktop 生成带图标的本机原生开发应用；只有显式执行 npm run desktop:install 才创建原生开发快捷方式，目标是 exe。安装版 MSI 只管理一个正式桌面入口。
 
-使用 node tools/release/build-release.js --version 0.8.13 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
+使用 node tools/release/build-release.js --version 0.8.14 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
 
 GitHub Actions 在 v 开头的标签或勾选 publish 的手动运行中发布 Release（全部平台冒烟测试通过后才发布）；不勾选时只生成构件。分发包包含 THIRD_PARTY_NOTICES.txt，当前构件未进行代码签名。
 
@@ -94,3 +94,9 @@ macOS 和 Linux 使用随包脚本。macOS 的脚本位于应用包的 Contents/
 sh ./scripts/import-learning.sh '/path/to/学习记录.zip'
 ```
 在 Linux 上，存储位置须支持禁止覆盖的原子重命名。Ubuntu 的 ext4 已实测可用。如果 WSL 的 Windows 挂载盘返回「请选择支持此操作的本地文件系统」，请在 Linux 原生文件系统中选择存储位置。ZIP 文件本身可以放在挂载盘上。
+
+## 界面字号与全局学习偏好
+
+设置 → 外观提供四档界面字号，默认使用更易阅读的舒适字号，修改立即生效并在本机保留。主页、设置与学习页面保持文字层级。
+
+全局学习偏好在停止输入后自动保存，页面显示保存状态，失败时保留草稿并可重试。编辑框上方可添加费曼学习法、第一性原理、金字塔原理、苏格拉底式提问和多元思维等预置说明。预置会追加已有内容，可以继续修改。关闭应用前请确认显示已自动保存。

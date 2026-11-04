@@ -7,6 +7,7 @@ import { App } from './App';
 import 'katex/dist/katex.min.css';
 import '@/shared/styles/tokens.css';
 import '@/shared/styles/globals.css';
+import '@/shared/lib/fontSize';
 
 // Single QueryClient for the app. Default options keep data fresh enough
 // for a local-tool UX without hammering the backend.

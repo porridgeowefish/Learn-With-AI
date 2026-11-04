@@ -1,20 +1,20 @@
 .root { width: 100%; min-width: 0; }
 .controls, .attachments { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.controls { color: var(--muted); font-size: 12px; flex-wrap: nowrap; justify-content: space-between; }
+.controls { color: var(--muted); font-size: 0.8rem; flex-wrap: nowrap; justify-content: space-between; }
 .controls .upload, .controls .microphone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 34px; height: 32px; padding: 0 6px; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
 .controls .upload:hover, .controls .microphone:hover { background: var(--surface-sunken); }
 .controls .microphone[data-recording] { color: var(--pink); border-radius: 9px; gap: 4px; }
 .controls select { min-width: 0; max-width: 76px; border: 0; color: inherit; font: inherit; background: transparent; cursor: pointer; }
 .actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
-.status { font-size: 11px; }
+.status { font-size: 0.73333rem; }
 .chip button { color: inherit; border: 0; background: transparent; cursor: pointer; }
-@media (max-width: 600px) { .actions { gap: 3px; } .controls select { max-width: 56px; font-size: 11px; } .status { position: absolute; top: -18px; } }
-.chip { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; border: 1px solid var(--border, #dedbd3); border-radius: 8px; font-size: 12px; margin-bottom: 8px; }
+@media (max-width: 600px) { .actions { gap: 3px; } .controls select { max-width: 56px; font-size: 0.73333rem; } .status { position: absolute; top: -18px; } }
+.chip { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 8px; border: 1px solid var(--border, #dedbd3); border-radius: 8px; font-size: 0.8rem; margin-bottom: 8px; }
 .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip button { border: 0; }
-.error { color: var(--danger, #a34537); font-size: 12px; margin: 6px 0 0; }
+.error { color: var(--danger, #a34537); font-size: 0.8rem; margin: 6px 0 0; }
 .block { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 8px 0; min-width: 0; }
 .block img { display: block; max-width: min(100%, 360px); max-height: 260px; object-fit: contain; border-radius: 8px; }
 .block audio { max-width: 100%; }
 .block p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.name, .block summary { font-size: 12px; opacity: .75; }
+.name, .block summary { font-size: 0.8rem; opacity: .75; }

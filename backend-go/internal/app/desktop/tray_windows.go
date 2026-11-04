@@ -51,6 +51,14 @@ func attachWindowTray(hwnd uintptr, exit func()) (*windowTray, error) {
 	taskbarCreated, _, _ := user32.NewProc("RegisterWindowMessageW").Call(uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("TaskbarCreated"))))
 	t.callback = windows.NewCallback(func(window, message, wparam, lparam, id, data uintptr) uintptr {
 		switch message {
+		case 0x11: // WM_QUERYENDSESSION: Restart Manager is asking, not committing.
+			return 1
+		case 0x16: // WM_ENDSESSION: stop the engine only if shutdown was confirmed.
+			if wparam != 0 && !t.exiting {
+				t.exiting = true
+				go exit()
+			}
+			return 0
 		case 0x10: // WM_CLOSE, including Alt+F4
 			if !t.exiting && t.added {
 				user32.NewProc("ShowWindow").Call(window, 0)

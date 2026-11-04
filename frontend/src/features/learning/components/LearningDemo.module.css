@@ -1,50 +1,50 @@
 .modal { width: min(1120px, calc(100vw - 32px)); max-height: 92dvh; }
 .layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 24px; min-width: 0; }
 .steps { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; }
-.eyebrow { color: var(--accent-ink); font-size: 11px; letter-spacing: .07em; font-weight: 700; }
+.eyebrow { color: var(--accent-ink); font-size: 0.73333rem; letter-spacing: .07em; font-weight: 700; }
 .steps > .eyebrow { margin: 0 12px 14px; }
-.steps button { display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 8px; padding: 10px 12px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; }
-.steps button span { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--border); border-radius: 50%; font-size: 11px; flex-shrink: 0; }
+.steps button { display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 8px; padding: 10px 12px; background: transparent; color: var(--muted); text-align: left; font-size: 0.86667rem; }
+.steps button span { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--border); border-radius: 50%; font-size: 0.73333rem; flex-shrink: 0; }
 .steps .active { color: var(--fg); background: var(--accent-soft); border-color: var(--border); }
 .steps .active span { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.steps p, .note { color: var(--muted); font-size: 12px; line-height: 1.8; }
+.steps p, .note { color: var(--muted); font-size: 0.8rem; line-height: 1.8; }
 .steps p { padding: 12px; }
 .stage { min-width: 0; min-height: 0; border-left: 1px solid var(--border); padding-left: 24px; }
 .guide { padding: 12px 0 20px; border-bottom: 1px solid var(--border); }
-.guide p { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.85; }
+.guide p { margin-top: 8px; color: var(--muted); font-size: 0.86667rem; line-height: 1.85; }
 .teacher, .padded { padding: 24px 0; }
-.teacher h2, .padded h2 { margin: 0 0 20px; font: 500 24px/1.4 Georgia, 'Songti SC', serif; }
+.teacher h2, .padded h2 { margin: 0 0 20px; font: 500 1.6rem/1.4 Georgia, 'Songti SC', serif; }
 .questions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
-.questions button { border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 9px 12px; text-align: left; color: var(--fg); font-size: 12px; }
+.questions button { border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 9px 12px; text-align: left; color: var(--fg); font-size: 0.8rem; }
 .questions button[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); }
 .exchange { padding: 20px; border-left: 3px solid var(--accent); background: var(--surface-sunken); }
-.exchange > p { margin: 8px 0 20px; font-size: 15px; line-height: 1.7; }
-.speaker { display: block; margin-bottom: 10px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.exchange > p { margin: 8px 0 20px; font-size: 1rem; line-height: 1.7; }
+.speaker { display: block; margin-bottom: 10px; color: var(--muted); font-size: 0.73333rem; font-weight: 700; }
 .review > div:first-child { margin: 0; min-height: 0; }
 .review main { min-height: 0; padding: 24px 0; }
 .review header { padding-inline: 0; }
 .annotationActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .annotation, .saved { margin-top: 18px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--accent-soft); }
 .annotation blockquote, .saved blockquote { border-left: 2px solid var(--accent); padding-left: 12px; margin: 10px 0; line-height: 1.8; overflow-wrap: anywhere; }
-.annotation h3, .saved h3 { font-size: 13px; margin-bottom: 10px; }
-.annotation p { font-size: 13px; line-height: 1.8; margin-top: 12px; }
-.noteField { display: grid; gap: 12px; font-weight: 600; font-size: 14px; }
-.noteField textarea { min-height: 180px; width: 100%; resize: vertical; padding: 16px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--card); font-family: inherit; font-size: 14px; line-height: 1.85; font-weight: 400; }
-.resource { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: 8px; line-height: 1.85; font-size: 14px; }
+.annotation h3, .saved h3 { font-size: 0.86667rem; margin-bottom: 10px; }
+.annotation p { font-size: 0.86667rem; line-height: 1.8; margin-top: 12px; }
+.noteField { display: grid; gap: 12px; font-weight: 600; font-size: 0.93333rem; }
+.noteField textarea { min-height: 180px; width: 100%; resize: vertical; padding: 16px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--card); font-family: inherit; font-size: 0.93333rem; line-height: 1.85; font-weight: 400; }
+.resource { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: 8px; line-height: 1.85; font-size: 0.93333rem; }
 .resource summary { cursor: pointer; font-weight: 600; }
 .resource p, .resource ul { margin-top: 14px; }
 .resource ul { padding-left: 20px; }
 .footer { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.counter { color: var(--muted); font-size: 12px; }
+.counter { color: var(--muted); font-size: 0.8rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 @media (max-width: 760px) {
   .modal { width: calc(100vw - 20px); }
   .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 0; }
   .steps > .eyebrow, .steps p { display: none; }
-  .steps button { padding: 8px; font-size: 12px; }
+  .steps button { padding: 8px; font-size: 0.8rem; }
   .stage { border-left: 0; padding-left: 0; }
-  .teacher h2, .padded h2 { font-size: 21px; }
+  .teacher h2, .padded h2 { font-size: 1.4rem; }
   .exchange { padding: 14px; }
   .footer { gap: 8px; }
   .counter { margin-left: auto; }

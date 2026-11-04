@@ -20,6 +20,8 @@ export function FeynmanView({ slug }: { slug: string }) {
   const [live, setLive] = useState<Live | null>(null);
   const [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
+  const generation = useRef(0);
+  const composing = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
   const {search}=useLocation();
   const requestedSession=new URLSearchParams(search).get('session');
@@ -30,8 +32,14 @@ export function FeynmanView({ slug }: { slug: string }) {
   const session = list[current];
   const latest = current === list.length - 1;
 
-  useEffect(() => () => controller.current?.abort(), []);
-  useEffect(() => { setIndex(null); setLive(null); setError(''); setInput(''); }, [slug]);
+  useEffect(() => {
+    setIndex(null); setLive(null); setError(''); setInput(''); composing.current = false;
+    return () => {
+      generation.current += 1;
+      controller.current?.abort();
+      controller.current = null;
+    };
+  }, [slug]);
   useEffect(() => { if(requestedIndex>=0){setIndex(requestedIndex);located.current='';} }, [requestedIndex,search]);
   useEffect(() => {
     if(requestedMessage && located.current!==requestedMessage){
@@ -45,27 +53,31 @@ export function FeynmanView({ slug }: { slug: string }) {
   const run = async (sessionId: string, content: string) => {
     const next = new AbortController();
     controller.current = next;
+    const active = () => controller.current === next && !next.signal.aborted;
     setError('');
     setLive({ learner: content || undefined, text: '' });
     try {
-      await streamFeynman(slug, sessionId, { content }, delta => setLive(value => value ? { ...value, text: value.text + delta } : value), next.signal);
+      await streamFeynman(slug, sessionId, { content }, delta => {
+        if (active()) setLive(value => value ? { ...value, text: value.text + delta } : value);
+      }, next.signal);
     } catch (cause) {
-      if (!next.signal.aborted) setError(readableError(cause));
+      if (active()) setError(readableError(cause));
     } finally {
       await client.invalidateQueries({ queryKey: feynmanKeys.sessions(slug) });
-      if (controller.current === next) controller.current = null;
-      setLive(null);
+      if (active()) { controller.current = null; setLive(null); }
     }
   };
 
   const start = async () => {
+    const startedGeneration = generation.current;
     setError('');
     try {
       const created = await create.mutateAsync();
+      if (startedGeneration !== generation.current) return;
       setIndex(null);
       await run(created.sessionId, '');
     } catch (cause) {
-      setError(readableError(cause));
+      if (startedGeneration === generation.current) setError(readableError(cause));
     }
   };
 
@@ -110,7 +122,8 @@ export function FeynmanView({ slug }: { slug: string }) {
         <div ref={endRef} />
       </div>
       {latest ? <form className={s.composer} onSubmit={submit}>
-        <textarea value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => {
+        <textarea value={input} onChange={event => setInput(event.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={event => {
+          if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} placeholder={live ? '教师正在回应…' : '用自己的话讲给教师听，或回答它的问题…'} aria-label="我的讲解" rows={2} disabled={Boolean(live)} />
         <div className={s.composerActions}>

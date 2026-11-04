@@ -423,3 +423,7 @@
 @media (max-width: 700px) {
   .workspaceHeader { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
+.fontSize { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin: 18px 0; }
+.fontSize strong { display: block; font-size: .9rem; }
+.fontSize small { display: block; margin-top: 5px; color: var(--muted); font-size: .8rem; }
+.fontSize select { max-width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--card); }

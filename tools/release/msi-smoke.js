@@ -62,7 +62,8 @@ function main(input) {
       `$i=New-Object -ComObject WindowsInstaller.Installer;$d=$i.OpenDatabase('${path.resolve(input).replaceAll("'", "''")}',0);$v=$d.OpenView('SELECT Dialog FROM Dialog');$v.Execute();while($r=$v.Fetch()){Write-Output $r.StringData(1)}`,
     );
     assert(!/InstallDirDlg|BrowseDlg/.test(dialogs), "MSI still offers directory selection");
-    assert.match(dialogs, /WelcomeEulaDlg/);
+    assert.match(dialogs, /SimpleWelcomeDlg/);
+    assert(!/MaintenanceTypeDlg|UserExit/.test(dialogs), "Unexpected maintenance or cancel completion page");
     assert.match(dialogs, /UpgradeConfirmDlg/);
     const match = path
       .basename(input)

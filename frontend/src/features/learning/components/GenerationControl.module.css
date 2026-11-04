@@ -1,14 +1,14 @@
 .control { display:flex; flex-wrap:wrap; gap:10px; align-items:center; min-width:0; }
 .control button { padding:7px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--fg); }
-.status { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; }
+.status { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:0.8rem; }
 .status progress { max-width:160px; width:100%; accent-color:var(--accent); }
 .fields { display:grid; gap:16px; }
-.fields label { display:grid; gap:6px; font-size:13px; }
+.fields label { display:grid; gap:6px; font-size:0.86667rem; }
 .fields input,.fields select { min-width:0; max-width:100%; padding:8px; border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:6px; }
 .fields fieldset { min-width:0; border:1px solid var(--border); padding:12px; display:grid; gap:10px; }
 .fields .source { display:flex; align-items:center; flex-wrap:wrap; overflow-wrap:anywhere; }
 .fields small { color:var(--muted); }
 .referenceBox { display:grid; gap:8px; padding:16px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
-.referenceBox p { margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
+.referenceBox p { margin:0; color:var(--muted); font-size:0.86667rem; line-height:1.6; }
 .draft { max-height:60vh; overflow:auto; min-width:0; }
-.draft pre { margin:0; padding:14px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; }
+.draft pre { margin:0; padding:14px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:0.8rem; line-height:1.7; }

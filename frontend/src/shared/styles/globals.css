@@ -10,10 +10,8 @@
 }
 
 html {
-  font-size: 15px;
-  /* Keep browser 100% at its native scale. The learning workspace already
-     owns its compact typography; root zoom previously enlarged the entire
-     shell and pushed the teacher composer below the first viewport. */
+  font-size: var(--ui-font-size, 18px);
+  /* Scale text through rem while preserving viewport and pane geometry. */
   zoom: 1;
 }
 
@@ -46,7 +44,7 @@ body {
   border-radius: 8px;
   color: var(--muted);
   background: var(--surface-sunken);
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 
 .mermaid-fallback summary { cursor: pointer; }

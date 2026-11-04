@@ -1,23 +1,23 @@
 .page { height: 100%; overflow: auto; padding: 48px max(24px, calc((100% - 860px) / 2)); background: var(--bg); }
 .page > header { margin-bottom: 25px; }
-.page > header > span, .list header span { color: var(--accent-ink); font-size: 10px; font-weight: 800; letter-spacing: .09em; }
+.page > header > span, .list header span { color: var(--accent-ink); font-size: 0.66667rem; font-weight: 800; letter-spacing: .09em; }
 .page h1, .page h2 { font-family: Georgia, 'Songti SC', serif; }
-.page h1 { margin: 7px 0; font-size: 28px; font-weight: 500; }
-.page > header p { max-width: 620px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.page h1 { margin: 7px 0; font-size: 1.86667rem; font-weight: 500; }
+.page > header p { max-width: 620px; color: var(--muted); font-size: 0.8rem; line-height: 1.6; }
 .list { display: grid; gap: 12px; }
 .list article { border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-sm); }
 .list article > header { display: flex; align-items: start; justify-content: space-between; gap: 18px; padding: 15px 17px; }
-.list h2 { margin: 4px 0 2px; font-size: 18px; font-weight: 550; }
-.list header small, .list time { color: var(--muted); font-size: 10px; }
-.list header strong { color: var(--accent-ink); font-size: 12px; white-space: nowrap; }
+.list h2 { margin: 4px 0 2px; font-size: 1.2rem; font-weight: 550; }
+.list header small, .list time { color: var(--muted); font-size: 0.66667rem; }
+.list header strong { color: var(--accent-ink); font-size: 0.8rem; white-space: nowrap; }
 .list details { border-top: 1px solid var(--border); }
-.list summary { padding: 10px 17px; cursor: pointer; color: var(--muted); font-size: 11px; }
+.list summary { padding: 10px 17px; cursor: pointer; color: var(--muted); font-size: 0.73333rem; }
 .list ol { display: grid; gap: 6px; margin: 0; padding: 0 17px 14px; list-style: none; }
-.list li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 7px 8px; border-radius: 7px; background: var(--surface-raised); font-size: 11px; }
+.list li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 7px 8px; border-radius: 7px; background: var(--surface-raised); font-size: 0.73333rem; }
 .list li small { color: var(--muted); }
-.muted, .empty { color: var(--muted); font-size: 12px; }
+.muted, .empty { color: var(--muted); font-size: 0.8rem; }
 .empty { padding: 40px 0; text-align: center; }
-.error { color: var(--pink); font-size: 12px; }
+.error { color: var(--pink); font-size: 0.8rem; }
 @media (max-width: 650px) { .list article > header { display: grid; } .list li { grid-template-columns: 1fr; gap: 3px; } }
 
 /* ---- learning-investment heatmap (mirrors homepage heat scale) ---- */

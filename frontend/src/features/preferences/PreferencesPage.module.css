@@ -1,16 +1,25 @@
 .page { flex: 1; min-height: 0; overflow-y: auto; width: min(980px, 100%); padding: 34px 38px 52px; }
 .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 22px; }
-.eyebrow { color: var(--accent-ink); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
-.header h1 { margin: 7px 0 8px; font: 500 30px/1.2 Georgia, 'Songti SC', serif; }
-.header p { max-width: 660px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.eyebrow { color: var(--accent-ink); font-size: 0.66667rem; font-weight: 800; letter-spacing: .14em; }
+.header h1 { margin: 7px 0 8px; font: 500 2rem/1.2 Georgia, 'Songti SC', serif; }
+.header p { max-width: 660px; color: var(--muted); font-size: 0.86667rem; line-height: 1.7; }
 .editorShell { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: 0 12px 36px rgb(var(--shadow-color) / .07); }
 .fileBar { height: 42px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--surface-sunken); }
 .fileBar strong, .fileBar small { font-family: 'Cascadia Code', Consolas, monospace; }
-.fileBar strong { font-size: 11px; }
-.fileBar small { color: var(--muted); font-size: 9px; }
+.fileBar strong { font-size: 0.73333rem; }
+.fileBar small { color: var(--muted); font-size: 0.6rem; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.editorShell textarea { display: block; width: 100%; min-height: 430px; resize: vertical; padding: 22px 24px; border: 0; outline: 0; color: var(--fg); background: transparent; font: 13px/1.75 'Cascadia Code', Consolas, monospace; tab-size: 2; }
-.note { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-top: 15px; padding: 12px 14px; border-left: 2px solid var(--accent); color: var(--muted); background: color-mix(in srgb, var(--accent-soft) 45%, transparent); font-size: 11px; line-height: 1.55; }
+.editorShell textarea { display: block; width: 100%; min-height: 430px; resize: vertical; padding: 22px 24px; border: 0; outline: 0; color: var(--fg); background: transparent; font: 0.86667rem/1.75 'Cascadia Code', Consolas, monospace; tab-size: 2; }
+.note { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-top: 15px; padding: 12px 14px; border-left: 2px solid var(--accent); color: var(--muted); background: color-mix(in srgb, var(--accent-soft) 45%, transparent); font-size: 0.73333rem; line-height: 1.55; }
 .note strong { color: var(--fg); }
-.error { margin-top: 12px; color: var(--pink); font-size: 12px; }
+.error { margin-top: 12px; color: var(--pink); font-size: 0.8rem; }
 @media (max-width: 720px) { .page { padding: 22px 16px 40px; } .header { flex-direction: column; } .editorShell textarea { min-height: 360px; padding: 16px; } }
+.status { flex-shrink: 0; color: var(--muted); font-size: .8rem; padding-top: 10px; }
+.presets { margin-bottom: 20px; }
+.presets h2 { font-size: 1rem; margin-bottom: 6px; }
+.presets p { color: var(--muted); font-size: .85rem; margin-bottom: 12px; }
+.presets > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.fileBar { height: auto; min-height: 42px; padding-top: 10px; padding-bottom: 10px; }
+.fileBar strong { overflow-wrap: anywhere; min-width: 0; }
+.editorShell textarea { font-size: 1rem; }
+@media (max-width: 720px) { .fileBar { grid-template-columns: auto minmax(0, 1fr); } .fileBar small { grid-column: 2; } }

@@ -7,6 +7,7 @@ import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
 import { useUpdateInfo } from './update';
 import s from './SettingsPage.module.css';
+import { FONT_SIZES, useFontSize, type FontSize } from '@/shared/lib/fontSize';
 
 export function SettingsPage() {
   return <div className={s.host}><div className={s.scroll} data-testid="settings-scroll">
@@ -29,6 +30,8 @@ const THEME_OPTIONS: Array<{ id: ThemePreference; name: string; description: str
 ];
 
 function AppearanceSection() {
+  const fontSize = useFontSize(state => state.size);
+  const setFontSize = useFontSize(state => state.setSize);
   const appearance = useAppearance();
   const update = useUpdateAppearance();
   const selected = update.data?.theme ?? appearance.data?.theme ?? 'lychee-paper';
@@ -38,6 +41,12 @@ function AppearanceSection() {
         <h2 id="appearance-title">外观</h2>
         <p>选择一套柔和、可访问的配色。更改会立即应用并保存在本机。</p>
       </div>
+      <label className={s.fontSize}>
+        <span><strong>界面字号</strong><small>同时调整主页、设置和学习页面，保留文字层级。更改立即生效。</small></span>
+        <select aria-label="界面字号" value={fontSize} onChange={event => setFontSize(Number(event.target.value) as FontSize)}>
+          {FONT_SIZES.map((size, index) => <option key={size} value={size}>{['标准', '舒适（默认）', '大号', '特大'][index]}</option>)}
+        </select>
+      </label>
       <div className={s.themeChoices} role="radiogroup" aria-label="界面主题">
         {THEME_OPTIONS.map((theme) => (
           <button

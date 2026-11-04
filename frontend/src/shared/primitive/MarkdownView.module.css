@@ -18,7 +18,7 @@
    below a legible floor (the stage pans instead). */
 .body :global(.diagram-stage svg) { display:block; width:100%; height:auto; margin:0 auto; }
 .body :global(.diagram-tools) { display:flex; justify-content:flex-end; gap:4px; padding:5px 8px; border-bottom:1px solid var(--border); background:var(--surface-tint); }
-.body :global(.diagram-tools button), .body :global(.media-fullscreen-toggle) { width:30px; height:28px; border:1px solid var(--border); border-radius:5px; background:var(--card); color:var(--accent-ink); cursor:pointer; font-size:17px; }
+.body :global(.diagram-tools button), .body :global(.media-fullscreen-toggle) { width:30px; height:28px; border:1px solid var(--border); border-radius:5px; background:var(--card); color:var(--accent-ink); cursor:pointer; font-size:1.13333rem; }
 .body :global(.diagram-tools button::before) { content:attr(data-glyph); }
 .body :global(.media-fullscreen-toggle) { position:absolute; top:5px; right:8px; z-index:1; }
 .body :global(.media-fullscreen-toggle::before) { content:'⤢'; }

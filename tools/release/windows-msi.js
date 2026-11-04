@@ -96,6 +96,10 @@ function generateWxs(payload, version, arch, icon, options = {}) {
  <MajorUpgrade DowngradeErrorMessage="已安装更高版本的 Learn-With-AI，无法降级覆盖。请先卸载更高版本，学习数据会保留。" AllowSameVersionUpgrades="yes" Schedule="afterInstallInitialize"/><MediaTemplate EmbedCab="yes"/>
  <Icon Id="ApplicationIcon" SourceFile="${esc(icon)}"/><Property Id="ARPPRODUCTICON" Value="ApplicationIcon"/><Property Id="ARPHELPLINK" Value="https://github.com/xmz14/lll"/>
  <Property Id="MSIFASTINSTALL" Value="0"/>
+ <Property Id="ARPNOMODIFY" Value="1"/><Property Id="ARPNOREPAIR" Value="1"/>
+ <Binary Id="StopInstalledHelper" SourceFile="$(var.StopInstalledHelper)"/>
+ <CustomAction Id="StopInstalled" BinaryRef="StopInstalledHelper" ExeCommand="&quot;[INSTALLFOLDER].&quot;" Return="check"/>
+ <InstallExecuteSequence><Custom Action="StopInstalled" Before="InstallValidate" Condition="NOT UPGRADINGPRODUCTCODE"/></InstallExecuteSequence>
  <Property Id="INSTALLFOLDER" Secure="yes"/>
  <!-- Install beside the learner data under %LOCALAPPDATA% (normally the system drive). Windows' shell
       "Local AppData" folder can be redirected to another drive whose Config.Msi is blocked by security
@@ -111,10 +115,32 @@ function generateWxs(payload, version, arch, icon, options = {}) {
  <StandardDirectory Id="DesktopFolder"/><StandardDirectory Id="ProgramMenuFolder"><Directory Id="ApplicationProgramsFolder" Name="${esc(display)}"/></StandardDirectory>
  <DirectoryRef Id="INSTALLFOLDER"><Component Id="AppIntegration" Guid="${guid(`${identity}:${arch}:integration`)}"><RegistryValue Root="HKCU" Key="Software\\${esc(identity)}\\Installer" Name="Version" Value="[ProductVersion]" Type="string" KeyPath="yes"/><RegistryValue Root="HKCU" Key="Software\\${esc(identity)}\\Installer" Name="Architecture" Value="${arch}" Type="string"/><RegistryValue Root="HKCU" Key="Software\\${esc(identity)}\\Installer" Name="InstallLocation" Value="[INSTALLFOLDER]" Type="string"/><Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="${esc(display)}" Target="[INSTALLFOLDER]learn-with-ai.exe" WorkingDirectory="INSTALLFOLDER" Icon="ApplicationIcon"><ShortcutProperty Key="System.AppUserModel.ID" Value="learn-with-ai.Desktop"/></Shortcut><Shortcut Id="MenuShortcut" Directory="ApplicationProgramsFolder" Name="${esc(display)}" Target="[INSTALLFOLDER]learn-with-ai.exe" WorkingDirectory="INSTALLFOLDER" Icon="ApplicationIcon"><ShortcutProperty Key="System.AppUserModel.ID" Value="learn-with-ai.Desktop"/></Shortcut><RemoveFolder Id="RemoveApplicationMenu" Directory="ApplicationProgramsFolder" On="uninstall"/></Component></DirectoryRef>
  <Feature Id="Application" Title="${esc(display)}" Level="1">${components.map((id) => `<ComponentRef Id="${id}"/>`).join("")}<ComponentRef Id="AppIntegration"/></Feature>
- <ui:WixUI Id="WixUI_Minimal"/><WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)"/>
- <WixVariable Id="WixUIBannerBmp" Value="${esc(path.join(repoRoot, "scripts", "assets", "installer-banner.bmp"))}"/><WixVariable Id="WixUIDialogBmp" Value="${esc(path.join(repoRoot, "scripts", "assets", "installer-dialog.bmp"))}"/><UI><Dialog Id="UpgradeConfirmDlg" Width="370" Height="270" Title="[ProductName] 安装"><Control Id="Title" Type="Text" X="20" Y="20" Width="330" Height="30" Text="确认升级或覆盖安装"/><Control Id="Message" Type="Text" X="20" Y="60" Width="330" Height="125" Text="检测到已安装版本：[MSI_VERSION]（MSI）[LEGACY_VERSION]（旧 EXE）。是否升级或覆盖为 [ProductVersion]？学习数据会保留。旧 EXE 迁移会先卸载旧程序；新安装失败时请重新运行本安装包。MSI 版本升级由 Windows Installer 提供事务回滚。"/><Control Id="Cancel" Type="PushButton" X="200" Y="230" Width="70" Height="20" Text="取消" Cancel="yes"><Publish Event="EndDialog" Value="Exit"/></Control><Control Id="Continue" Type="PushButton" X="280" Y="230" Width="70" Height="20" Text="确认继续" Default="yes"><Publish Property="MIGRATELEGACY" Value="1"/><Publish Event="EndDialog" Value="Return"/></Control></Dialog>
- <Publish Dialog="WelcomeEulaDlg" Control="Install" Event="SpawnDialog" Value="UpgradeConfirmDlg" Order="0" Condition="LicenseAccepted = &quot;1&quot; AND (WIX_UPGRADE_DETECTED OR LEGACY_VERSION)"/>
- <Publish Dialog="WelcomeEulaDlg" Control="InstallNoShield" Event="SpawnDialog" Value="UpgradeConfirmDlg" Order="0" Condition="LicenseAccepted = &quot;1&quot; AND (WIX_UPGRADE_DETECTED OR LEGACY_VERSION)"/>
+ <UI Id="SimpleInstallUI">
+ <TextStyle Id="Normal" FaceName="Microsoft YaHei UI" Size="10"/><Property Id="DefaultUIFont" Value="Normal"/>
+
+ <Dialog Id="SimpleWelcomeDlg" Width="370" Height="270" Title="[ProductName] 安装">
+ <Control Id="Title" Type="Text" X="20" Y="20" Width="330" Height="30" Text="安装 [ProductName] [ProductVersion]"/>
+ <Control Id="Message" Type="Text" X="20" Y="65" Width="330" Height="100" Text="点击安装以安装或覆盖更新。学习数据会保留。继续后，安装程序会停止此安装位置正在运行的应用；请先完成当前操作。软件使用 MIT 许可。"/>
+ <Control Id="Cancel" Type="PushButton" X="200" Y="230" Width="70" Height="20" Text="取消" Cancel="yes"><Publish Event="EndDialog" Value="Exit"/></Control>
+ <Control Id="Install" Type="PushButton" X="280" Y="230" Width="70" Height="20" Text="安装" Default="yes"><Publish Event="SpawnDialog" Value="UpgradeConfirmDlg" Order="1" Condition="WIX_UPGRADE_DETECTED OR LEGACY_VERSION"/><Publish Event="EndDialog" Value="Return" Order="2"/></Control></Dialog>
+ <Dialog Id="UpgradeConfirmDlg" Width="370" Height="270" Title="[ProductName] 更新">
+ <Control Id="Message" Type="Text" X="20" Y="45" Width="330" Height="150" Text="已有安装。继续将覆盖更新为 [ProductVersion]，学习数据会保留。旧 EXE 迁移会先卸载旧程序；新安装失败时请重新运行此安装包。"/>
+ <Control Id="Cancel" Type="PushButton" X="200" Y="230" Width="70" Height="20" Text="取消" Cancel="yes"><Publish Event="EndDialog" Value="Exit"/></Control><Control Id="Continue" Type="PushButton" X="280" Y="230" Width="70" Height="20" Text="继续安装" Default="yes"><Publish Property="MIGRATELEGACY" Value="1"/><Publish Event="EndDialog" Value="Return"/></Control></Dialog>
+ <Dialog Id="AlreadyInstalledDlg" Width="370" Height="200" Title="[ProductName]">
+ <Control Id="Message" Type="Text" X="20" Y="35" Width="330" Height="100" Text="此版本已经安装，可以直接打开使用。如需卸载，请前往 Windows 设置 → 应用 → 已安装的应用。"/>
+ <Control Id="Close" Type="PushButton" X="280" Y="160" Width="70" Height="20" Text="关闭" Default="yes" Cancel="yes"><Publish Event="EndDialog" Value="Exit"/></Control></Dialog>
+ <Dialog Id="SimpleProgressDlg" Width="370" Height="150" Title="[ProductName]" Modeless="yes">
+ <Control Id="Message" Type="Text" TabSkip="no" X="20" Y="25" Width="330" Height="40" Text="正在处理，请稍候…"/><Control Id="Progress" Type="ProgressBar" X="20" Y="80" Width="330" Height="15" ProgressBlocks="yes"><Subscribe Event="SetProgress" Attribute="Progress"/></Control></Dialog>
+ <Dialog Id="SimpleCompleteDlg" Width="370" Height="180" Title="[ProductName]">
+ <Control Id="Message" Type="Text" X="20" Y="35" Width="330" Height="75" Text="操作已完成。"/><Control Id="Close" Type="PushButton" X="280" Y="140" Width="70" Height="20" Text="完成" Default="yes" Cancel="yes"><Publish Event="EndDialog" Value="Return"/></Control></Dialog>
+ <Dialog Id="SimpleFailureDlg" Width="370" Height="180" Title="[ProductName]">
+ <Control Id="Message" Type="Text" X="20" Y="35" Width="330" Height="75" Text="操作未能完成。请关闭正在运行的应用后重新运行安装包。学习数据会保留。"/><Control Id="Close" Type="PushButton" X="280" Y="140" Width="70" Height="20" Text="关闭" Default="yes" Cancel="yes"><Publish Event="EndDialog" Value="Return"/></Control></Dialog>
+ <InstallUISequence>
+ <Show Dialog="AlreadyInstalledDlg" Before="ExecuteAction" Condition="Installed AND NOT REMOVE"/>
+ <Show Dialog="SimpleWelcomeDlg" Before="AlreadyInstalledDlg" Condition="NOT Installed"/>
+ <Show Dialog="SimpleProgressDlg" Before="ExecuteAction"/>
+ <Show Dialog="SimpleCompleteDlg" OnExit="success"/><Show Dialog="SimpleFailureDlg" OnExit="error"/>
+ </InstallUISequence>
  </UI></Package></Wix>`;
 }
 function run(bin, args, environment = {}) {
@@ -229,6 +255,8 @@ function buildMsi(payload, output, version, arch, options = {}) {
     ],
     { GOOS: "windows", GOARCH: arch, CGO_ENABLED: "0" },
   );
+  const stopHelper = safePath(path.join(staging, "stop-installed.exe"));
+  run("go", ["build", "-trimpath", "-ldflags", "-H windowsgui -s -w", "-o", stopHelper, "./tools/release/stop-installed"], { GOOS: "windows", GOARCH: arch, CGO_ENABLED: "0" });
   const license = path.join(staging, "LICENSE.rtf");
   fs.writeFileSync(
     safePath(license),
@@ -264,6 +292,8 @@ function buildMsi(payload, output, version, arch, options = {}) {
     `LicenseRtf=${license}`,
     "-d",
     `MigrationHelper=${helper}`,
+    "-d",
+    `StopInstalledHelper=${stopHelper}`,
     "-o",
     msi,
   ]);

@@ -1,6 +1,6 @@
-.trigger { border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--muted); padding: 6px 9px; font: inherit; font-size: 11px; white-space: nowrap; cursor: pointer; }
+.trigger { border: 1px solid var(--border); border-radius: 7px; background: var(--card); color: var(--muted); padding: 6px 9px; font: inherit; font-size: 0.73333rem; white-space: nowrap; cursor: pointer; }
 .trigger:hover { color: var(--fg); background: var(--surface-sunken); }
-.label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.label { display: block; margin-bottom: 8px; font-size: 0.86667rem; font-weight: 600; }
 .input { width: 100%; min-height: 140px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); font: inherit; resize: vertical; }
 .input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-.hint { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.hint { margin-top: 8px; color: var(--muted); font-size: 0.8rem; line-height: 1.6; }

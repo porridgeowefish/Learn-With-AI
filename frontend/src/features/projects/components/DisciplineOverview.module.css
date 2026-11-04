@@ -556,7 +556,7 @@
   }
 
 }
-.coverageNotice { margin-bottom: 24px; padding: 14px 16px; border-left: 2px solid var(--accent-ink); background: var(--surface-tint); border-radius: 0 6px 6px 0; font-size: 12px; line-height: 1.7; }
-.coverageNotice strong { font-size: 11px; color: var(--accent-ink); }
+.coverageNotice { margin-bottom: 24px; padding: 14px 16px; border-left: 2px solid var(--accent-ink); background: var(--surface-tint); border-radius: 0 6px 6px 0; font-size: 0.8rem; line-height: 1.7; }
+.coverageNotice strong { font-size: 0.73333rem; color: var(--accent-ink); }
 .coverageNotice p { margin: 4px 0; }
 .coverageNotice small { display: block; color: var(--muted); overflow-wrap: anywhere; }

@@ -1,27 +1,27 @@
 .feynman { display:flex; flex-direction:column; gap:16px; padding-top:4px; }
 .head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:14px 24px; padding-bottom:18px; border-bottom:1px solid var(--border); }
 .head > div:first-child { min-width:0; max-width:620px; }
-.head span { color:var(--muted); font-size:10px; letter-spacing:.08em; }
-.head h2 { margin-top:5px; font:500 26px/1.25 Georgia, 'Songti SC', serif; }
-.head p { margin-top:8px; color:var(--muted); font-size:12.5px; line-height:1.7; }
+.head span { color:var(--muted); font-size:0.66667rem; letter-spacing:.08em; }
+.head h2 { margin-top:5px; font:500 1.73333rem/1.25 Georgia, 'Songti SC', serif; }
+.head p { margin-top:8px; color:var(--muted); font-size:0.83333rem; line-height:1.7; }
 .headActions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-.headActions button, .pager button { padding:6px 11px; border:1px solid var(--border); border-radius:7px; color:var(--fg); background:transparent; font-size:11px; }
+.headActions button, .pager button { padding:6px 11px; border:1px solid var(--border); border-radius:7px; color:var(--fg); background:transparent; font-size:0.73333rem; }
 .headActions button:disabled { opacity:.45; cursor:default; }
-.pager { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:11px; }
+.pager { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:0.73333rem; }
 .transcript { display:flex; flex-direction:column; gap:16px; min-height:200px; }
-.learner { align-self:flex-end; max-width:78%; padding:10px 14px; border-radius:14px 14px 4px 14px; background:var(--surface-sunken); font-size:13.5px; line-height:1.7; }
-.teacher { max-width:100%; font-size:13.5px; line-height:1.72; }
-.speaker { display:block; margin-bottom:6px; color:var(--accent-ink); font-size:11px; font-weight:700; letter-spacing:.06em; }
-.thinking { color:var(--muted); font-size:12px; }
-.notice { margin-top:8px; color:var(--orange); font-size:12px; }
+.learner { align-self:flex-end; max-width:78%; padding:10px 14px; border-radius:14px 14px 4px 14px; background:var(--surface-sunken); font-size:0.9rem; line-height:1.7; }
+.teacher { max-width:100%; font-size:0.9rem; line-height:1.72; }
+.speaker { display:block; margin-bottom:6px; color:var(--accent-ink); font-size:0.73333rem; font-weight:700; letter-spacing:.06em; }
+.thinking { color:var(--muted); font-size:0.8rem; }
+.notice { margin-top:8px; color:var(--orange); font-size:0.8rem; }
 .composer { position:sticky; bottom:0; display:grid; gap:8px; padding:12px; border:1px solid color-mix(in srgb, var(--accent) 18%, var(--border)); border-radius:13px; background:var(--surface-translucent); box-shadow:var(--shadow-sm); backdrop-filter:blur(14px); }
 .composer textarea { width:100%; min-height:56px; max-height:220px; resize:vertical; padding:6px 4px; border:0; outline:0; background:transparent; line-height:1.5; }
 .composerActions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
-.composerActions button, .empty button { padding:7px 14px; border:1px solid var(--border); border-radius:8px; color:var(--fg); background:var(--card); font-size:12px; }
+.composerActions button, .empty button { padding:7px 14px; border:1px solid var(--border); border-radius:8px; color:var(--fg); background:var(--card); font-size:0.8rem; }
 .composerActions button:disabled, .empty button:disabled { opacity:.45; cursor:default; }
 .primary { border-color:var(--accent)!important; color:var(--on-accent)!important; background:var(--accent)!important; font-weight:650; }
 .finish { border-color:color-mix(in srgb, var(--accent) 40%, var(--border))!important; color:var(--accent-ink)!important; background:var(--accent-soft)!important; }
 .empty { display:grid; justify-items:center; gap:14px; padding:64px 20px; color:var(--muted); text-align:center; line-height:1.7; }
-.readonly { padding:10px 0; color:var(--muted); font-size:12px; text-align:center; }
-.error { padding:10px 12px; border-radius:8px; color:var(--pink); background:color-mix(in srgb, var(--pink) 8%, transparent); font-size:12px; }
+.readonly { padding:10px 0; color:var(--muted); font-size:0.8rem; text-align:center; }
+.error { padding:10px 12px; border-radius:8px; color:var(--pink); background:color-mix(in srgb, var(--pink) 8%, transparent); font-size:0.8rem; }
 @media (max-width:700px) { .learner { max-width:92%; } }

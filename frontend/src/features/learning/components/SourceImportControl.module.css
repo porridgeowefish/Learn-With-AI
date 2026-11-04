@@ -1,9 +1,9 @@
 .control { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.importButton { flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--accent); border-radius: 8px; color: var(--on-accent); background: var(--accent); font-size: 12px; cursor: pointer; }
+.importButton { flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--accent); border-radius: 8px; color: var(--on-accent); background: var(--accent); font-size: 0.8rem; cursor: pointer; }
 .importButton:hover { background: var(--accent2); }
 .importButton:disabled { opacity: .65; cursor: wait; }
 .importButton:focus-visible, .feedback summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.progress, .feedback { color: var(--muted); font-size: 11px; }
+.progress, .feedback { color: var(--muted); font-size: 0.73333rem; }
 .progress { overflow: hidden; max-width: 220px; white-space: nowrap; text-overflow: ellipsis; }
 .feedback summary { cursor: pointer; }
 .feedback .failed, .resultPanel .failed { color: var(--pink); }
@@ -11,9 +11,9 @@
 .resultPanel ul { margin: 0; padding: 0; list-style: none; }
 .resultPanel li { display: grid; gap: 4px; padding: 8px 0; overflow-wrap: anywhere; }
 .resultPanel li + li { border-top: 1px solid var(--border); }
-.resultPanel strong { font-size: 12px; }
-.resultPanel p { margin: 10px 0 0; color: var(--muted); font-size: 11px; }
+.resultPanel strong { font-size: 0.8rem; }
+.resultPanel p { margin: 10px 0 0; color: var(--muted); font-size: 0.73333rem; }
 .compact { flex-wrap: nowrap; }
-.compact .importButton { padding: 6px 9px; font-size: 11px; }
+.compact .importButton { padding: 6px 9px; font-size: 0.73333rem; }
 .compact .progress { max-width: 120px; }
-@media (max-width: 700px) { .compact .progress { max-width: 90px; } .compact .feedback { font-size: 10px; } }
+@media (max-width: 700px) { .compact .progress { max-width: 90px; } .compact .feedback { font-size: 0.66667rem; } }

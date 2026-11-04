@@ -62,7 +62,7 @@
 .headerActions, .onboardingActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .onboardingActions { grid-column: 2; grid-row: 1 / 3; }
 .onboardingExample { grid-column: 1; padding: 12px 0 0 58px; }
-.onboardingExample strong { color: var(--fg); font-size: 13px; }
+.onboardingExample strong { color: var(--fg); font-size: 0.86667rem; }
 .onboardingExample p { margin-top: 6px; }
 
 .onboardingHead {
