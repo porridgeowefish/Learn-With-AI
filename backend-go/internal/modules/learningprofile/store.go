@@ -272,7 +272,7 @@ func Context(slug string) string {
 }
 func LengthPrompt(length string) string {
 	instruction := map[string]string{"short": "简短回复：直接回答核心问题，只保留必要解释，不强行增加例子或追问。", "medium": "适中回复：围绕当前学习目标提供必要解释和活动，按需举例或反馈。", "long": "详细回复：按当前任务展开必要依据、推导、文本分析或实践指导，保持目标聚焦，不凑字数。"}[length]
-	return "\n\n回复长度偏好：" + instruction + " 学习者在当前消息明确要求的长度优先；公式、代码和交互图表必须完整。"
+	return "\n\n回复长度偏好：" + instruction + " 学习者在当前消息明确要求的长度、内容、教法和顺序优先；所有长度都必须保留 Part 进度首行、有限总数和一次只讲一个 part 的结构。概念、推导和选择式反馈按学习目标及用户要求取舍，不强制逐项展开；使用公式、代码和交互图表时保持完整。"
 }
 
 // Observe only receives the just-completed learner statement, never old history

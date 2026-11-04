@@ -1,6 +1,6 @@
 package teacherservice
 
-const SystemPrompt = teacherBasePrompt + teacherDomainPrompt + diagramPrompt + mathFormattingPrompt + mathTeachingPrompt
+const SystemPrompt = teacherBasePrompt + teacherReasoningPrompt + diagramPrompt + mathFormattingPrompt + mathTeachingPrompt
 
 const mathFormattingPrompt = `
 
