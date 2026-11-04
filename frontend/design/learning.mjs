@@ -1,16 +1,28 @@
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
 const reply =
-  '试着画出两个向量，再把第二个向量的起点移到第一个向量的终点。连接起点和终点，你观察到什么？';
+  '向量加法表示连续发生的位移。把第二个向量的起点移到第一个向量的终点，再连接最初的起点和最后的终点，就得到合位移。';
 const review =
   '# 向量与坐标\n\n## 核心概念\n\n向量同时具有大小和方向。用一对坐标表示它，可以分别计算两个方向上的变化。\n\n## 一个例子\n\n向东走三步，再向北走四步，位移的大小为五步。';
 const seedSlugs = new Set(['math', 'physics', 'math-map']);
 const physicsReply =
-  '先选定小球和地球作为系统。小球下落时重力势能减小，忽略空气阻力时，它会转化成哪种能量？';
+  '先选定小球和地球作为系统。忽略空气阻力时，小球下落减少的重力势能转化成动能，两者之和保持不变。';
 const physicsReview =
   '# 机械能守恒\n\n## 系统与条件\n\n只有重力或弹簧弹力做功时，系统的动能与势能之和保持不变。\n\n## 一个例子\n\n忽略空气阻力，自由落体的重力势能转化成动能。';
 // Simulate the teacher's per-turn footer using the same wire format as production.
 function previewAnswer(physics, question = '') {
+  if (!question) return physics
+    ? '小球下落时高度降低、速度增大。忽略空气阻力，减少的重力势能主要转化成哪种能量？\n\n```suggested-replies\n["动能","内能","化学能","还不确定，先看讲解"]\n```'
+    : '向量加法表示连续发生的位移。先向东走 3 步，再向西走 2 步，最后停在哪里？\n\n```suggested-replies\n["向东 1 步","向东 5 步","回到起点","还不确定，先看讲解"]\n```';
+  if (question === '还不确定，先看讲解' || question === '跳过') return physics
+    ? '可以，先看讲解。小球落下时速度变快，说明动能增加；忽略空气阻力，增加的动能等于减少的重力势能。'
+    : '可以，先看讲解。向东记为正、向西记为负，3 + (−2) = 1，所以最后在起点东边 1 步处。方向相反的位移会抵消一部分。';
+  if (physics && ['动能', '内能', '化学能'].includes(question)) return question === '动能'
+    ? '这次判断正确：速度增大意味着动能增加。忽略空气阻力时，减少的重力势能转化成动能。'
+    : '这里应选择动能。小球速度增大，动能随之增加；题目忽略了空气阻力，所以不考虑阻力造成的机械能向内能转化。';
+  if (!physics && ['向东 1 步', '向东 5 步', '回到起点'].includes(question)) return question === '向东 1 步'
+    ? '这次判断正确。两段位移方向相反，3 步向东与 2 步向西抵消后，还剩 1 步向东。向量相加时要同时考虑大小和方向。'
+    : '最后在起点东边 1 步处。两段路方向相反，不能把长度直接相加；向东 3 步再退回 2 步，仍留有 1 步向东的位移。';
   if (!physics && question === '反向走呢') {
     return '先向东走 3 步，再向西走 2 步，最后停在起点东边 1 步处。看图时沿两条路线依次走，比较 A 和 C 的位置。\n\n```svg\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110"><g fill="none" stroke-width="3"><path stroke="#34756c" d="M30 32H255m-10 -6 10 6-10 6"/><path stroke="#b15c38" d="M255 60H105m10 -6-10 6 10 6"/></g><g font-size="14"><text x="15" y="24">A 起点</text><text x="218" y="24">B 折返</text><text x="82" y="86">C 终点</text></g></svg>\n```';
   }
@@ -22,8 +34,8 @@ function previewAnswer(physics, question = '') {
       : '拖动滑块改变第二段位移。虚线连接起点和终点，表示合位移。\n\n```html-interactive\n<label>第二段位移 <input id="step" type="range" min="-4" max="4" value="2"></label><svg viewBox="0 0 200 140"><path d="M20 70H120" fill="none" stroke="#34756c" stroke-width="3"/><line id="b" x1="120" y1="70" x2="120" y2="46" stroke="#b15c38" stroke-width="3"/><line id="sum" x1="20" y1="70" x2="120" y2="46" stroke="#586a96" stroke-width="2" stroke-dasharray="5 3"/></svg><script>document.querySelector("#step").oninput=e=>{for(const id of ["#b","#sum"])document.querySelector(id).setAttribute("y2",70-12*e.target.value)}</script>\n```';
   }
   if (question === '举个例子') return physics ? '松开手中的球，它越落越快：高度降低时，重力势能逐渐转化成动能。' : '向东走三步，再向北走四步。虽然走了七步，你离出发点只有五步。';
-  if (question === '太难，退一步') return physics ? '先想一个现象：球从高处落下，速度会怎样变化？' : '先把位移看作一根箭头：箭头朝哪儿，你就向哪儿移动。';
-  if (question === '太简单，快一点') return physics ? '加入空气阻力后，机械能还守恒吗？试着指出能量的去向。' : '如果两段位移的夹角逐渐变大，合位移的长度会怎样变化？';
+  if (question === '太难，退一步') return physics ? '先看一个熟悉的现象：松开手中的球，它会越落越快。速度变快意味着动能增加。' : '先把位移看作一根箭头：箭头朝哪儿，你就向哪儿移动。';
+  if (question === '太简单，快一点') return physics ? '加入空气阻力后，部分机械能转化为内能，机械能不再守恒，但包含内能在内的总能量仍然守恒。' : '两段位移长度不变时，夹角越大，合位移越短；夹角达到 180 度时，长度等于两段位移长度之差的绝对值。';
   return physics ? physicsReply : reply;
 }
 function practice(count = 2, physics = false) {
@@ -345,7 +357,11 @@ function conversation(ctx, s, parts, b) {
     if (controls?.length === 'short' && !answer.includes('```')) answer = answer.split('。')[0] + '。';
     if (controls?.length === 'long' && !answer.includes('```')) answer += '\n\n我们可以再用坐标验证：先向东走 3 步，再向北走 4 步，得到位移 (3, 4)。横纵坐标分别记录两个方向的变化。';
     const searched = controls?.search.enabled && b.options?.webSearch;
-    if (searched) answer += '\n\n搜索结果演示：[向量资料](https://zh.wikipedia.org/wiki/向量)。';
+    if (searched) {
+      const searchText = '\n\n搜索结果演示：[向量资料](https://zh.wikipedia.org/wiki/向量)。';
+      const footer = answer.indexOf('\n\n```suggested-replies\n');
+      answer = footer < 0 ? answer + searchText : answer.slice(0, footer) + searchText + answer.slice(footer);
+    }
     const teacher = message('teacher', answer);
     const reasoning = controls?.showReasoning && b.options?.effort ? '设计预览：先确认概念与条件，再通过例子核对结论。实际摘要由所选模型提供。' : '';
     if (reasoning) teacher.blocks.push({id:id(),type:'reasoning-summary',source:reasoning});

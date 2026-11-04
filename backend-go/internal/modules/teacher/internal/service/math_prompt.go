@@ -1,6 +1,6 @@
 package teacherservice
 
-const SystemPrompt = teacherBasePrompt + diagramPrompt + mathFormattingPrompt + mathTeachingPrompt
+const SystemPrompt = teacherBasePrompt + teacherDomainPrompt + diagramPrompt + mathFormattingPrompt + mathTeachingPrompt
 
 const mathFormattingPrompt = `
 
@@ -13,11 +13,8 @@ Mermaid图示使用简短自然语言节点名称，完整公式放在图示前�
 
 const diagramPrompt = `
 
-先想清楚学习者要看懂什么，再从当前可用的组件中自行选择或组合。例如：
-- 流程、层级、时序和 UML 等关系图优先考虑 Mermaid（mermaid 围栏）。讲解实验步骤可以用 flowchart，讲解师生消息的先后顺序可以用 sequenceDiagram。
-- 需要精确表现形态、剖面、空间位置或机制细节的静态图，适合用纯 SVG（svg 围栏）。例如，讲 DNA 复制时，可以在复制叉两侧标出新链的合成方向。
-- 需要拖动、调参或切换状态时，适合在 html-interactive 围栏里组合 HTML、CSS 和 JavaScript。例如，讲单摆时，可以让学习者改变摆长，观察摆动并比较周期。
-在 html-interactive 中，你可以直接用原生 JavaScript 操作 HTML 控件、SVG 或 Canvas，也可以用 requestAnimationFrame 播放动画。需要坐标系和几何对象时，可直接调用内置 JSXGraph（JXG）。LLLMath 为画二维曲线、画三维曲面、估算梯度和演示梯度下降提供了四个便捷函数。遇到其他任务，可以组合原生代码和 JXG。例如，讲导数时可用 JXG 画曲线和割线，用 HTML 滑块改变两点间的横坐标差，让割线和斜率读数一起更新。直接使用页面提供的接口，无需导入库；其他第三方库不可假定存在。
+按教学目的选组件：流程、层级、时序和 UML 用 Mermaid（mermaid 围栏）；形态、剖面和空间细节用纯 SVG（svg 围栏）；拖动、调参或状态切换用 html-interactive，组合 HTML、CSS 和 JavaScript。
+在 html-interactive 中可用原生控件、SVG、Canvas 和 requestAnimationFrame；坐标系与几何对象可用内置 JSXGraph（JXG）。LLLMath 提供二维曲线、三维曲面、梯度与梯度下降接口。按需组合，不必每次调用。无需导入库，不能假定其他第三方库存在。
 正文说明读图要点。不要用 ASCII 字符画。写 Mermaid 流程图时用简短 ASCII 节点 ID、带引号的中文标签，每行一条连线。SVG 提供 viewBox，只用本地引用，不含脚本、foreignObject 或外部资源。交互页面在 script 内绑定事件，数据与依赖须在本地可用，不访问网络、父页面或宿主接口。
 `
 

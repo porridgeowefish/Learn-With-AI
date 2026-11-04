@@ -5,7 +5,7 @@ import type { ConversationMessage } from '../api/learningWorkspace';
 import type { TeacherSession } from '../teacher/useTeacherSession';
 import { projectTeacherMessages } from '../teacher/sessionState';
 import { TeacherMessage, messageMarkdown } from './TeacherMessage';
-import { QuickReplies, teacherMarkdown } from './LearningProgress';
+import { QuickReplies, readSuggestedReplies, teacherMarkdown } from './LearningProgress';
 import s from './TeacherView.module.css';
 
 export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
@@ -28,7 +28,8 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
   const persistentIDs = useMemo(() => new Set(conversation.data?.messages.map(message => message.id)), [conversation.data?.messages]);
   const lastTeacher = [...(conversation.data?.messages ?? [])].reverse().find(message => message.role === 'teacher');
   const last = conversation.data?.messages.at(-1);
-  const quickReply = !live && !conversation.data?.queue?.length && last?.role === 'teacher' && last.status === 'completed' ? last : null;
+  const readyForReply = !live && (session.phase === 'idle' || session.phase === 'failed') && session.connection !== 'connecting';
+  const quickReply = readyForReply && !conversation.data?.queue?.length && last?.role === 'teacher' && last.status === 'completed' ? last : null;
 
   useEffect(()=>{
     if(!requestedMessage||located.current===requestedMessage)return;
@@ -91,7 +92,7 @@ export function TeacherTranscript({ slug, session, sourceNames, onSend }: {
     })}
     {live?.reading && <div className={s.searches} role="status">{live.reading.operation === 'search' ? '正在查找资料' : '正在查阅'}{live.reading.sourceId && <> · {sourceNames.get(live.reading.sourceId) ?? '资料'}</>}{live.reading.displayRange && <> · {live.reading.displayRange}</>}</div>}
     {!!live?.searches.length && <div className={s.searches} role="status">{live.searches.map((search, index) => <span key={index} className={s.searchChip} data-failed={search.failed || undefined}><SearchIcon size={12} />已搜索：{search.query}{typeof search.count === 'number' ? ` · ${search.count} 条结果` : search.failed ? ' · 暂不可用' : ' · 检索中…'}</span>)}</div>}
-    {quickReply && <QuickReplies onSend={onSend} />}
+    {quickReply && <QuickReplies replies={readSuggestedReplies(messageMarkdown(quickReply))} onSend={onSend} />}
     {session.error && <div className={s.error} role="alert">{session.error}{session.live && session.connection === 'disconnected' && <button type="button" onClick={() => void session.reconnect()}>重新连接</button>}</div>}
     <div className={s.streamAnchor} aria-hidden="true" />
   </div></div>;

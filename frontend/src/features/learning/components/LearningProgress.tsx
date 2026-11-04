@@ -15,7 +15,7 @@ function readReplies(value: unknown): string[] {
     if (!text || text.length > 40 || seen.has(text)) continue;
     seen.add(text);
     replies.push(text);
-    if (replies.length === 3) break;
+    if (replies.length === 4) break;
   }
   return replies;
 }
@@ -71,10 +71,11 @@ export function LearningProgress({ value, slug }: { value?: LearningProgressValu
 const chartReply = '结合交互图表理解';
 const shortcuts = ['举个例子', '太难，退一步', '太简单，快一点', chartReply];
 
-export function QuickReplies({ onSend }: { onSend: (text: string) => void }) {
+export function QuickReplies({ replies = [], onSend }: { replies?: string[]; onSend: (text: string) => void }) {
+  const options = replies.length >= 2 ? replies : shortcuts;
   return <div className={s.quick} aria-label="快捷回复">
     <div className={s.quickRow} role="group" aria-label="建议回复">
-      {shortcuts.map(text => <button key={text} type="button" className={s.suggestion} onClick={() => onSend(text)}>
+      {options.map(text => <button key={text} type="button" className={s.suggestion} onClick={() => onSend(text)}>
         {text === chartReply && <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 2v11h12M4 10l3-4 3 2 4-5" /></svg>}
         {text}
       </button>)}
