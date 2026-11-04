@@ -151,7 +151,7 @@ func Export(ctx context.Context, root string, out io.Writer) error {
 			return e
 		}
 		p := filepath.ToSlash(rel)
-		if p == "preferences.md" || skipOperational(p) {
+		if p == "preferences.md" || p == "learning-profile.json" || strings.HasPrefix(p, ".learning-profile-") || skipOperational(p) {
 			if d.IsDir() {
 				return fs.SkipDir
 			}

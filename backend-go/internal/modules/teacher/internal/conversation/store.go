@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"io"
 	"os"
@@ -90,13 +91,14 @@ type Projection struct {
 
 // QueueItem is one learner message waiting for the current turn to finish.
 type QueueItem struct {
-	QueueID        string    `json:"queueId"`
-	Content        string    `json:"content"`
-	AttachmentRefs []string  `json:"attachmentRefs,omitempty"`
-	MediaBlocks    []Block   `json:"mediaBlocks,omitempty"`
-	OperationID    string    `json:"operationId,omitempty"`
-	ProviderID     string    `json:"providerId,omitempty"`
-	QueuedAt       time.Time `json:"queuedAt"`
+	Options        *learningprofile.TurnOptions `json:"options,omitempty"`
+	QueueID        string                       `json:"queueId"`
+	Content        string                       `json:"content"`
+	AttachmentRefs []string                     `json:"attachmentRefs,omitempty"`
+	MediaBlocks    []Block                      `json:"mediaBlocks,omitempty"`
+	OperationID    string                       `json:"operationId,omitempty"`
+	ProviderID     string                       `json:"providerId,omitempty"`
+	QueuedAt       time.Time                    `json:"queuedAt"`
 }
 
 // PromotedTurn is the durable result of moving a queue item into a real turn.
@@ -734,6 +736,9 @@ func hiddenTeacherMessages(events []Event) map[string]bool {
 var ErrQueueItemNotFound = errors.New("queue item not found")
 
 func (s *Store) Enqueue(content string, attachmentRefs []string, operationID, providerID string, mediaIDs ...[]string) (QueueItem, error) {
+	return s.EnqueueConfigured(content, attachmentRefs, operationID, providerID, nil, mediaIDs...)
+}
+func (s *Store) EnqueueConfigured(content string, attachmentRefs []string, operationID, providerID string, options *learningprofile.TurnOptions, mediaIDs ...[]string) (QueueItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, events, err := s.loadLocked()
@@ -751,7 +756,7 @@ func (s *Store) Enqueue(content string, attachmentRefs []string, operationID, pr
 			}
 		}
 	}
-	item := QueueItem{QueueID: idgen.New("q"), Content: content, AttachmentRefs: attachmentRefs, OperationID: operationID, ProviderID: providerID, QueuedAt: time.Now().UTC()}
+	item := QueueItem{Options: options, QueueID: idgen.New("q"), Content: content, AttachmentRefs: attachmentRefs, OperationID: operationID, ProviderID: providerID, QueuedAt: time.Now().UTC()}
 	if len(mediaIDs) > 0 {
 		item.MediaBlocks, err = s.attachmentBlocksLocked(mediaIDs[0])
 		if err != nil {

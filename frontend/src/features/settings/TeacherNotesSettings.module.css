@@ -11,7 +11,7 @@
 .description { margin: 4px 0 0; font-size: .8rem; color: var(--muted); line-height: 1.65; }
 .toggle { display: inline-flex; align-items: center; gap: 9px; font-size: .8rem; cursor: pointer; flex-shrink: 0; position: relative; }
 .toggle input { position: absolute; width: 36px; height: 22px; margin: 0; opacity: 0; }
-.track { width: 36px; height: 22px; border-radius: 20px; background: var(--border); position: relative; transition: background .15s; }
+.track { pointer-events: none; width: 36px; height: 22px; border-radius: 20px; background: var(--border); position: relative; transition: background .15s; }
 .track::after { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--card); transition: transform .15s; box-shadow: 0 1px 3px #0002; }
 .toggle input:checked + .track { background: var(--accent); }
 .toggle input:checked + .track::after { transform: translateX(14px); }

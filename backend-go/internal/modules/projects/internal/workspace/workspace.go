@@ -141,7 +141,7 @@ func DeleteProject(slug string) error {
 }
 
 // CreateProjectSkeleton writes the canonical folder tree plus initial
-// state.json and project.md. Returns os.ErrExist-equivalent
+// state.json and learning metadata. Returns os.ErrExist-equivalent
 // (via *SlugConflictError) if the project already exists.
 // CreateProjectSkeleton creates a project with empty background fields.
 // parentSlug is ignored; it remains only for source compatibility. All new
@@ -150,8 +150,7 @@ func CreateProjectSkeleton(slug, title string, parentSlug string) error {
 	return CreateProjectSkeletonWithInput(slug, title, parentSlug, ProjectInput{})
 }
 
-// CreateProjectSkeletonWithInput is the rich-form creator: writes project.md
-// seeded with the user's why / current / target / standard fields.
+// CreateProjectSkeletonWithInput creates project state and conversation instructions.
 func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in ProjectInput) error {
 	root, err := projectRoot(slug)
 	if err != nil {
@@ -200,12 +199,6 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 
 	// state.json (atomic)
 	if err := WriteProjectState(slug, state, ""); err != nil {
-		return err
-	}
-
-	// project.md
-	projectMd := fmt.Sprintf("# %s\n\n%s", title, defaultProjectMdBodyForInput(in))
-	if err := filesystem.AtomicWriteFile(filepath.Join(root, "project.md"), []byte(projectMd), 0o644); err != nil {
 		return err
 	}
 
@@ -343,12 +336,7 @@ func IsSlugConflict(err error) bool {
 	return errors.As(err, &sc)
 }
 
-func defaultProjectMdBody() string {
-	return defaultProjectMdBodyForInput(ProjectInput{})
-}
-
-// ProjectInput captures creation-time context. Why/Current/Target/Standard seed
-// only system-learning project briefs; discipline-map briefs ignore them.
+// ProjectInput captures creation-time context. Legacy questionnaire fields are ignored.
 type ProjectInput struct {
 	SystemPrompt  string // learner-owned conversation instructions
 	ProjectType   ProjectType
@@ -357,65 +345,6 @@ type ProjectInput struct {
 	Target        string // target ability self-assessment
 	Standard      string // completion criteria the learner commits to
 	LearningScope *learningscope.Scope
-}
-
-func defaultProjectMdBodyForInput(in ProjectInput) string {
-	if NormalizeProjectType(in.ProjectType) == ProjectTypeDisciplineMap {
-		return `## 项目形态
-
-学科地图
-
-## 总览目标
-
-建立这门学科的统一入口，了解学科边界、主要研究领域、领域关系、研究方法、典型应用与可选学习路线。
-
-## 范围备注
-
-_尚未填写：特别关注或暂不覆盖的方向。_
-
-## 备注
-
-_由学习者维护；智能体未经确认不得覆盖本文件。_`
-	}
-
-	why := strings.TrimSpace(in.Why)
-	if why == "" && strings.TrimSpace(in.Current) == "" && strings.TrimSpace(in.Target) == "" && strings.TrimSpace(in.Standard) == "" {
-		return "## 学习主题\n\n围绕项目标题学习。特殊要求可在教师页的附加信息中填写、修改或清空；可以不填。\n\n## 备注\n\n_由学习者维护；智能体未经确认不得覆盖本文件。_"
-	}
-	if why == "" {
-		why = "_尚未填写：为什么这个主题值得学。_"
-	}
-	current := strings.TrimSpace(in.Current)
-	if current == "" {
-		current = "_尚未评估：当前在哪个水平。_"
-	}
-	target := strings.TrimSpace(in.Target)
-	if target == "" {
-		target = "_尚未设定：希望达到什么水平。_"
-	}
-	standard := strings.TrimSpace(in.Standard)
-	if standard == "" {
-		standard = "_尚未约定：怎样的成果算「完成」。_"
-	}
-	return fmt.Sprintf(`## Why this topic matters
-
-%s
-
-## Current ability
-
-%s
-
-## Target ability
-
-%s
-
-## Completion standard
-
-%s
-
-## Notes
-
-_Learner-owned. Agents will not overwrite this file without confirmation._`, why, current, target, standard)
 }
 
 // FindProjectBySlug scans the flat project index.

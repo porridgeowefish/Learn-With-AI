@@ -21,6 +21,9 @@ func openAIRequest(p askaiconfig.Provider, in Request, stream bool) map[string]a
 		messages = append(messages, openAIMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "messages": messages, "stream": stream}
+	if in.ReasoningEffort != "" {
+		body["reasoning_effort"] = in.ReasoningEffort
+	}
 	body[openAIOutputLimitKey(p)] = platformconfig.ModelOutputTokens
 	if len(in.Tools) > 0 {
 		var tools []map[string]any
@@ -59,10 +62,13 @@ func anthropicRequest(p askaiconfig.Provider, in Request, stream bool) map[strin
 			replayableThinking = false
 		}
 	}
-	if p.Thinking && replayableThinking {
+	if (p.Thinking || in.ReasoningEffort != "") && replayableThinking {
 		thinkingBudget := 2048
 		if in.MaxThinkingTokens > 0 {
 			thinkingBudget = in.MaxThinkingTokens
+		}
+		if in.ReasoningEffort != "" {
+			thinkingBudget = map[string]int{"low": 2048, "medium": 4096, "high": 8192, "xhigh": 16384}[in.ReasoningEffort]
 		}
 		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": thinkingBudget}
 	}
@@ -106,6 +112,12 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 
 // StreamProvider uses the same protocol implementation for configured and explicit connections.
 func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+	if err := validateEffort(p, in); err != nil {
+		return err
+	}
+	if in.ShowReasoning != nil {
+		p.Reasoning = *in.ShowReasoning
+	}
 	if p.Kind == "siwc" {
 		return streamSIWC(ctx, p, in, emit)
 	}

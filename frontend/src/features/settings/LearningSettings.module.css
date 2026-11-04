@@ -1,0 +1,21 @@
+.card { padding: 14px 18px; }
+.rows { display: grid; gap: 8px; margin-top: 12px; }
+.rows .row { margin-top: 0; min-height: 32px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: .85rem; }
+.row > select { width: auto; max-width: 220px; }
+.row small { display: block; color: var(--muted); font-size: .75rem; margin-top: 5px; }
+.segments { display: inline-flex; padding: 3px; gap: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.segments button { border: 0; border-radius: 5px; padding: 4px 14px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.segments button[aria-pressed='true'] { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px #0001; }
+.segments button:focus-visible { outline: 2px solid var(--accent); }
+.configuration { display: grid; gap: 10px; margin-top: 12px; }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.memory { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.memory:last-child { border-bottom: 0; }
+.memory > p { margin: 0 0 8px; font-size: .85rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.memory textarea { min-height: 80px; height: auto; resize: vertical; }
+.source { font-size: .75rem; color: var(--muted); }
+.source summary { cursor: pointer; }
+.source p { max-width: 560px; overflow-wrap: anywhere; }
+.source a { color: var(--accent); }
+@media(max-width:600px) { .row { flex-wrap: wrap; gap: 10px; } }

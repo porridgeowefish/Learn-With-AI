@@ -139,7 +139,7 @@ export function useSaveAskAiSettings() {
       });
       if (!res.ok) throw new ApiError(res.status, 'save failed', null);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qkAskAi.settings() }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['learning-profile'] }); return qc.invalidateQueries({ queryKey: qkAskAi.settings() }); },
   });
 }
 

@@ -100,10 +100,36 @@ async function importSnapshot({state, request, json}) {
 export async function settings(ctx) {
   const {url,path,method,request,state,json} = ctx;
   const key = path.replace('/api/settings/','');
+  if (path === '/api/settings/learning') {
+    state.settings ||= {};
+    const saved = state.settings.learning ||= {length:'medium',effort:'medium',showReasoning:true,memoryEnabled:false,search:{enabled:false,provider:'',providerId:'',hasKey:false}};
+    if (method === 'PUT') {
+      const input = await request.json();
+      if (input.search.enabled && !((input.search.provider==='chatgpt' && input.search.providerId) || (input.search.provider==='zhipu' && (input.search.apiKey || saved.search.hasKey)))) {
+        saved.search.enabled=false;
+        return json({error:'请完成搜索配置后再开启'},400);
+      }
+      input.search.hasKey=!!input.search.apiKey || saved.search.hasKey;
+      delete input.search.apiKey;
+      state.settings.learning=input;
+    }
+    const providers = state.settings['ask-ai']?.providers || defaults['ask-ai'].providers;
+    return json({settings:state.settings.learning,capabilities:Object.fromEntries(providers.map(p=>[p.id,['low','medium','high','xhigh']]))});
+  }
+  if (path.startsWith('/api/learning-memories')) {
+    state.memories ||= [];
+    const id = decodeURIComponent(path.split('/')[3] || '');
+    if (method === 'DELETE') { state.forgottenMemories ||= []; state.forgottenMemories.push(...state.memories.filter(m=>id==='all'||m.id===id).map(m=>m.evidence)); state.memories=state.memories.filter(m=>id!=='all'&&m.id!==id); }
+    if (method === 'PUT') {const input=await request.json();const m=state.memories.find(m=>m.id===id);if(m){m.text=input.text;m.edited=true;}}
+    return json({memories:state.memories});
+  }
+
   if (Object.hasOwn(defaults,key)) {
     state.settings ||= {};
     if (method === 'PUT') state.settings[key] = await request.json();
-    return json(state.settings[key] || defaults[key]);
+    const value = structuredClone(state.settings[key] || defaults[key]);
+    if (key==='ask-ai') { for(const p of value.providers) { if(p.id==='preview'&&!p.baseURL)p.baseURL='https://preview.invalid'; } }
+    return json(value);
   }
   if (path === '/api/preferences') {
     if (method === 'PUT') state.preferences = await request.text();

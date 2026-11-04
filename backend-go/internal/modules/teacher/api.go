@@ -67,6 +67,8 @@ type WebSearchResult = websearch.Result
 
 func ConfiguredWebSearch() WebSearcher { return websearch.Configured() }
 
+var SearchFromSettings = websearch.FromSettings
+
 func NewActiveResponses() *ActiveResponses { return service.NewActiveResponses() }
 
 func NewConversation(slug string) (*ConversationStore, error) { return conversation.New(slug) }

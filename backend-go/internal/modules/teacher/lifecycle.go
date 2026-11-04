@@ -3,6 +3,7 @@ package teacher
 import (
 	"context"
 	"errors"
+	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"strings"
@@ -97,7 +98,7 @@ func (s *Lifecycle) Queue(slug string, in TurnInput) (string, bool, error) {
 	if err = EnsureGreeting(store, slug); err != nil {
 		return "", false, err
 	}
-	item, err := store.Enqueue(content, in.AttachmentRefs, in.OperationID, in.ProviderID, in.ConversationAttachmentIDs)
+	item, err := store.EnqueueConfigured(content, in.AttachmentRefs, in.OperationID, in.ProviderID, in.Options, in.ConversationAttachmentIDs)
 	if err != nil {
 		return "", false, err
 	}
@@ -185,7 +186,7 @@ func (s *Lifecycle) Steer(ctx context.Context, slug, id string) (*ActiveResponse
 	s.notify(slug)
 	return run, nil
 }
-func (s *Lifecycle) Regenerate(slug, id, provider string) (*ActiveResponse, error) {
+func (s *Lifecycle) Regenerate(slug, id, provider string, options ...*learningprofile.TurnOptions) (*ActiveResponse, error) {
 	lock := s.lock(slug)
 	lock.Lock()
 	defer lock.Unlock()
@@ -214,7 +215,7 @@ func (s *Lifecycle) Regenerate(slug, id, provider string) (*ActiveResponse, erro
 		return nil, ErrNotLatestResponse
 	}
 	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(StreamFrame)) error {
-		return s.Service.RegenerateResponse(ctx, slug, id, provider, emit)
+		return s.Service.RegenerateResponse(ctx, slug, id, provider, emit, options...)
 	})
 	if run == nil {
 		return nil, ErrResponseActive

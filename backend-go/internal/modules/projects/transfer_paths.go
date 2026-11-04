@@ -5,7 +5,7 @@ func TransferPaths() []string {
 	return []string{
 		"state.json",
 		"unit.json",
-		"project.md",
+		"project.md", // Preserve legacy files during transfer; no runtime consumer.
 		"learning-scope.json",
 		"learning-plan.json",
 		"overview.md",

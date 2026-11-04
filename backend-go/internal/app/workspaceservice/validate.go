@@ -47,9 +47,6 @@ func validateProjectFiles(ctx context.Context, base string) error {
 		}
 		return nil
 	}
-	if e := require("project.md"); e != nil {
-		return e
-	}
 	// Only source records with independent text should remain visible after import.
 	visible := map[string]bool{}
 	remove := []string{}

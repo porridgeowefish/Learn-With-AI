@@ -2,6 +2,7 @@ import { useAppearance, useUpdateAppearance } from './appearance';
 import { ModelsPage } from './ModelsPage';
 import { WorkspaceSettings } from './WorkspaceSettings';
 import { TeacherNotesSettings } from './TeacherNotesSettings';
+import { LearningSettings } from './LearningSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
 import { useUpdateInfo } from './update';
@@ -12,6 +13,7 @@ export function SettingsPage() {
     <header className={s.header}><h1 className={s.title}>设置</h1></header>
     <AppearanceSection />
     <ModelsPage />
+    <LearningSettings />
     <TeacherNotesSettings />
     <WorkspaceSettings />
     <VersionAndDataSection />

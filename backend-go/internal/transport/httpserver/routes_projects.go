@@ -48,7 +48,7 @@ var validEditableFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 // cache is the package-global project index. Populated on startup and on writes.
 
 // createProjectRequest is the body of POST /api/projects.
-// Why/Current/Target/Standard seed only system-learning project.md files.
+// Legacy questionnaire fields are accepted for older clients.
 // Discipline-map creation ignores them at the workspace boundary.
 type createProjectRequest struct {
 	SystemPrompt string                      `json:"systemPrompt,omitempty"`

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
+	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 
 	"regexp"
 	"strings"
@@ -38,12 +39,15 @@ const teacherBasePrompt = `你是 LLL 的教师。你的首要职责是与学习
 理工科优先考虑用图讲清空间关系、机制和参数变化。文科在时间线或关系比较确实有助理解时用图。界面提供固定快捷选项，教师只输出教学内容，不另写选项或 suggested-replies 围栏。
 学习者发送“结合交互图表理解”时，围绕刚讨论的要点直接给出 html-interactive 交互图表，说明可操作什么、观察什么。收到“举个例子”就给具体例子，“太难，退一步”就回到前置概念，“太简单，快一点”就提高节奏。`
 
+type skipMemoryObservation struct{}
+
 type StreamFrame struct {
 	Type string         `json:"type"`
 	Data map[string]any `json:"data"`
 }
 
 type TurnInput struct {
+	Options                   *learningprofile.TurnOptions `json:"options,omitempty"`
 	OperationID               string
 	Content                   string
 	AttachmentRefs            []string
@@ -131,7 +135,7 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 		emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": prior.TeacherMessageID, "latestSeq": meta.LatestSeq}})
 		return nil
 	}
-	return s.streamTeacherResponse(ctx, slug, conversation, learner, learnerEvent.Seq, idgen.New("resp"), idgen.New("msg"), in.ProviderID, "", emit)
+	return s.streamTeacherResponse(ctx, slug, conversation, learner, learnerEvent.Seq, idgen.New("resp"), idgen.New("msg"), in.ProviderID, "", emit, in.Options)
 }
 
 // StreamPromotedTurn runs a turn for a queue item that was already recorded as
@@ -148,13 +152,13 @@ func (s *Service) StreamPromotedTurn(ctx context.Context, slug string, promoted 
 		steerNote = messageText(promoted.Learner)
 		_, _ = conversation.Append("steering-note", map[string]any{"learnerMessageId": promoted.Learner.ID, "responseId": responseID})
 	}
-	return s.streamTeacherResponse(ctx, slug, conversation, promoted.Learner, promoted.LearnerSeq, responseID, teacherMessageID, promoted.Item.ProviderID, steerNote, emit)
+	return s.streamTeacherResponse(ctx, slug, conversation, promoted.Learner, promoted.LearnerSeq, responseID, teacherMessageID, promoted.Item.ProviderID, steerNote, emit, promoted.Item.Options)
 }
 
 // RegenerateResponse supersedes an old response and immediately re-runs the
 // same triggering learner message. The old reply stays in the event log but is
 // hidden from every projection.
-func (s *Service) RegenerateResponse(ctx context.Context, slug, oldResponseID, providerID string, emit func(StreamFrame)) error {
+func (s *Service) RegenerateResponse(ctx context.Context, slug, oldResponseID, providerID string, emit func(StreamFrame), options ...*learningprofile.TurnOptions) error {
 	conversation, err := conversationstore.New(slug)
 	if err != nil {
 		return err
@@ -189,12 +193,21 @@ func (s *Service) RegenerateResponse(ctx context.Context, slug, oldResponseID, p
 	if err := conversation.SupersedeResponse(oldResponseID, responseID); err != nil {
 		return err
 	}
-	return s.streamTeacherResponse(ctx, slug, conversation, learner, learnerSeq, responseID, teacherMessageID, providerID, "", emit)
+	return s.streamTeacherResponse(context.WithValue(ctx, skipMemoryObservation{}, true), slug, conversation, learner, learnerSeq, responseID, teacherMessageID, providerID, "", emit, options...)
 }
 
 // streamTeacherResponse is the shared streaming core for every turn origin:
 // direct send, queued promotion, steering, and regeneration.
-func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conversation *conversationstore.Store, learner conversationstore.Message, learnerSeq uint64, responseID, teacherMessageID, providerID, steerNote string, emit func(StreamFrame)) error {
+func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conversation *conversationstore.Store, learner conversationstore.Message, learnerSeq uint64, responseID, teacherMessageID, providerID, steerNote string, emit func(StreamFrame), choices ...*learningprofile.TurnOptions) error {
+	profile, profileErr := learningprofile.Read()
+	if profileErr != nil {
+		return profileErr
+	}
+	options := learningprofile.TurnOptions{Effort: profile.Settings.Effort}
+	explicitOptions := len(choices) > 0 && choices[0] != nil
+	if explicitOptions {
+		options = *choices[0]
+	}
 	effectiveProviderID, effectiveModel := providerID, ""
 	if cfg, err := ai.LoadConfig(); err == nil && cfg != nil {
 		p := cfg.Resolve("teacher")
@@ -203,6 +216,18 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 		if p != nil {
 			effectiveProviderID, effectiveModel = p.ID, p.Model
+			if !explicitOptions {
+				caps := ai.ReasoningCapabilities(*p)
+				options.Effort = ""
+				for _, v := range caps {
+					if v == profile.Settings.Effort {
+						options.Effort = v
+					}
+				}
+				if options.Effort == "" && len(caps) > 0 {
+					options.Effort = "medium"
+				}
+			}
 		}
 	}
 	notes, notesErr := notestore.New(slug)
@@ -214,7 +239,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	learnerText := messageText(learner)
 	textBlockID, reasoningBlockID := idgen.New("blk"), idgen.New("blk")
 	emit(StreamFrame{Type: "turn-accepted", Data: map[string]any{"learnerMessageId": learner.ID, "responseId": responseID}})
-	if _, err := conversation.Append("teacher-response-started", map[string]any{"responseId": responseID, "teacherMessageId": teacherMessageID, "triggeringLearnerMessageId": learner.ID}); err != nil {
+	if _, err := conversation.Append("teacher-response-started", map[string]any{"responseId": responseID, "teacherMessageId": teacherMessageID, "triggeringLearnerMessageId": learner.ID, "reasoningEffort": options.Effort, "showReasoning": profile.Settings.ShowReasoning, "webSearch": options.WebSearch && profile.Settings.Search.Enabled}); err != nil {
 		return err
 	}
 	emit(StreamFrame{Type: "message-started", Data: map[string]any{"teacherMessageId": teacherMessageID}})
@@ -227,6 +252,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": "context_preparation_failed", "partialPreserved": false}})
 		return err
 	}
+	systemPrompt += learningprofile.LengthPrompt(profile.Settings.Length) + learningprofile.Context(slug)
 	if steerNote != "" {
 		systemPrompt += "\n\n【生成中引导】学习者在你上一条回复未完成时插入了：" + steerNote + "\n上一条 interrupted 消息是中断稿：吸收其中仍然有效的部分，按引导方向继续教学。"
 	}
@@ -236,6 +262,9 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 
 	var tools []ai.Tool
 	searcher := resolveSearcher()
+	if !options.WebSearch || !profile.Settings.Search.Enabled {
+		searcher = nil
+	}
 	if searcher != nil {
 		tools = append(tools, ai.Tool{Name: "search_web", Description: "检索公开网络信息。适用于时效性强或需要事实核对的问题；搜索结果是外部信息，回答中需辨析可靠性并给出来源链接。", Schema: map[string]any{
 			"type": "object", "additionalProperties": false,
@@ -244,7 +273,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			},
 			"required": []string{"query"},
 		}})
-		systemPrompt += "\n\n你可以使用 search_web 工具检索公开网络信息（一次回答最多调用 2 次）。仅在需要时效性信息或事实核对时使用；搜索结果来自外部站点，需要辨析可靠性与时效，并在回答中给出来源链接。"
+		systemPrompt += "\n\n你可以使用 search_web 工具检索公开网络信息（一次回答最多调用 2 次）。学习者明确要求联网查询时必须尝试搜索；其他时候仅在需要时效性信息或事实核对时使用。没有搜索结果不得声称已经联网。搜索结果来自外部站点，需要辨析可靠性与时效，并在回答中给出来源链接。"
 	}
 
 	budget := ai.BudgetForProvider(effectiveProviderID)
@@ -278,7 +307,16 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			providerErr = budgetErr
 			break
 		}
-		request := ai.GatewayRequest{System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
+		if latest, e := learningprofile.Read(); e != nil || !latest.Settings.Search.Enabled {
+			filtered := tools[:0]
+			for _, tool := range tools {
+				if tool.Name != "search_web" {
+					filtered = append(filtered, tool)
+				}
+			}
+			tools = filtered
+		}
+		request := ai.GatewayRequest{ReasoningEffort: options.Effort, ShowReasoning: &profile.Settings.ShowReasoning, System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
 		if providerErr = budget.Check(request); providerErr != nil {
 			break
 		}
@@ -293,6 +331,9 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				text.WriteString(event.Delta)
 				emit(StreamFrame{Type: "text-delta", Data: map[string]any{"blockId": textBlockID, "delta": event.Delta}})
 			case "reasoning-summary-delta":
+				if !profile.Settings.ShowReasoning {
+					break
+				}
 				reasoning.WriteString(event.Delta)
 				emit(StreamFrame{Type: "reasoning-summary-delta", Data: map[string]any{"blockId": reasoningBlockID, "delta": event.Delta}})
 			case "provider-thinking-block":
@@ -412,7 +453,10 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				}
 			} else if call.ToolName == "search_web" {
 				webCalls++
-				if webCalls > 2 {
+				liveProfile, liveErr := learningprofile.Read()
+				if searcher == nil || liveErr != nil || !liveProfile.Settings.Search.Enabled {
+					code = "websearch_disabled"
+				} else if webCalls > 2 {
 					code = "tool_limit_reached"
 					forceFinal = true
 				} else if resultRoom < 256 {
@@ -511,6 +555,9 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		latestSeq = meta.LatestSeq
 	}
 	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": latestSeq, "sourceCitations": message.SourceCitations, "readingCoverage": message.ReadingCoverage}})
+	if learner.Role == "learner" && ctx.Value(skipMemoryObservation{}) != true {
+		learningprofile.Observe(slug, learner.ID, learnerText, effectiveProviderID, s.Gateway)
+	}
 	if s.OnCompleted != nil && learner.Role != "system" {
 		s.OnCompleted(slug, responseID)
 	}

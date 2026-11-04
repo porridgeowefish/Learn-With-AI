@@ -142,7 +142,7 @@ export function useChatMedia(slug: string) {
   };
 }
 
-export function ChatMediaInput({ media, children }: { media: ReturnType<typeof useChatMedia>; children?: ReactNode }) {
+export function ChatMediaInput({ media, children, leadingActions }: { media: ReturnType<typeof useChatMedia>; children?: ReactNode; leadingActions?: ReactNode }) {
   const input = useRef<HTMLInputElement>(null);
   return <div className={s.root}>
     {media.attachments.length > 0 && <div className={s.attachments}>{media.attachments.map(a => <div className={s.chip} key={a.attachmentId}>
@@ -151,6 +151,7 @@ export function ChatMediaInput({ media, children }: { media: ReturnType<typeof u
     <div className={s.controls}>
       <input ref={input} hidden type="file" multiple accept="image/png,image/jpeg,image/gif,audio/*,.pdf,.md,.markdown,.txt,.pptx,.docx,.xlsx,.csv" aria-label="上传附件" onChange={event => { void media.addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
       <button type="button" className={s.upload} aria-label="上传图片、音频或附件" title="上传图片、音频或附件" disabled={media.pending || media.recording} onClick={() => input.current?.click()}><UploadIcon size={21} /></button>
+      {leadingActions}
       {media.pending && <span role="status" className={s.status}>正在处理附件…</span>}
       <div className={s.actions}>
         <select aria-label="识别语言" title="识别语言" value={media.language} disabled={media.pending || media.recording} onChange={event => media.setLanguage(event.target.value)}><option value="zh-CN">中文</option><option value="en-US">English</option></select>

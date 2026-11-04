@@ -439,7 +439,7 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 		payload["learnerPreferences"] = pref.Content
 		f.PreferencesHash = hash(pref.Content)
 	}
-	for _, name := range []string{"project.md", "learning-scope.json", "intro/output.md"} {
+	for _, name := range []string{"learning-scope.json", "intro/output.md"} {
 		b, e := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if e == nil {
 			if len(b) > 256<<10 {

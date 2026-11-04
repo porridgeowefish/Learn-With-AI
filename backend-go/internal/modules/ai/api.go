@@ -25,6 +25,7 @@ type AIFrame = providers.Frame
 type Budget = budget.Budget
 
 var LoadConfig = aiconfig.Load
+var ReasoningCapabilities = gateway.ReasoningCapabilities
 var SaveConfig = aiconfig.Save
 var UseConfigPathForTest = aiconfig.UseConfigPathForTest
 var BudgetForProvider = budget.ForProvider

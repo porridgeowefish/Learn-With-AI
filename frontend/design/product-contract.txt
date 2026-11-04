@@ -2,6 +2,8 @@ api /api/activity?{}
 api /api/events
 api /api/folders
 api /api/health
+api /api/learning-memories
+api /api/learning-memories/{}
 api /api/model-connections/models
 api /api/preferences
 api /api/project-type-advice
@@ -48,6 +50,7 @@ api /api/projects/{}/sources/{}/structure-jobs
 api /api/settings/appearance
 api /api/settings/ask-ai
 api /api/settings/ask-ai/probe
+api /api/settings/learning
 api /api/settings/siwc
 api /api/settings/siwc/disconnect
 api /api/settings/siwc/models

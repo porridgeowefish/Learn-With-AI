@@ -62,12 +62,15 @@ type Event struct {
 }
 
 type Request struct {
-	System      string
-	Messages    []Message
-	Tools       []Tool
-	ProviderID  string
-	BindingName string
-	Model       string
+	ReasoningEffort string
+	ShowReasoning   *bool
+	WebSearch       bool
+	System          string
+	Messages        []Message
+	Tools           []Tool
+	ProviderID      string
+	BindingName     string
+	Model           string
 	// MaxOutputTokens is a legacy budget annotation, not a provider override.
 	// The user-selected platform ModelOutputTokens owns the wire ceiling.
 	MaxOutputTokens   int

@@ -14,10 +14,13 @@ export interface TeacherSubmission {
   content: string;
   attachments: ChatAttachment[];
   providerId?: string;
+  options?: { effort: string; webSearch: boolean };
 }
 
 export function useTeacherSession(slug: string) {
   const client = useQueryClient();
+  const controls = useRef<{ providerId?: string; options?: { effort: string; webSearch: boolean } }>({});
+  const configure = useCallback((value: typeof controls.current) => { controls.current = value; }, []);
   const conversation = useConversation(slug);
   const projection = useRef(conversation.data);
   projection.current = conversation.data;
@@ -119,7 +122,7 @@ export function useTeacherSession(slug: string) {
     const accept = () => { if (!accepted) { accepted = true; onAccepted(); } };
     const attachments = input.attachments;
     const data = {
-      operationId: input.operationId, content: input.content, providerId: input.providerId,
+      operationId: input.operationId, content: input.content, providerId: input.providerId, options: input.options,
       attachmentRefs: attachments.filter(a => a.kind === 'source').map(a => a.attachmentId),
       conversationAttachmentIds: attachments.filter(a => a.kind !== 'source').map(a => a.attachmentId),
     };
@@ -161,7 +164,7 @@ export function useTeacherSession(slug: string) {
     const id = projection.current?.latestResponseId;
     if (!id) return;
     const learner = [...(projection.current?.messages ?? [])].reverse().find(message => message.role === 'learner') ?? placeholderLearner('teacher-opening');
-    return run((signal, emit) => regenerateTeacherResponse(slug, id, signal, emit), emptyLive(learner));
+    return run((signal, emit) => regenerateTeacherResponse(slug, id, signal, emit, controls.current), emptyLive(learner));
   };
   const queueCommand = async (command: () => Promise<unknown>) => {
     const token = generation.current;
@@ -170,7 +173,7 @@ export function useTeacherSession(slug: string) {
   };
   const reconnect = () => run((signal, emit) => resumeTeacherTurn(slug, signal, emit, current.current.cursor), undefined, true);
   return {
-    conversation, ...state, send, stop, steer, regenerate, reportError, reconnect,
+    conversation, ...state, configure, send, stop, steer, regenerate, reportError, reconnect,
     edit: (id: string, content: string) => queueCommand(() => editQueuedTurn(slug, id, { content })),
     discard: (id: string) => queueCommand(() => discardQueuedTurn(slug, id)),
     resume: () => queueCommand(() => resumeTeacherQueue(slug)),

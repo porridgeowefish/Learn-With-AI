@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"net/http"
 )
@@ -100,9 +101,12 @@ func (s *Server) handleSteerQueuedTurn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRegenerateTeacherResponse(w http.ResponseWriter, r *http.Request) {
-	var in struct{ ProviderID string }
+	var in struct {
+		ProviderID string
+		Options    *learningprofile.TurnOptions
+	}
 	_ = httpx.ReadJSON(r, &in)
-	run, err := s.teachingLifecycle().Regenerate(r.PathValue("id"), r.PathValue("responseId"), in.ProviderID)
+	run, err := s.teachingLifecycle().Regenerate(r.PathValue("id"), r.PathValue("responseId"), in.ProviderID, in.Options)
 	if err != nil {
 		writeTeacherError(w, err)
 		return

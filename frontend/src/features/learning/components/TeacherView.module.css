@@ -180,3 +180,12 @@
 
 .queueBar { min-height: 0; flex: 0 1 auto; }
 .queuePause, .failedSubmission { flex-shrink: 0; }
+
+.reasoningControl { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.searchToggle { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; min-height: 28px; color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.searchToggle input { position: absolute; right: 0; width: 30px; height: 18px; margin: 0; opacity: 0; cursor: pointer; }
+.searchTrack { width: 30px; height: 18px; border-radius: 999px; background: var(--border); pointer-events: none; transition: background 120ms ease; }
+.searchTrack::before { content: ''; display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%; background: var(--card); transition: transform 120ms ease; }
+.searchToggle input:checked + .searchTrack { background: var(--accent); }
+.searchToggle input:checked + .searchTrack::before { transform: translateX(12px); }
+.searchToggle input:focus-visible + .searchTrack { outline: 2px solid var(--accent); outline-offset: 3px; }

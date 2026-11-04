@@ -49,7 +49,16 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 	}
 	body := map[string]any{"model": p.Model, "input": input, "store": false, "stream": true}
 	if supportsSIWCReasoningSummary(p.Model) {
-		body["reasoning"] = map[string]any{"summary": "auto"}
+		reasoning := map[string]any{}
+		if in.ShowReasoning == nil || *in.ShowReasoning {
+			reasoning["summary"] = "auto"
+		}
+		if in.ReasoningEffort != "" {
+			reasoning["effort"] = in.ReasoningEffort
+		}
+		if len(reasoning) > 0 {
+			body["reasoning"] = reasoning
+		}
 	}
 	if in.System != "" {
 		body["instructions"] = in.System
@@ -60,6 +69,10 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 			tools = append(tools, map[string]any{"type": "function", "name": tool.Name, "description": tool.Description, "parameters": tool.Schema})
 		}
 		body["tools"] = []map[string]any{{"type": "namespace", "name": "lll", "description": "Local learning tools available in Learn-With-AI", "tools": tools}}
+	}
+	if in.WebSearch {
+		body["tools"] = []map[string]any{{"type": "web_search"}}
+		body["tool_choice"] = "required"
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {
@@ -84,6 +97,8 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 	scanner.Buffer(make([]byte, 64<<10), 4<<20)
 	completed := false
 	seenCalls := map[string]bool{}
+	searchCompleted := false
+	sources := map[string]bool{}
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data:") {
@@ -94,6 +109,10 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 			break
 		}
 		var frame struct {
+			Annotation struct {
+				URL   string `json:"url"`
+				Title string `json:"title"`
+			} `json:"annotation"`
 			Type  string `json:"type"`
 			Delta string `json:"delta"`
 			Item  struct {
@@ -106,8 +125,11 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 				Status string
 				Error  *struct{ Code, Message string }
 				Usage  struct {
-					InputTokens  int `json:"input_tokens"`
-					OutputTokens int `json:"output_tokens"`
+					InputTokens   int `json:"input_tokens"`
+					OutputTokens  int `json:"output_tokens"`
+					OutputDetails struct {
+						ReasoningTokens int `json:"reasoning_tokens"`
+					} `json:"output_tokens_details"`
 				}
 				Output []struct {
 					Type      string `json:"type"`
@@ -121,6 +143,13 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 			continue
 		}
 		switch frame.Type {
+		case "response.web_search_call.completed":
+			searchCompleted = true
+		case "response.output_text.annotation.added":
+			if in.WebSearch && strings.HasPrefix(frame.Annotation.URL, "https://") && !sources[frame.Annotation.URL] {
+				sources[frame.Annotation.URL] = true
+				emit(Event{Type: "text-delta", Delta: "\n来源：" + frame.Annotation.URL + "\n"})
+			}
 		case "response.output_text.delta":
 			emit(Event{Type: "text-delta", Delta: frame.Delta})
 		case "response.reasoning_summary_text.delta":
@@ -135,7 +164,7 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 					emitSIWCCall(item.CallID, item.Name, item.Arguments, seenCalls, emit)
 				}
 			}
-			emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": frame.Response.Usage.InputTokens, "outputTokens": frame.Response.Usage.OutputTokens}})
+			emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": frame.Response.Usage.InputTokens, "outputTokens": frame.Response.Usage.OutputTokens, "reasoningTokens": frame.Response.Usage.OutputDetails.ReasoningTokens}})
 			emit(Event{Type: "response-completed"})
 			completed = true
 		case "response.failed", "response.incomplete":
@@ -153,6 +182,9 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 	}
 	if !completed {
 		return errors.New("ChatGPT stream ended before response.completed")
+	}
+	if in.WebSearch && !searchCompleted {
+		return errors.New("当前连接未完成联网搜索，请核对模型和账户权限")
 	}
 	return nil
 }

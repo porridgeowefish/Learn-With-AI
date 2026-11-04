@@ -1,3 +1,4 @@
+import { useLearningProfile } from '@/features/settings';
 import { memo, useId, useState } from 'react';
 import type { ConversationMessage } from '../api/learningWorkspace';
 import { CopyIcon, DownloadIcon, RegenerateIcon } from '@/shared/primitive/Icons';
@@ -19,6 +20,7 @@ interface MessageActions {
 
 export const TeacherMessage = memo(function Message({ slug, message, sourceNames, reasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; sourceNames: Map<string, string>; reasoningOpen: boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
   const teacher = message.role === 'teacher';
+  const profile = useLearningProfile();
   const [selectedEvidence, setSelectedEvidence] = useState('');
   const citations = message.sourceCitations ?? [];
   const citationSource = (source: string) => source.replace(/\[\[source:([^\]]+)\]\]/g, (_marker, id: string) => {
@@ -40,7 +42,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
       }}>
         {streaming && !message.blocks?.some((block) => block.type === 'markdown' && block.source) && <span className={s.thinking} role="status">教师正在生成…</span>}
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
-          ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} open={reasoningOpen} onOpenChange={setReasoningOpen} />
+          ? (profile.data?.settings.showReasoning !== false && <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} open={reasoningOpen} onOpenChange={setReasoningOpen} />)
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
@@ -79,8 +81,8 @@ function ReasoningBlock({ messageID, source, streaming, open, onOpenChange }: { 
   const panelID = useId();
   return <div className={s.reasoning}>
     <button type="button" className={s.reasoningToggle} aria-expanded={open} aria-controls={panelID} onClick={() => onOpenChange(messageID, !open)}>
-      <span aria-hidden="true">{open ? '▾' : '▸'}</span>思考过程
+      <span aria-hidden="true">{open ? '▾' : '▸'}</span>思考摘要
     </button>
-    <div id={panelID} role="region" aria-label="思考内容" hidden={!open} className={s.reasoningText} aria-busy={streaming}>{source}</div>
+    <div id={panelID} role="region" aria-label="思考摘要内容" hidden={!open} className={s.reasoningText} aria-busy={streaming}>{source}</div>
   </div>;
 }

@@ -340,8 +340,19 @@ function conversation(ctx, s, parts, b) {
     if (b.content || learner.blocks.length > 1) s.messages.push(learner);
     if (op === 'regenerate' && s.messages.at(-1)?.role === 'teacher')
       s.messages.pop();
-    const answer = previewAnswer(s.physics, b.content || s.messages.findLast(m => m.role === 'learner')?.blocks[0]?.source);
+    let answer = previewAnswer(s.physics, b.content || s.messages.findLast(m => m.role === 'learner')?.blocks[0]?.source);
+    const controls = ctx.state.settings?.learning;
+    if (controls?.length === 'short' && !answer.includes('```')) answer = answer.split('。')[0] + '。';
+    if (controls?.length === 'long' && !answer.includes('```')) answer += '\n\n我们可以再用坐标验证：先向东走 3 步，再向北走 4 步，得到位移 (3, 4)。横纵坐标分别记录两个方向的变化。';
+    const searched = controls?.search.enabled && b.options?.webSearch;
+    if (searched) answer += '\n\n搜索结果演示：[向量资料](https://zh.wikipedia.org/wiki/向量)。';
     const teacher = message('teacher', answer);
+    const reasoning = controls?.showReasoning && b.options?.effort ? '设计预览：先确认概念与条件，再通过例子核对结论。实际摘要由所选模型提供。' : '';
+    if (reasoning) teacher.blocks.push({id:id(),type:'reasoning-summary',source:reasoning});
+    if (controls?.memoryEnabled && b.content && /我.*(学过|学习|希望|喜欢|目标)/.test(b.content) && !ctx.state.forgottenMemories?.includes(b.content)) {
+      ctx.state.memories ||= [];
+      if(!ctx.state.memories.some(m=>m.evidence===b.content))ctx.state.memories.push({id:id(),text:b.content,project:'',sourceProject:ctx.path.split('/')[3],messageId:learner.id,evidence:b.content,updatedAt:now(),edited:false});
+    }
     s.messages.push(teacher);
     const deltas = answer.match(/[\s\S]{1,40}/gu) || [];
     s.streamingUntil = Date.now() + 300 * (deltas.length + 1);
@@ -353,6 +364,8 @@ function conversation(ctx, s, parts, b) {
           { learnerMessageId: learner.id, responseId: s.responseId },
         ],
         ['message-started', { teacherMessageId: teacher.id }],
+        ...(reasoning ? [['reasoning-summary-delta',{blockId:teacher.blocks[1].id,delta:reasoning}]] : []),
+        ...(searched ? [['search-started',{query:b.content}],['search-completed',{query:b.content,count:1}]] : []),
         ...deltas.map((delta) => [
           'text-delta',
           { blockId: teacher.blocks[0].id, delta },

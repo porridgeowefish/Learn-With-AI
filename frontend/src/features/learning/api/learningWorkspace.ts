@@ -299,7 +299,7 @@ export function usePermanentlyDeleteSource(slug: string) {
   });
 }
 
-export async function streamTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; conversationAttachmentIds?: string[]; providerId?: string }, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
+export async function streamTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; conversationAttachmentIds?: string[]; providerId?: string; options?: { effort: string; webSearch: boolean } }, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
   const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/turns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal });
   // A server-owned queued run may begin before the client learns about it.
   // The rejected direct request was not recorded. Preserve its operation ID
@@ -346,7 +346,7 @@ export function resumeTeacherQueue(slug: string) {
 // Queued turns: durable server-side waiting line for messages sent while the
 // teacher is streaming. promoted=true means no response was active and the
 // item already became a normal turn (reattach via resumeTeacherTurn).
-export async function queueTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; conversationAttachmentIds?: string[]; providerId?: string }) {
+export async function queueTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; conversationAttachmentIds?: string[]; providerId?: string; options?: { effort: string; webSearch: boolean } }) {
   return http.post<{ queueId: string; promoted: boolean }>(`/api/projects/${encodeURIComponent(slug)}/conversation/turns/queue`, input);
 }
 
@@ -368,8 +368,8 @@ export async function steerQueuedTurn(slug: string, queueId: string, signal: Abo
   return true;
 }
 
-export async function regenerateTeacherResponse(slug: string, responseId: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/${encodeURIComponent(responseId)}/regenerate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' , signal });
+export async function regenerateTeacherResponse(slug: string, responseId: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void, controls: { providerId?: string; options?: { effort: string; webSearch: boolean } } = {}) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/${encodeURIComponent(responseId)}/regenerate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(controls), signal });
   if (!response.ok || !response.body) throw new ApiError(response.status, '重新生成未能开始', await response.text());
   await consumeSSE(response, onFrame);
 }
