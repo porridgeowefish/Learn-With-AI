@@ -4,17 +4,17 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 | 系统 | 分发文件 | 安装与打开 |
 | --- | --- | --- |
-| Windows Intel / AMD 64 位 | learn-with-ai-0.8.15-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
-| Windows ARM64 | learn-with-ai-0.8.15-windows-arm64.msi | 同上，需要 Windows ARM64 |
+| Windows Intel / AMD 64 位 | learn-with-ai-0.8.16-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
+| Windows ARM64 | learn-with-ai-0.8.16-windows-arm64.msi | 同上，需要 Windows ARM64 |
 | macOS | darwin-…-app.tar.gz / 原生 CI 生成的 .pkg | 放进 Applications 后打开；当前 macOS 版本仍使用默认浏览器界面 |
 | Debian / Ubuntu | linux-….deb | sudo apt install ./文件名.deb；当前 Linux 版本仍使用默认浏览器界面 |
 | 其他 Linux | linux-…-install.tar.gz | 解压后运行 ./install.sh，从应用菜单打开；界面同上 |
 
 ## Windows 安装、覆盖与卸载
 
-v0.8.15 起，「设置 → 版本与更新」从固定 Gitee 仓库检查正式版本，支持下载进度、取消与重试；已登记的 Windows MSI 安装版下载完成后可安装并重启。请先结束学习和资料任务。其他运行形态使用安装包入口。
+v0.8.16 修复 Gitee 真实附件大小读取和官方下载域名跳转。「设置 → 版本与更新」从固定 Gitee 仓库检查正式版本，支持下载进度、取消与重试；已登记的 Windows MSI 安装版下载完成后可安装并重启。请先结束学习和资料任务。其他运行形态使用安装包入口。
 
-本次 v0.8.15 仅在 GitHub 发布安装包，Gitee 同步代码与标签。旧版需手动下载本版安装一次；Gitee 尚无正式发行包时，新更新器会明确提示暂无可用版本，不会隐式改用 GitHub。完整 Gitee 下载与自动升级待后续发行验收。
+v0.8.15 及更早版本需手动下载修复版安装一次。GitHub 提供全部平台的完整安装包；Gitee 提供 Windows x64、ARM64 的 MSI 分片，必须按发行说明合并同一架构的全部分片后安装。Gitee 无发行包或缺少当前系统附件时，应用明确显示实际缺口，不会隐式改用 GitHub。真实 x64 下载、合并和 MSI 校验已通过，正式应用完整自动安装链路仍保留实机验收边界。
 
 如果0.7.9等旧版本更新时提示“新版本缺少安装包”，请从[GitHub正式版本](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)下载适合本机架构的Windows MSI。在托盘退出旧应用后，双击MSI完成升级，再打开应用。该旧更新器不接受仓库更名后的下载地址；重新点击旧版更新按钮无法修复。学习数据保存在独立目录，升级时保留。
 
@@ -50,7 +50,7 @@ macOS 默认数据为 ~/Library/Application Support/learn-with-ai；Linux 为 $X
 
 仓库 Start-LLL / npm run build / npm start 是快速源码验证工具，保留在仓库中，不进入公开 MSI。开发二进制统一生成到 dist/dev/，发布包位于 dist/releases/，dist/ 根目录不保留 EXE。npm run build:desktop 生成带图标的本机原生开发应用；只有显式执行 npm run desktop:install 才创建原生开发快捷方式，目标是 exe。安装版 MSI 只管理一个正式桌面入口。
 
-使用 node tools/release/build-release.js --version 0.8.15 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
+使用 node tools/release/build-release.js --version 0.8.16 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
 
 GitHub Actions 在 v 开头的标签或勾选 publish 的手动运行中发布 Release（全部平台冒烟测试通过后才发布）；不勾选时只生成构件。分发包包含 THIRD_PARTY_NOTICES.txt，当前构件未进行代码签名。
 

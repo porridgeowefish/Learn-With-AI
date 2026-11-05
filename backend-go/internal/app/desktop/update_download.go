@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,6 +38,22 @@ func allowedUpdateURL(raw string) bool {
 		return false
 	}
 	return strings.HasPrefix(u.Path, "/szu-andrew/learn-with-ai/attach_files/") || strings.HasPrefix(u.Path, "/szu-andrew/learn-with-ai/releases/download/") || strings.HasPrefix(u.Path, "/szu-andrew/learn-with-ai/attachments/")
+}
+
+var giteeAttachmentPath = regexp.MustCompile(`^/szu-andrew/learn-with-ai/attach_files/[0-9]+/download/[^/]+$`)
+var giteeCDNPath = regexp.MustCompile(`^/attach_file/[0-9]+/[^/]+$`)
+
+func allowedUpdateRedirect(next *url.URL, via []*http.Request) bool {
+	if allowedUpdateURL(next.String()) {
+		return true
+	}
+	if len(via) < 1 || next.Scheme != "https" || next.Host != "foruda.gitee.com" || next.User != nil || next.Fragment != "" || !giteeCDNPath.MatchString(next.Path) {
+		return false
+	}
+	first, previous := via[0].URL, via[len(via)-1].URL
+	return allowedUpdateURL(first.String()) && allowedUpdateURL(previous.String()) &&
+		giteeAttachmentPath.MatchString(previous.Path) &&
+		path.Base(next.Path) == path.Base(first.Path) && path.Base(next.Path) == path.Base(previous.Path)
 }
 
 func (u *updater) snapshot() UpdateInfo { u.mu.Lock(); defer u.mu.Unlock(); return u.info }

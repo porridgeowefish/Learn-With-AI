@@ -18,7 +18,9 @@ import (
 
 const giteeReleases = "https://gitee.com/szu-andrew/learn-with-ai/releases"
 
-var releaseAPI = "https://gitee.com/api/v5/repos/szu-andrew/learn-with-ai/releases?per_page=100"
+const giteeReleaseAPI = "https://gitee.com/api/v5/repos/szu-andrew/learn-with-ai/releases"
+
+var releaseAPI = giteeReleaseAPI + "?per_page=100"
 
 type UpdateInfo struct {
 	Current         string `json:"current"`
@@ -38,6 +40,7 @@ type UpdateInfo struct {
 }
 
 type release struct {
+	ID      int64          `json:"id"`
 	Tag     string         `json:"tag_name"`
 	HTMLURL string         `json:"html_url"`
 	Draft   bool           `json:"draft"`
@@ -74,7 +77,7 @@ type updater struct {
 func newUpdater(current string) *updater {
 	u := &updater{current: current, client: &http.Client{Timeout: 12 * time.Second}, install: launchUpdateInstaller, validate: validateUpdateInstaller}
 	u.downloadClient = &http.Client{Timeout: 30 * time.Minute, CheckRedirect: func(r *http.Request, via []*http.Request) error {
-		if len(via) > 5 || !allowedUpdateURL(r.URL.String()) {
+		if len(via) > 5 || !allowedUpdateRedirect(r.URL, via) {
 			return errors.New("更新下载重定向不受信任")
 		}
 		return nil
@@ -216,6 +219,28 @@ func (u *updater) fetchRelease(ctx context.Context) (*release, error) {
 	}
 	if selected == nil {
 		return nil, errors.New("Gitee 暂无可用的正式发行版，请稍后重试")
+	}
+	// The release list only includes attachment names and URLs. The public
+	// attachment endpoint supplies the sizes required to validate multipart MSI.
+	if selected.ID > 0 {
+		endpoint := fmt.Sprintf("%s/%d/attach_files?per_page=100", giteeReleaseAPI, selected.ID)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "Learn-With-AI/"+u.current)
+		resp, err := u.client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("无法读取 Gitee 发行附件：%w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("读取 Gitee 发行附件失败：%d", resp.StatusCode)
+		}
+		if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&selected.Assets); err != nil {
+			return nil, fmt.Errorf("无法解析 Gitee 发行附件：%w", err)
+		}
 	}
 	return selected, nil
 }
