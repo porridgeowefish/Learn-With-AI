@@ -42,7 +42,7 @@ Learn-With-AI is a desktop study workspace for moving from reading an explanatio
 | Move your study workspace | Change storage location or import/export learning records as ZIP; personal preferences, API configuration and learning memory stay private and are excluded from ZIP exports |
 | Update from Gitee (current source) | Automatic version checks, download progress, cancellation and retry; registered Windows MSI installations can install and restart from Settings. Other systems and portable builds use the installer download link |
 
-The Gitee updater is implemented in the current source and will ship in a later release. Existing v0.8.14 and earlier installations need one manual installation of a version containing the new updater. This round publishes source changes only; live Gitee release and upgrade verification follow separately.
+The Gitee updater ships with v0.8.15. Existing v0.8.14 and earlier installations need one manual installation of v0.8.15 or later. This release publishes packages on GitHub; Gitee receives source and tags only. Until Gitee packages are published, the updater reports that no official release is available. Live Gitee download and complete upgrade verification follow separately.
 
 Learning files stay on your computer. You choose the model connection, including OpenAI- and Anthropic-compatible APIs. Local-first describes storage and local processing; model generation can use a remote service.
 
