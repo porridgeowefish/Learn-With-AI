@@ -389,6 +389,10 @@
 .settingsActions a:hover, .settingsActions button:hover { border-color: var(--accent); }
 .settingsActions button { cursor: pointer; }
 .settingsActions button:disabled { opacity: .55; cursor: default; }
+.updatePanel { align-items: flex-start; }
+.updatePanel > div { min-width: 0; }
+.updatePanel progress { width: 100%; max-width: 420px; accent-color: var(--accent); }
+.releaseNotes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; margin-top: 10px; font-size: .8rem; }
 
 @media (max-width: 720px) {
   .openSource { align-items: flex-start; flex-direction: column; }

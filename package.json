@@ -20,7 +20,7 @@
     "release:build": "node tools/release/build-release.js",
     "release:installers": "node tools/release/build-installers.js",
     "release:tools": "node tools/release/restore-windows-tools.js",
-    "release:test": "node --test tools/release/build-release.test.js tools/release/build-installers.test.js tools/release/linux-installer-smoke.test.js tools/release/windows-msi.test.js tools/release/windows-resources.test.js tools/release/msi-smoke.test.js",
+    "release:test": "node --test tools/release/build-release.test.js tools/release/build-installers.test.js tools/release/linux-installer-smoke.test.js tools/release/windows-msi.test.js tools/release/windows-resources.test.js tools/release/msi-smoke.test.js tools/release/split-gitee-msi.test.js",
     "build:desktop": "node tools/release/manage.js build-desktop",
     "desktop:icon": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/release/build-icon.ps1",
     "design": "npm --prefix frontend run design",

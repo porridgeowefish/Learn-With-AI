@@ -71,6 +71,15 @@ Public CI runs `check:fast`; run `check:full` locally before release.
 
 ## 3. Team Principles
 
+### 双远程同步与发布
+
+用户于 2026-11-05 要求同时在 GitHub 与 Gitee 管理版本和发布。
+`origin` 指向 GitHub，`origin_gitee` 指向 Gitee。
+每次获授权上传代码时，将同一分支提交同步推送到两个远程；发布时同步对应版本标签，并核验两端分支与标签指向。
+GitHub Release 与 Gitee Release 的说明和安装包也须同步；推送标签不代表 Gitee Release 已发布。
+任一端失败时，报告实际成功端、失败原因与待补同步项，不得声明双端完成。不使用强制推送覆盖远程历史。
+此约定规定后续已授权上传的目标，不单独授权提交、推送或创建新版本。
+
 ```text
 以瞎猜接口为耻，以认真查询为荣。
 以模糊执行为耻，以寻求确认为荣。

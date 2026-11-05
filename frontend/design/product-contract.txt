@@ -57,6 +57,7 @@ api /api/settings/siwc/models
 api /api/settings/siwc/start
 api /api/settings/teacher
 api /api/system/speech
+api /api/system/update/{}
 api /api/system/update{}
 api /api/treasures
 api /api/treasures/rewards/{}/seen

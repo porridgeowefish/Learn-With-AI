@@ -5,7 +5,7 @@ import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { LearningSettings } from './LearningSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
-import { useUpdateInfo } from './update';
+import { UpdatePanel } from './UpdatePanel';
 import s from './SettingsPage.module.css';
 import { FONT_SIZES, useFontSize, type FontSize } from '@/shared/lib/fontSize';
 
@@ -17,7 +17,7 @@ export function SettingsPage() {
     <LearningSettings />
     <TeacherNotesSettings />
     <WorkspaceSettings />
-    <VersionAndDataSection />
+    <UpdatePanel />
     <OpenSourceSection />
   </div></div>;
 }
@@ -66,28 +66,6 @@ function AppearanceSection() {
         ))}
       </div>
       {update.isError && <div className={s.error}>主题保存失败：{(update.error as Error).message}</div>}
-    </section>
-  );
-}
-
-function VersionAndDataSection() {
-  const { data: info } = useUpdateInfo();
-  const current = info;
-  const status = current?.available ? `发现新版本 ${current.latest}` : '';
-  return (
-    <section className={s.openSource} aria-labelledby="version-data-title">
-      <div>
-        <h2 id="version-data-title">版本与数据</h2>
-        <p>
-          {current ? <>当前版本 <strong>{current.current}</strong>{status && <> · {status}</>}</> : '前往 GitHub 下载最新版本。macOS 下载对应芯片的安装包，安装后重新打开应用。'}
-        </p>
-        <p>
-          升级和卸载都会保留本机的学习记录。
-        </p>
-      </div>
-        <div className={s.settingsActions}>
-          <a href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest" target="_blank" rel="noreferrer">GitHub 下载与安装指引</a>
-        </div>
     </section>
   );
 }

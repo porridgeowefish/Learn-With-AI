@@ -31,3 +31,12 @@ change: `type(scope): imperative summary`. Typical types are `feat`, `fix`,
 `refactor`, `test`, `docs`, and `chore`. Stage explicit paths, inspect
 `git diff --cached`, and include only source, tests, committed non-secret
 configuration, product assets, or documentation that the change needs.
+
+## Maintainer remote synchronization
+
+The maintained remotes are `origin` (GitHub) and `origin_gitee` (Gitee).
+For each authorized upload, push the same branch commit to both remotes and
+verify their branch tips. For a release, synchronize the version tag as well
+as the release notes and packages. A successful tag push does not create a
+Gitee Release. Report partial failures explicitly and complete the missing
+side; do not force-push to overwrite divergent history.

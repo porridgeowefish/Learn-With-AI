@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/app/bootstrap"
+	"github.com/xmz14/lll/backend-go/internal/app/desktop"
 	"github.com/xmz14/lll/backend-go/internal/app/workspaceservice"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
@@ -67,7 +68,14 @@ func main() {
 	fmt.Printf("  Frontend:  %s\n", paths.FRONTEND_ROOT)
 	fmt.Printf("Listening on http://localhost:%s\n", portEnv)
 
-	httpServer := &http.Server{Addr: addr, Handler: srv.Server.Handler()}
+	httpServer := &http.Server{Addr: addr}
+	updates, stopUpdates := desktop.UpdateHandler(Version, func() { _ = httpServer.Close() })
+	defer stopUpdates()
+	mux := http.NewServeMux()
+	mux.Handle("/api/system/update", updates)
+	mux.Handle("/api/system/update/", updates)
+	mux.Handle("/", srv.Server.Handler())
+	httpServer.Handler = mux
 	srv.Server.SetShutdownFunc(func() {
 		time.Sleep(200 * time.Millisecond)
 		fmt.Println("\nShutting down from UI...")

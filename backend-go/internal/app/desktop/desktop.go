@@ -28,14 +28,15 @@ type Options struct {
 	Version string
 }
 type Engine struct {
-	URL       string
-	Workspace string
-	Done      chan struct{}
-	server    *http.Server
-	app       *bootstrap.App
-	instance  *paths.Lease
-	unpublish func()
-	once      sync.Once
+	URL         string
+	Workspace   string
+	Done        chan struct{}
+	server      *http.Server
+	app         *bootstrap.App
+	instance    *paths.Lease
+	unpublish   func()
+	stopUpdates func()
+	once        sync.Once
 }
 
 func Start(options Options) (*Engine, error) {
@@ -65,7 +66,8 @@ func Start(options Options) (*Engine, error) {
 	}
 	// Desktop-only update check routes sit in front of the
 	// shared application server.
-	updates := newUpdater(options.Version).handler()
+	updates, stopUpdates := UpdateHandler(options.Version, engine.Close)
+	engine.stopUpdates = stopUpdates
 	mux := http.NewServeMux()
 	mux.Handle("/api/system/update", updates)
 	mux.Handle("/api/system/update/", updates)
@@ -92,6 +94,9 @@ const windowRecordName = ".learn-with-ai.window"
 
 func (engine *Engine) Close() {
 	engine.once.Do(func() {
+		if engine.stopUpdates != nil {
+			engine.stopUpdates()
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		// SSE streams can remain open; bounded shutdown then closes owned connections.

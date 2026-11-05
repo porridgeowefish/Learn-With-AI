@@ -136,7 +136,21 @@ export async function settings(ctx) {
     return json({ok:true,path:'preferences.md',content:state.preferences ?? '请先用例子解释，再给出定义。',maxBytes:65536});
   }
   if (path === '/api/health') return json({ok:true,workspace:state.workspace || '/设计预览/Learn-With-AI',stats:{projects:state.projects.length}});
-  if (path === '/api/system/update') return json({current:'设计预览',available:false});
+  if (path.startsWith('/api/system/update')) {
+    state.update ||= {current:'0.8.14',latest:'0.8.15',available:true,canInstall:true,phase:'idle',downloadedBytes:0,totalBytes:48000000,
+      notesUrl:'https://gitee.com/szu-andrew/learn-with-ai/releases/tag/v0.8.15',
+      downloadUrl:'https://gitee.com/szu-andrew/learn-with-ai/releases/download/v0.8.15/learn-with-ai-0.8.15-windows-amd64.msi',
+      releaseNotes:'设计预览：以 Gitee 为更新源，支持检查、下载、取消与安装交接。这里不会下载或执行安装程序。'};
+    const update=state.update;
+    if (path.endsWith('/prepare') && !['ready','installing'].includes(update.phase)) update.phase='downloading';
+    if (path.endsWith('/cancel')) {update.phase='idle';update.downloadedBytes=0;}
+    if (path.endsWith('/install') && update.phase==='ready') update.phase='installing';
+    if (method==='GET' && update.phase==='downloading') {
+      update.downloadedBytes=Math.min(update.totalBytes,update.downloadedBytes+12000000);
+      if(update.downloadedBytes===update.totalBytes) update.phase='ready';
+    }
+    return json(update);
+  }
   if (path === '/api/system/speech') return json({languages:[],setupHint:'设计预览使用文字输入。'});
   if (path === '/api/model-connections/models') return json({models:[{id:'demo',contextWindowTokens:32000}],source:'preset',verifiedAt:new Date().toISOString()});
   if (key === 'ask-ai/probe') return json({ok:true});
