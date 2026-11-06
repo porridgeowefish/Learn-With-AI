@@ -42,11 +42,21 @@ func Generate(ctx context.Context, provider, model string, turns []notestore.Not
 			content.WriteString(e.Delta)
 		}
 		if e.Type == "usage" {
+			reported.UsageReported = reported.UsageReported || len(e.Usage) > 0
 			if n, ok := e.Usage["inputTokens"]; ok {
 				reported.InputTokens = n
 			}
 			if n, ok := e.Usage["outputTokens"]; ok {
 				reported.OutputTokens = n
+			}
+			if value := usage.OptionalTokens(e.Usage, "cacheReadTokens"); value != nil {
+				reported.CacheReadTokens = value
+			}
+			if value := usage.OptionalTokens(e.Usage, "cacheWriteTokens"); value != nil {
+				reported.CacheWriteTokens = value
+			}
+			if value := usage.OptionalTokens(e.Usage, "cacheMissTokens"); value != nil {
+				reported.CacheMissTokens = value
 			}
 		}
 	})
@@ -68,5 +78,5 @@ func recordUsage(slug string, job notestore.NoteJob, reported notestore.NoteUsag
 	if err != nil {
 		return err
 	}
-	return usage.AppendNote(slug, usage.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: idgen.New("noteattempt"), ProviderID: job.ProviderID, InputTokens: reported.InputTokens, OutputTokens: reported.OutputTokens})
+	return usage.AppendNote(slug, usage.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: idgen.New("noteattempt"), ProviderID: job.ProviderID, InputTokens: reported.InputTokens, OutputTokens: reported.OutputTokens, UsageReported: reported.UsageReported, CacheReadTokens: reported.CacheReadTokens, CacheWriteTokens: reported.CacheWriteTokens, CacheMissTokens: reported.CacheMissTokens})
 }

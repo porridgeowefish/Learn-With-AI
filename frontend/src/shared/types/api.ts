@@ -26,6 +26,7 @@ export interface DeleteProjectResponse {
 // Requests
 export interface CreateProjectRequest {
 	 systemPrompt?: string;
+	 learningMode?: import('./learningMode').LearningMode;
   title: string;
   projectType: ProjectType;
   slug?: string;

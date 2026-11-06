@@ -105,15 +105,16 @@ export async function settings(ctx) {
     const saved = state.settings.learning ||= {length:'medium',effort:'medium',showReasoning:true,memoryEnabled:false,search:{enabled:false,provider:'',providerId:'',hasKey:false}};
     if (method === 'PUT') {
       const input = await request.json();
-      if (input.search.enabled && !((input.search.provider==='chatgpt' && input.search.providerId) || (input.search.provider==='zhipu' && (input.search.apiKey || saved.search.hasKey)))) {
+      if (input.search.enabled && !((input.search.provider==='chatgpt' && input.search.providerId) || (['zhipu','deepseek','yuanbao'].includes(input.search.provider) && (input.search.apiKey || (saved.search.provider===input.search.provider && saved.search.hasKey))) || (input.search.provider==='zhipu-plan' && (state.settings['ask-ai']?.providers || []).some(p=>p.baseURL?.startsWith('https://open.bigmodel.cn/api/coding/') || p.baseURL==='https://open.bigmodel.cn/api/anthropic')))) {
         saved.search.enabled=false;
         return json({error:'请完成搜索配置后再开启'},400);
       }
-      input.search.hasKey=!!input.search.apiKey || saved.search.hasKey;
+      input.search.hasKey=!!input.search.apiKey || (input.search.provider===saved.search.provider && saved.search.hasKey) || input.search.provider==='zhipu-plan';
       delete input.search.apiKey;
       state.settings.learning=input;
     }
     const providers = state.settings['ask-ai']?.providers || defaults['ask-ai'].providers;
+    if (!state.settings.learning.search.provider) { const plan=providers.find(p=>p.baseURL?.startsWith('https://open.bigmodel.cn/api/coding/') || p.baseURL==='https://open.bigmodel.cn/api/anthropic'); if(plan) state.settings.learning.search={enabled:true,provider:'zhipu-plan',providerId:plan.id,hasKey:true}; }
     return json({settings:state.settings.learning,capabilities:Object.fromEntries(providers.map(p=>[p.id,['low','medium','high','xhigh']]))});
   }
   if (path.startsWith('/api/learning-memories')) {
@@ -161,7 +162,8 @@ export async function settings(ctx) {
     return json(state.siwc ? {authorizationUrl:'https://auth.openai.com/design-preview'} : {ok:true});
   }
   if (path === '/api/usage/projects') return json({projects:state.projects.map((p,i)=>({projectSlug:p.slug,title:p.title,
-    inputTokens:1200*(i+1),outputTokens:850*(i+1),noteInputTokens:340*(i+1),noteOutputTokens:105*(i+1)}))});
+    inputTokens:1200*(i+1),outputTokens:850*(i+1),noteInputTokens:340*(i+1),noteOutputTokens:105*(i+1),
+    ...(i%3===0?{cacheReadTokens:800*(i+1),cacheWriteTokens:120*(i+1)}:i%3===1?{cacheReadTokens:0}:{} )}))});
   if (path === '/api/usage/teacher') return json({page:Number(url.searchParams.get('page')) || 1,pageSize:20,total:0,conversations:[]});
   if (path.startsWith('/api/treasures')) {
     state.rewards ??= [{id:'preview-welcome',itemId:'cockle',kind:'teacher',projectSlug:'math',projectId:'math',projectTitle:'线性代数',

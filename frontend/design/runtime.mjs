@@ -1,6 +1,7 @@
 import { projects, seedProjects } from '/__design/projects.mjs';
 import { initializeLearning, learning } from '/__design/learning.mjs';
 import { settings } from '/__design/settings.mjs';
+import { visuals } from '/__design/visuals.mjs';
 
 
 
@@ -61,7 +62,7 @@ export async function dispatch(request, url) {
   const data = await state;
   let changed = false;
   const ctx = {request, url, path:url.pathname, method:request.method, state:data, json, emit, dirty() { changed = true; }};
-  for (const handle of [projects, learning, settings]) {
+  for (const handle of [projects, learning, settings, visuals]) {
     const response = await handle(ctx);
     if (response) {
       if (changed || (!['GET','HEAD'].includes(request.method) && response.ok)) await save(data);

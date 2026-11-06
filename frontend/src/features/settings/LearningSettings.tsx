@@ -40,15 +40,16 @@ export function LearningSettings() {
           else { setSearchDraft(undefined); update({ search: { ...cfg.search, enabled: false } }); }
         }} />
       </header>
-      {cfg.search.enabled && !searchDraft && <div className={style.row}><span className={s.hint}>{cfg.search.provider === 'chatgpt' ? 'ChatGPT 原生搜索' : '智谱搜索'}</span><Button variant="ghost" size="sm" onClick={() => setSearchDraft({ ...cfg.search })}>修改配置</Button></div>}
+      {cfg.search.enabled && !searchDraft && <div className={style.row}><span className={s.hint}>{({chatgpt:'ChatGPT 原生搜索', 'zhipu-plan':'智谱 Plan · 自动复用模型连接', zhipu:'智谱普通 API', deepseek:'DeepSeek 搜索', yuanbao:'元宝搜索'} as Record<string,string>)[cfg.search.provider]}</span><Button variant="ghost" size="sm" onClick={() => setSearchDraft({ ...cfg.search })}>修改配置</Button></div>}
+      <p className={s.hint}>配置智谱 Coding Plan 后自动接入套餐搜索；手动选择的搜索服务优先。DeepSeek 与元宝使用各自的搜索额度。</p>
       {searchDraft && <div className={style.configuration}>
         <p className={s.hint}>完成配置并验证后，开关才会保持开启。验证会执行一次搜索。</p>
-        <label className={s.field}>搜索来源<select aria-label="搜索来源" className={s.input} value={searchDraft.provider} disabled={save.isPending} onChange={e => setSearchDraft({ ...searchDraft, provider: e.target.value, providerId: '' })}>
-          <option value="">选择搜索来源</option><option value="chatgpt">ChatGPT 原生搜索</option><option value="zhipu">智谱搜索</option>
+        <label className={s.field}>搜索来源<select aria-label="搜索来源" className={s.input} value={searchDraft.provider} disabled={save.isPending} onChange={e => setSearchDraft({ ...searchDraft, provider: e.target.value, providerId: '', apiKey: '', hasKey: false })}>
+          <option value="">选择搜索来源</option><option value="chatgpt">ChatGPT 原生搜索</option><option value="zhipu-plan">智谱 Coding Plan（复用连接）</option><option value="zhipu">智谱普通 API（按次计费）</option><option value="deepseek">DeepSeek 搜索</option><option value="yuanbao">元宝搜索</option>
         </select></label>
         {searchDraft.provider === 'chatgpt' && <label className={s.field}>ChatGPT 连接<select aria-label="搜索连接" className={s.input} value={searchDraft.providerId} disabled={save.isPending} onChange={e => setSearchDraft({ ...searchDraft, providerId: e.target.value })}><option value="">选择已登录连接</option>{providers.filter(p => p.kind === 'siwc').map(p => <option key={p.id} value={p.id}>{p.name || p.model}</option>)}</select><small className={s.hint}>使用该连接的模型和账户额度。</small></label>}
-        {searchDraft.provider === 'zhipu' && <label className={s.field}>API Key<input className={s.input} type="password" autoComplete="off" value={searchDraft.apiKey || ''} placeholder={searchDraft.hasKey ? '已保存，留空保留' : '填写智谱 API Key'} disabled={save.isPending} onChange={e => setSearchDraft({ ...searchDraft, apiKey: e.target.value })} /></label>}
-        <div className={style.actions}><Button variant="outline" size="sm" loading={save.isPending} onClick={() => save.mutate({ ...cfg, search: { ...searchDraft, enabled: true } }, { onSuccess: () => setSearchDraft(undefined), onError: () => setSearchDraft(undefined) })}>验证并开启</Button><Button variant="ghost" size="sm" disabled={save.isPending} onClick={() => setSearchDraft(undefined)}>取消</Button></div>
+        {['zhipu','deepseek','yuanbao'].includes(searchDraft.provider) && <label className={s.field}>API Key<input className={s.input} type="password" autoComplete="off" value={searchDraft.apiKey || ''} placeholder={searchDraft.hasKey ? '已保存，留空保留' : '填写对应服务 API Key'} disabled={save.isPending} onChange={e => setSearchDraft({ ...searchDraft, apiKey: e.target.value })} /></label>}
+        <div className={style.actions}><Button variant="outline" size="sm" loading={save.isPending} onClick={() => save.mutate({ ...cfg, search: { ...searchDraft, enabled: true } }, { onSuccess: () => setSearchDraft(undefined), onError: () => {} })}>验证并开启</Button><Button variant="ghost" size="sm" disabled={save.isPending} onClick={() => setSearchDraft(undefined)}>取消</Button></div>
       </div>}
     </section>
     <section className={`${s.card} ${style.card}`} aria-labelledby="memory-settings-title">

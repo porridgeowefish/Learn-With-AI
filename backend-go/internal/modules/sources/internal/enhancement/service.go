@@ -21,41 +21,35 @@ import (
 )
 
 type task struct {
-	slug, sourceID    string
-	st                *store.Store
-	job               store.StructureJob
-	providerID, model string
+	slug, sourceID string
+	st             *store.Store
+	job            store.StructureJob
 }
 
 var manager = struct {
 	sync.Mutex
 	once    sync.Once
-	queue   chan task
+	queue   *taskQueue
 	running map[string]context.CancelFunc
 	event   func(string, store.StructureJob)
-}{queue: make(chan task, 16), running: map[string]context.CancelFunc{}}
+}{queue: newTaskQueue(), running: map[string]context.CancelFunc{}}
 var operation = regexp.MustCompile(`^[A-Za-z0-9_-]{8,128}$`)
-var automaticQueue = make(chan task, 16)
+var automaticQueue = newTaskQueue()
 var automaticOnce sync.Once
 
 func NotifyAutomatic(slug string, st *store.Store, sourceID string) {
-	providerID, model := ocr.AutomaticPageSelection()
 	automaticOnce.Do(func() {
 		go func() {
-			for t := range automaticQueue {
+			for {
+				t := automaticQueue.next()
 				workspacegate.Worker(context.Background(), func() {
-					provider, err := ocr.ResolvePageProvider(t.providerID, t.model)
-					if err == nil {
-						automatic(t.slug, t.st, t.sourceID, provider)
-					}
+					Automatic(t.slug, t.st, t.sourceID)
 				})
+				automaticQueue.done(t)
 			}
 		}()
 	})
-	select {
-	case automaticQueue <- task{slug: slug, st: st, sourceID: sourceID, providerID: providerID, model: model}:
-	default:
-	}
+	automaticQueue.push(task{slug: slug, st: st, sourceID: sourceID})
 }
 func ConfigureEvents(event func(string, store.StructureJob)) {
 	manager.Lock()
@@ -120,9 +114,6 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		if j.Status == "queued" || j.Status == "running" {
 			return j, errors.New("structure-active")
 		}
-	}
-	if len(manager.queue) >= cap(manager.queue) {
-		return store.StructureJob{}, errors.New("structure-queue-full")
 	}
 	source, rev, path, e := st.OriginalPath(sourceID)
 	if e != nil {
@@ -218,24 +209,17 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		return j, e
 	}
 	manager.once.Do(func() { go loop() })
-	manager.queue <- task{slug: slug, sourceID: sourceID, st: st, job: j}
+	manager.queue.push(task{slug: slug, sourceID: sourceID, st: st, job: j})
 	return j, nil
 }
 func Automatic(slug string, st *store.Store, sourceID string) {
-	provider, e := ocr.ResolvePageProvider("", "")
-	if e != nil {
-		return
-	}
-	automatic(slug, st, sourceID, provider)
-}
-func automatic(slug string, st *store.Store, sourceID string, provider ocr.PageProvider) {
 	source, rev, e := st.Get(sourceID)
 	if e != nil || !strings.HasSuffix(strings.ToLower(rev.Original.Filename), ".pdf") {
 		return
 	}
 	// System OCR supplements missing text only. A complete text layer must
 	// not be replaced by less reliable recognition merely because it is free.
-	if ocr.IsLocal(provider) && source.Status == "ready" {
+	if source.Status == "ready" {
 		structure, err := st.ReadStructure(sourceID, rev.RevisionID, "")
 		if err != nil || len(structure.Coverage.UnreadUnits) == 0 {
 			return
@@ -243,7 +227,52 @@ func automatic(slug string, st *store.Store, sourceID string, provider ocr.PageP
 	}
 	ctx, c := context.WithTimeout(context.Background(), 45*time.Second)
 	defer c()
-	_, _ = Create(ctx, slug, sourceID, store.StructureRequest{AllPages: ocr.IsLocal(provider), OperationID: "automatic_" + rev.RevisionID, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: provider.ID, Model: provider.Model}, true)
+	providerID, model := ocr.AutomaticPageSelection()
+	req := store.StructureRequest{AllPages: true, OperationID: "automatic_local_" + rev.RevisionID, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: providerID, Model: model}
+	jobs, e := st.StructureJobs(sourceID)
+	if e != nil {
+		return
+	}
+	for _, j := range jobs {
+		// Terminal jobs are not permission to retry on every restart.
+		if j.RevisionID == rev.RevisionID && (store.IsLocalOCRProvider(j.ProviderID) && (j.Automatic || j.Status == "failed" || j.Status == "interrupted") || j.Status == "cancelled") {
+			return
+		}
+	}
+	job, e := Create(ctx, slug, sourceID, req, true)
+	if e == nil {
+		emit(slug, job)
+	}
+	if e != nil && e.Error() != "no-candidate-pages" && e.Error() != "structure-active" && e.Error() != "operation-conflict" && !errors.Is(e, store.ErrSourceDeleted) {
+		recordAutomaticFailure(slug, st, sourceID, rev, req, e)
+	}
+}
+
+func recordAutomaticFailure(slug string, st *store.Store, sourceID string, rev store.Revision, req store.StructureRequest, cause error) {
+	manager.Lock()
+	_, currentRevision, err := st.Get(sourceID)
+	if err != nil || currentRevision.RevisionID != rev.RevisionID || currentRevision.DerivedVersionID != rev.DerivedVersionID {
+		manager.Unlock()
+		return
+	}
+	jobs, err := st.StructureJobs(sourceID)
+	if err != nil {
+		manager.Unlock()
+		return
+	}
+	for _, j := range jobs {
+		if j.OperationID == req.OperationID || j.Status == "queued" || j.Status == "running" {
+			manager.Unlock()
+			return
+		}
+	}
+	now := time.Now().UTC()
+	j := store.StructureJob{ID: idgen.New("structure"), OperationID: req.OperationID, Status: "failed", ErrorCode: failureCode(cause), AllPages: true, Automatic: true, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: req.ProviderID, Model: req.Model, OriginalHash: rev.Original.SHA256, Intent: req, CreatedAt: now, UpdatedAt: now}
+	j, err = st.SaveStructureJob(sourceID, j)
+	manager.Unlock()
+	if err == nil {
+		emit(slug, j)
+	}
 }
 func Get(slug, sourceID, jobID string) (store.StructureJob, error) {
 	st, e := store.New(slug)
@@ -270,13 +299,26 @@ func Cancel(slug, sourceID, jobID string) (store.StructureJob, error) {
 	return j, e
 }
 func loop() {
-	for t := range manager.queue {
+	for {
+		t := manager.queue.next()
 		workspacegate.Worker(context.Background(), func() { run(t) })
+		manager.queue.done(t)
 	}
 }
 func run(t task) {
 	j, e := t.st.GetStructureJob(t.sourceID, t.job.ID)
 	if e != nil || j.Status != "queued" {
+		return
+	}
+	// Old releases could queue an automatic cloud batch. Upgrading or replaying
+	// that queue is not authorization for a new paid request.
+	if j.Automatic && !store.IsLocalOCRProvider(j.ProviderID) {
+		j.Status, j.ErrorCode = "interrupted", "automatic-local-required"
+		j, e = t.st.SaveStructureJob(t.sourceID, j)
+		if e == nil {
+			emit(t.slug, j)
+			NotifyAutomatic(t.slug, t.st, t.sourceID)
+		}
 		return
 	}
 	timeout := 600 * time.Second
@@ -330,7 +372,7 @@ func failureCode(err error) string {
 			"vision-request-failed", "vision-provider-error", "vision-no-text", "vision-invalid-response",
 			"vision-output-truncated", "vision-output-limit", "vision-request-limit", "automatic-budget-limit",
 			"windows-ocr-unavailable", "windows-ocr-invalid-output", "windows-ocr-no-text",
-			"local-ocr-unavailable", "local-ocr-no-text",
+			"local-ocr-unavailable", "local-ocr-no-text", "structure-unavailable",
 			"render-batch-limit", "render-input-limit", "render-image-limit", "renderer-unavailable", "resource-limit":
 			return err.Error()
 		}
@@ -676,17 +718,26 @@ func recoverJobs() {
 				continue
 			}
 			for _, j := range jobs {
+				manager.Lock()
+				if manager.running[j.ID] != nil {
+					manager.Unlock()
+					continue
+				}
 				if j.Status == "running" {
 					j, _ = st.RecoverStructureJob(src.SourceID, j.ID)
 				}
 				if j.Status == "queued" {
-					manager.Lock()
-					select {
-					case manager.queue <- task{slug: unit.Slug, sourceID: src.SourceID, st: st, job: j}:
-					default:
+					if j.Automatic && !store.IsLocalOCRProvider(j.ProviderID) {
+						j.Status, j.ErrorCode = "interrupted", "automatic-local-required"
+						_, _ = st.SaveStructureJob(src.SourceID, j)
+					} else {
+						manager.queue.push(task{slug: unit.Slug, sourceID: src.SourceID, st: st, job: j})
 					}
-					manager.Unlock()
 				}
+				manager.Unlock()
+			}
+			if src.Status == "ready" || src.FailureCode == "no_extractable_text" {
+				NotifyAutomatic(unit.Slug, st, src.SourceID)
 			}
 		}
 	}

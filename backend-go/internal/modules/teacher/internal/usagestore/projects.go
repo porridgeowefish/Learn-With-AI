@@ -13,6 +13,8 @@ type ProjectUsage struct {
 	OutputTokens     int    `json:"outputTokens"`
 	NoteInputTokens  int    `json:"noteInputTokens"`
 	NoteOutputTokens int    `json:"noteOutputTokens"`
+	CacheReadTokens  *int   `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens *int   `json:"cacheWriteTokens,omitempty"`
 }
 
 func ListProjects() ([]ProjectUsage, error) {
@@ -27,12 +29,16 @@ func ListProjects() ([]ProjectUsage, error) {
 			return nil, err
 		}
 		row := ProjectUsage{ProjectSlug: project.Slug, Title: project.Title}
+		hasUsage := false
 		for _, name := range []string{"usage.jsonl", "note-usage.jsonl"} {
 			records, err := read(filepath.Join(root, "conversation", name))
 			if err != nil {
 				return nil, err
 			}
+			hasUsage = hasUsage || len(records) > 0
 			for _, record := range records {
+				addOptionalTokens(&row.CacheReadTokens, record.CacheReadTokens)
+				addOptionalTokens(&row.CacheWriteTokens, record.CacheWriteTokens)
 				if name == "usage.jsonl" {
 					row.InputTokens += record.InputTokens
 					row.OutputTokens += record.OutputTokens
@@ -42,7 +48,7 @@ func ListProjects() ([]ProjectUsage, error) {
 				}
 			}
 		}
-		if row.InputTokens+row.OutputTokens+row.NoteInputTokens+row.NoteOutputTokens > 0 {
+		if hasUsage {
 			rows = append(rows, row)
 		}
 	}

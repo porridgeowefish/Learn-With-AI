@@ -9,7 +9,7 @@
 .body :where(table) { display:block; width:max-content; max-width:100%; overflow-x:auto; border-collapse:collapse; }
 .body :where(th,td) { padding:8px 12px; border:1px solid var(--border); }.body :where(th) { background:var(--surface-tint); }
 .body :where(pre) { overflow:auto; padding:14px; border:1px solid var(--border); border-radius:8px; background:var(--surface-sunken); line-height:1.65; }
-.body :where(code) { font-family:ui-monospace,Consolas,monospace; font-size:.9em; }.body :where(p code,li code) { padding:2px 5px; background:var(--ink-soft); border-radius:4px; }
+.body :where(code) { font-family: 'FangSong', '仿宋', 'STFangsong', serif; font-size:.9em; }.body :where(p code,li code) { padding:2px 5px; background:var(--ink-soft); border-radius:4px; }
 .body :global(.katex-display) { overflow-x:auto; overflow-y:hidden; padding:6px 0; }
 .body :global(.inline-svg), .body :global(.mermaid-placeholder), .body :global(.interactive-placeholder) { position:relative; min-width:0; margin:18px 0; width:100%; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--card); }
 .body :global(.diagram-stage) { display:block; overflow:auto; min-height:80px; padding:14px; touch-action:none; cursor:grab; }
@@ -28,3 +28,23 @@
 .body :global(.interactive-placeholder iframe) { display:block; width:100%; border:0; min-height:240px; background:#fff; }
 .body :global(.media-fullscreen iframe) { flex:1; height:100%!important; }
 @media (max-width:560px) { .body :global(.media-fullscreen) { inset:10px; } }
+.body :global(.learning-figure) {
+  margin: 1.25em 0;
+  padding: 1em;
+  border: 1px solid var(--border-subtle, #ddd);
+  border-radius: 12px;
+}
+.body :global(.learning-figure img) {
+  display: block;
+  max-width: 100%;
+  max-height: 440px;
+  width: auto;
+  height: auto;
+  margin: 0 auto 0.75em;
+  background: white;
+  object-fit: contain;
+}
+.body :global(.learning-figure img[hidden]),
+.body :global(.learning-figure-unavailable[hidden]) { display: none; }
+.body :global(.learning-figure figcaption) { font-size: .85em; color: var(--text-secondary, #666); line-height: 1.6; overflow-wrap: anywhere; }
+.body :global(.learning-figure-unavailable) { display: block; margin-top: .5em; }

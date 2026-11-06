@@ -1,3 +1,5 @@
+import { previewFigureAnswer, previewManufacturingAnswer } from '/__design/visuals.mjs';
+
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
 const reply =
@@ -11,6 +13,8 @@ const physicsReview =
   '# 机械能守恒\n\n## 系统与条件\n\n只有重力或弹簧弹力做功时，系统的动能与势能之和保持不变。\n\n## 一个例子\n\n忽略空气阻力，自由落体的重力势能转化成动能。';
 // Simulate the teacher's per-turn footer using the same wire format as production.
 function previewAnswer(physics, question = '') {
+  if (/芯片|智能制造|制造组图/.test(question)) return previewManufacturingAnswer;
+  if (question.includes('开放图示')) return previewFigureAnswer;
   if (!question) return physics
     ? '小球下落时高度降低、速度增大。忽略空气阻力，减少的重力势能主要转化成哪种能量？\n\n```suggested-replies\n["动能","内能","化学能","还不确定，先看讲解"]\n```'
     : '向量加法表示连续发生的位移。先向东走 3 步，再向西走 2 步，最后停在哪里？\n\n```suggested-replies\n["向东 1 步","向东 5 步","回到起点","还不确定，先看讲解"]\n```';
@@ -202,6 +206,7 @@ function initialize(project) {
       jobs: [],
     },
     systemPrompt: project.systemPrompt || '',
+    learningMode: project.learningMode || 'general',
   };
 }
 function stream(frames, delay = 0, interrupted = () => false) {
@@ -352,7 +357,13 @@ function conversation(ctx, s, parts, b) {
     if (b.content || learner.blocks.length > 1) s.messages.push(learner);
     if (op === 'regenerate' && s.messages.at(-1)?.role === 'teacher')
       s.messages.pop();
-    let answer = previewAnswer(s.physics, b.content || s.messages.findLast(m => m.role === 'learner')?.blocks[0]?.source);
+    const question = b.content || s.messages.findLast(m => m.role === 'learner')?.blocks[0]?.source || '';
+    let answer = previewAnswer(s.physics, question);
+    if (!question.includes('开放图示') && !/换.*(讲|方法)|直接|先讲/.test(question)) {
+      if (s.learningMode === 'history') answer = '进度：Part 1/3 · 本 part：来龙去脉\n\n这是历史脉络的设计演示。我们可以从背景、关键转折与影响梳理一条时间线，再选择你感兴趣的阶段展开。实际教学会依据项目主题与资料。';
+      if (s.learningMode === 'book') answer = '进度：Part 1/3 · 本 part：阅读地图\n\n这是书籍导读的设计演示。可以先从书的类型、成书背景与篇章结构建立阅读地图。目前没有核对具体版本和目录，不虚构章节。你可以上传目录，或直接选择想讨论的段落。';
+      if (s.learningMode === 'concept') answer = '进度：Part 1/3 · 本 part：理解概念\n\n这是概念探究的设计演示。我们可以从它解决的问题、一个例子和适用边界建立直觉，再和相近概念对照。也可以直接从你当前的疑惑开始。';
+    }
     const controls = ctx.state.settings?.learning;
     if (controls?.length === 'short' && !answer.includes('```')) answer = answer.split('。')[0] + '。';
     if (controls?.length === 'long' && !answer.includes('```')) answer += '\n\n我们可以再用坐标验证：先向东走 3 步，再向北走 4 步，得到位移 (3, 4)。横纵坐标分别记录两个方向的变化。';
@@ -399,18 +410,44 @@ function conversation(ctx, s, parts, b) {
     );
   }
 }
+function startSourceOCR(row, providerId = 'windows-local-ocr', automatic = true) {
+  const pages = Array.from({ length: 12 }, (_, i) => i + 1);
+  const job = { id: id(), revisionId: row.revision.revisionId, status: 'running', providerId, model: providerId.endsWith('-local-ocr') ? 'windows-zh-Hans' : '示例文档模型', allPages: true, automatic, pages, completedPages: [], previewStartedAt: Date.now() };
+  row.jobs.unshift(job);
+  row.source.status = 'processing';
+  row.source.coverage = { complete: false, extractedPages: 0, totalPages: 12, unreadPages: 12 };
+  return job;
+}
+function advanceSourceOCR(row) {
+  const job = row.jobs.find(item => item.status === 'running');
+  if (!job?.previewStartedAt) return;
+  const processed = Math.min(job.pages.length, Math.floor((Date.now() - job.previewStartedAt) / 700));
+  job.completedPages = job.pages.slice(0, processed);
+  if (processed >= 8) {
+    row.source.status = 'ready';
+    row.parsedText = '# 设计预览\n\n这是自动整份识别的示例文字，用于预览进度与操作。';
+    row.source.coverage = { complete: false, extractedPages: processed - 1, totalPages: 12, unreadPages: 13 - processed };
+  }
+  if (processed === job.pages.length) {
+    job.status = 'succeeded';
+    job.emptyPages = [5];
+  }
+}
 async function sources(ctx, s, parts, b) {
   const { method, json } = ctx;
   const [key, action] = parts;
   if (!key) {
-    if (method === 'GET')
+    if (method === 'GET') {
+      s.sources.forEach(advanceSourceOCR);
       return json({ sources: s.sources.map((x) => x.source) });
+    }
     const text =
       /\.(md|txt|csv|markdown)$/i.test(b.file.name) ||
       b.file.type.startsWith('text/')
         ? await b.file.text()
         : '';
     const row = source(b.displayName || b.file.name, b.file, text);
+    if (/\.pdf$/i.test(row.source.displayName)) startSourceOCR(row);
     s.sources.push(row);
     return json({
       source: row.source,
@@ -422,15 +459,17 @@ async function sources(ctx, s, parts, b) {
   const row = s.sources.find((x) => x.source.sourceId === key);
   if (!row) return json({ error: '资料不存在' }, 404);
   if (action === 'structure-jobs') {
-    if (method === 'GET')
-      return json({ jobs: row.jobs, localOCRAvailable: true });
-    const job = {
-      ...b,
-      id: id(),
-      revisionId: row.revision.revisionId,
-      status: 'succeeded',
-    };
-    row.jobs.unshift(job);
+    advanceSourceOCR(row);
+    if (method === 'GET') return json({ jobs: row.jobs, localOCRAvailable: true, configuredOCRAvailable: true, localOCR: { platform: 'windows', providerId: 'windows-local-ocr', name: 'Windows 系统 OCR', available: true } });
+    if (parts[3] === 'cancel') {
+      const job = row.jobs.find(item => item.id === parts[2]);
+      if (!job) return json({ error: '任务不存在' }, 404);
+      job.status = 'cancelled';
+      row.source.status = row.parsedText ? 'ready' : 'failed';
+      if (!row.parsedText) row.source.failureCode = 'no_extractable_text';
+      return json({ job });
+    }
+    const job = startSourceOCR(row, b.providerId || 'preview-vision', false);
     return json({ job });
   }
   if (action === 'revisions' && parts[2] === row.revision.revisionId) {

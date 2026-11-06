@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>一起学一会儿 · 教师动画</title>
+    <style>
+      :root {
+        font-family: FangSong, 仿宋, STFangsong, serif;
+        color: #574637;
+        background: #faf7f0;
+        font-synthesis: none;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 52px 24px 40px; }
+      main { max-width: 960px; margin: 0 auto; }
+      header { margin-bottom: 30px; }
+      .eyebrow { margin: 0 0 12px; color: #8b7867; font-size: 15px; letter-spacing: .12em; }
+      h1 { margin: 0; font-size: clamp(28px, 5vw, 38px); font-weight: 600; }
+      .intro { margin: 14px 0 0; font-size: 17px; line-height: 1.8; color: #7c6c5e; }
+      .characters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+      .character { background: #fffdf9; border: 1px solid #e9e1d5; border-radius: 24px; overflow: hidden; }
+      .stage { min-height: 340px; display: grid; place-items: center; padding: 20px 16px 0; }
+      .stage img { display: block; width: 100%; max-width: 320px; aspect-ratio: 1; object-fit: contain; }
+      .caption { padding: 18px 24px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      h2 { margin: 0 0 5px; font-size: 24px; font-weight: 600; }
+      .status { margin: 0; min-height: 22px; color: #8b7867; font-size: 15px; line-height: 1.5; }
+      button { flex: none; font: inherit; font-size: 17px; color: #574637; border: 1px solid #dfd3c1; border-radius: 999px; padding: 10px 17px; background: #f6efdf; cursor: pointer; }
+      button:hover { background: #efe5cf; }
+      button:focus-visible { outline: 3px solid #8eafd2; outline-offset: 4px; }
+      .sequence { margin: 28px 0 0; padding: 22px 24px; border-top: 1px solid #e7ddcd; }
+      .sequence h2 { font-size: 19px; margin-bottom: 16px; }
+      ol { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0; padding: 0; list-style: none; }
+      li { font-size: 17px; }
+      li span { display: block; margin-top: 4px; color: #8b7867; font-size: 14px; }
+      .note { color: #8b7867; font-size: 15px; line-height: 1.7; margin: 20px 0 0; }
+      @media (max-width: 620px) {
+        body { padding: 32px 16px; }
+        .characters { grid-template-columns: 1fr; gap: 20px; }
+        .stage { min-height: 0; padding: 16px 12px 0; }
+        .caption { padding: 16px 20px 22px; }
+        .sequence { padding: 22px 4px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">教师伙伴 · 学习小动作</p>
+        <h1>一起学一会儿</h1>
+        <p class="intro">想一想，写下来，再看看。每段动作之间留一会儿安静，最后自然停住。</p>
+      </header>
+      <section class="characters" aria-label="两位教师伙伴">
+        <article class="character" data-character="penguin">
+          <div class="stage"><img src="penguin-study-v2.png" alt="小企鹅思考后横向写下笔记，抬头看一看，最后停止" width="320" height="320" /></div>
+          <div class="caption">
+            <div><h2>小企鹅</h2><p class="status" aria-live="polite">静态预览</p></div>
+            <button type="button" aria-label="重新播放小企鹅学习动画">再看一次</button>
+          </div>
+        </article>
+        <article class="character" data-character="ghost">
+          <div class="stage"><img src="ghost-study-v2.png" alt="小幽灵思考后横向写下笔记，抬头看一看，最后停止" width="320" height="320" /></div>
+          <div class="caption">
+            <div><h2>小幽灵</h2><p class="status" aria-live="polite">静态预览</p></div>
+            <button type="button" aria-label="重新播放小幽灵学习动画">再看一次</button>
+          </div>
+        </article>
+      </section>
+      <section class="sequence" aria-labelledby="sequence-title">
+        <h2 id="sequence-title">一段完整的学习过程</h2>
+        <ol>
+          <li>思考<span>0—2 秒</span></li>
+          <li>停一停<span>2—3 秒</span></li>
+          <li>横向写字<span>3—6 秒</span></li>
+          <li>停一停<span>6—7 秒</span></li>
+          <li>看笔记<span>7—9 秒</span></li>
+          <li>最后停止<span>保留结束姿势</span></li>
+        </ol>
+        <p class="note">动画只播放一次。想再看时，点击对应角色的“再看一次”。如果系统启用了减少动态效果，页面先显示静态图。</p>
+      </section>
+    </main>
+    <script>
+      const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const players = [...document.querySelectorAll('[data-character]')].map((card) => {
+        const name = card.dataset.character;
+        const picture = card.querySelector('img');
+        const button = card.querySelector('button');
+        const status = card.querySelector('.status');
+        let timeout;
+        let revision = 0;
+        function showStill() {
+          window.clearTimeout(timeout);
+          picture.onload = null;
+          picture.onerror = null;
+          picture.src = `${name}-study-v2.png`;
+          button.textContent = '播放动画';
+          status.textContent = '静态预览';
+        }
+        function play() {
+          window.clearTimeout(timeout);
+          status.textContent = '正在加载';
+          button.textContent = '再看一次';
+          picture.onload = () => {
+            status.textContent = '学习中 · 9 秒';
+            timeout = window.setTimeout(() => {
+              picture.onload = null;
+              picture.src = `${name}-study-v2.png`;
+              status.textContent = '已停止 · 再看一次吧';
+            }, 9000);
+          };
+          picture.onerror = () => { status.textContent = '动画未能加载，请重试'; };
+          picture.src = `${name}-study-v2.gif?replay=${Date.now()}-${++revision}`;
+        }
+        button.addEventListener('click', play);
+        if (motionPreference.matches) showStill();
+        else play();
+        return { showStill };
+      });
+      motionPreference.addEventListener('change', (event) => {
+        if (event.matches) players.forEach((player) => player.showStill());
+      });
+    </script>
+  </body>
+</html>

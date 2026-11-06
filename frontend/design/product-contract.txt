@@ -4,6 +4,8 @@ api /api/folders
 api /api/health
 api /api/learning-memories
 api /api/learning-memories/{}
+api /api/learning/visuals/image?{}
+api /api/learning/visuals/metadata?{}
 api /api/model-connections/models
 api /api/preferences
 api /api/project-type-advice

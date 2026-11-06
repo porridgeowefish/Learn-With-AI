@@ -59,7 +59,7 @@
 }
 
 .slug {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 0.7rem;
   color: var(--muted);
 }

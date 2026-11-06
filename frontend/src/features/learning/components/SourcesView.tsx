@@ -19,7 +19,7 @@ export function SourcesView({ slug }: { slug: string }) {
   return (
     <section className={s.sources}>
       <header>
-        <div><span>附件库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>免费识别使用本机 OCR，无需 API Key；一次启动后在后台处理整份资料，离开此页也会继续。可以查看进度或取消，本地识别重启后恢复。模型识别整份资料会逐页调用已配置的文档模型，按服务商计费。已提取正文可直接用于学习，公式和化学结构仍需对照原件核对。旧版 DOC 请另存为 DOCX 后导入。</p></div>
+        <div><span>附件库</span><h2>当前文件</h2><p>上传后自动解析整份资料：先提取原有文字，再用本机 OCR 逐页补齐扫描页，无需手动分批。教师按问题读取所需段落，不会因上传整本书就把全文发送给模型。</p><p>离开此页也会继续，可以查看进度或取消；本地识别重启后恢复。模型识别需由你启动，逐页调用已配置的文档模型并按服务商计费。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。公式和化学结构仍需对照原件核对；旧版 DOC 请另存为 DOCX。</p></div>
         <SourceImportControl slug={slug} />
       </header>
       {sources.isError && <div className={s.error} role="alert">资料列表读取失败。<button type="button" onClick={() => void sources.refetch()}>重试</button></div>}
@@ -55,11 +55,11 @@ function statusLabel(source: LearningSource) {
     invalid_document: '文件格式无效或已损坏，请检查后重新导入。',
     encrypted_document: '文件已加密，请解密后重新导入。',
     resource_limit: '文件内容超出解析资源限制，请拆分后重新导入。',
-    no_extractable_text: '没有可直接提取的文字，请使用“识别扫描页”；重新解析不会识别图片中的文字。',
+    no_extractable_text: '没有可直接提取的文字，扫描页交由后台识别。',
     parse_cancelled: '解析被中断，可以重试。',
     parse_failed: '解析未完成，可以重试。',
   };
-  if (source.status === 'failed' && source.failureCode === 'no_extractable_text') return '扫描资料：没有可直接提取的文字，请识别扫描页。';
+  if (source.status === 'failed' && source.failureCode === 'no_extractable_text') return '扫描资料：没有可直接提取的文字，识别进度见下方。';
   if (source.status === 'failed') return `解析失败：${failures[source.failureCode ?? ''] ?? '请检查文件是否损坏、加密或没有可提取文字，再重新导入。'}`;
   if (source.status === 'ready' && source.coverage?.totalPages) {
     const coverage = source.coverage;
@@ -72,5 +72,5 @@ function statusLabel(source: LearningSource) {
 }
 
 function canRetry(source: LearningSource) {
-  return !source.originalUnavailable && (source.status === 'failed' || source.status === 'opaque') && /\.(pdf|md|markdown|txt|pptx|docx|xlsx|csv)$/i.test(source.displayName);
+  return !source.originalUnavailable && source.failureCode !== 'no_extractable_text' && (source.status === 'failed' || source.status === 'opaque') && /\.(pdf|md|markdown|txt|pptx|docx|xlsx|csv)$/i.test(source.displayName);
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 	learningscope "github.com/xmz14/lll/backend-go/internal/modules/projects/internal/learningscope"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
@@ -171,6 +172,9 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	if len(in.SystemPrompt) > 32*1024 {
 		return errors.New("conversation instructions exceed 32768 UTF-8 bytes")
 	}
+	if !learningprofile.ValidLearningMode(in.LearningMode) {
+		return errors.New("invalid learning mode")
+	}
 
 	// Folder tree. Discipline maps deliberately do not own learning zones.
 	dirs := []string{"", "assets"}
@@ -204,6 +208,10 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 
 	if projectType == ProjectTypeSystemLearning {
 		if err := filesystem.AtomicWriteFile(filepath.Join(root, "conversation", "system-prompt.txt"), []byte(in.SystemPrompt), 0o644); err != nil {
+			return err
+		}
+		modeData, _ := json.Marshal(learningprofile.NewLearningGuideline(in.LearningMode))
+		if err := filesystem.AtomicWriteFile(filepath.Join(root, "conversation", "learning-mode.json"), modeData, 0o644); err != nil {
 			return err
 		}
 		var scope any = learningscope.NewDraft(title, parsed)
@@ -339,6 +347,7 @@ func IsSlugConflict(err error) bool {
 // ProjectInput captures creation-time context. Legacy questionnaire fields are ignored.
 type ProjectInput struct {
 	SystemPrompt  string // learner-owned conversation instructions
+	LearningMode  string
 	ProjectType   ProjectType
 	Why           string // motivation: why this topic matters
 	Current       string // current ability self-assessment

@@ -133,10 +133,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 					} `json:"tool_calls"`
 				} `json:"delta"`
 			} `json:"choices"`
-			Usage *struct {
-				PromptTokens     int `json:"prompt_tokens"`
-				CompletionTokens int `json:"completion_tokens"`
-			} `json:"usage"`
+			Usage *openAIUsage `json:"usage"`
 		}
 		if err := json.Unmarshal(payload, &chunk); err != nil {
 			return nil
@@ -172,7 +169,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 			}
 		}
 		if chunk.Usage != nil {
-			emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": chunk.Usage.PromptTokens, "outputTokens": chunk.Usage.CompletionTokens}})
+			emit(Event{Type: "usage", Usage: chunk.Usage.metrics()})
 		}
 		return nil
 	}, func() {
@@ -322,6 +319,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 	var toolBuffers toolBufferSet
 	blockTypes := map[int]string{}
 	thinkingBlocks := map[int]map[string]any{}
+	var reported anthropicUsage
 	// shape records the block/delta type fingerprint of this provider stream.
 	// GLM's anthropic-compat endpoint intermittently mislabels thinking or
 	// body deltas (the 2026-09-12 mixed reasoning incidents); this log pins
@@ -349,15 +347,9 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				Signature   string `json:"signature"`
 			} `json:"delta"`
 			Message struct {
-				Usage *struct {
-					InputTokens  int `json:"input_tokens"`
-					OutputTokens int `json:"output_tokens"`
-				} `json:"usage"`
+				Usage *anthropicUsage `json:"usage"`
 			} `json:"message"`
-			Usage *struct {
-				InputTokens  int `json:"input_tokens"`
-				OutputTokens int `json:"output_tokens"`
-			} `json:"usage"`
+			Usage *anthropicUsage `json:"usage"`
 		}
 		if json.Unmarshal(payload, &event) != nil {
 			return nil
@@ -369,7 +361,8 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			// message_start carries usage nested inside its message envelope;
 			// input token counts only exist there.
 			if event.Message.Usage != nil {
-				emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": event.Message.Usage.InputTokens}})
+				reported.merge(event.Message.Usage)
+				emit(Event{Type: "usage", Usage: reported.metrics()})
 			}
 		case "content_block_start":
 			blockTypes[event.Index] = event.ContentBlock.Type
@@ -447,7 +440,8 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				emit(Event{Type: "output-limit"})
 			}
 			if event.Usage != nil {
-				emit(Event{Type: "usage", Usage: map[string]int{"outputTokens": event.Usage.OutputTokens}})
+				reported.merge(event.Usage)
+				emit(Event{Type: "usage", Usage: reported.metrics()})
 			}
 		case "message_stop":
 			emit(Event{Type: "response-completed"})

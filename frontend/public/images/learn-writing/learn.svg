@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="110" viewBox="0 0 280 110">
+  <defs>
+    <path id="script" pathLength="1" d="M 18,76 C 29,77 43,63 49,44 C 56,21 48,15 41,25 C 32,39 37,69 49,72 C 58,75 70,65 74,55 C 78,43 65,45 62,55 C 57,73 74,78 89,61 C 96,51 105,48 111,52 C 116,58 106,72 98,71 C 85,69 91,51 109,51 C 113,50 114,50 115,48 C 109,62 108,73 117,71 C 125,68 131,59 135,50 C 132,59 129,68 129,71 C 133,63 141,48 148,50 C 154,52 147,59 144,57 C 144,65 149,71 154,69 C 162,64 166,55 168,49 C 164,59 161,68 162,71 C 169,55 177,47 184,51 C 192,56 178,70 186,73 C 195,76 206,65 214,58 C 224,49 235,50 237,55 C 241,67 215,82 182,86 C 151,90 119,86 107,82" />
+    <linearGradient id="metal" x1="0" x2="1">
+      <stop stop-color="#9e6a30"/><stop offset=".22" stop-color="#d6aa62"/><stop offset=".48" stop-color="#fff0c4"/><stop offset=".7" stop-color="#d9af68"/><stop offset="1" stop-color="#98622d"/>
+    </linearGradient>
+    <linearGradient id="enamel" x1="0" x2="1">
+      <stop stop-color="#142831"/><stop offset=".28" stop-color="#385561"/><stop offset=".52" stop-color="#1a3541"/><stop offset="1" stop-color="#101e28"/>
+    </linearGradient>
+    <linearGradient id="gem" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#b9e7d0"/><stop offset=".35" stop-color="#54a88e"/><stop offset="1" stop-color="#15524c"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.89;.97;1" dur="5s" repeatCount="indefinite" />
+    <use href="#script" fill="none" stroke="#735547" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1">
+      <animate attributeName="stroke-dashoffset" values="1;0;0" keyTimes="0;.72;1" dur="5s" repeatCount="indefinite" />
+    </use>
+  </g>
+  <g>
+    <animateMotion dur="5s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.72;1" calcMode="linear"><mpath href="#script" /></animateMotion>
+    <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;.04;.72;.8;1" dur="5s" repeatCount="indefinite" />
+    <g transform="rotate(60)">
+      <path d="M 0,0 C -1.1,-2.8 -4.1,-5.3 -3.9,-10.7 L 3.9,-10.7 C 4.1,-5.3 1.1,-2.8 0,0 Z" fill="url(#metal)" stroke="#805628" stroke-width=".55" />
+      <path d="M 0,-.6 V -7.5 M -2.8,-8.9 Q -2.4,-5.7 -.8,-4.5 M 2.8,-8.9 Q 2.4,-5.7 .8,-4.5" fill="none" stroke="#95672f" stroke-width=".45" stroke-linecap="round" />
+      <circle cy="-7.5" r=".65" fill="#30434a" />
+      <rect x="-4.25" y="-28.6" width="8.5" height="18.5" rx="2.5" fill="url(#enamel)" stroke="#a47a40" stroke-width=".45" />
+      <path d="M -2.65,-25.7 V -13.3" stroke="#b2c8c6" stroke-width=".65" opacity=".65" stroke-linecap="round" />
+      <path d="M -.6,-25.8 C 2.7,-25.1 2.3,-22.4 .1,-22 C -2,-21.5 -1.7,-19.3 .5,-18.8 C 2.7,-18.3 2.1,-15.8 -.3,-15.1 M .4,-25.7 C -1.7,-24.9 -1.5,-23.2 .1,-22.7 M -.1,-21.6 C 2.4,-20.6 2,-19.9 .6,-19.6 M .3,-18.3 C -1.5,-17.5 -1.3,-16.2 -.3,-15.7" fill="none" stroke="#e3bd7b" stroke-width=".5" stroke-linecap="round" />
+      <path d="M -4.15,-12.5 H 4.15 M -4,-10.6 H 4 M -4,-27.5 H 4" stroke="url(#metal)" stroke-width="1.4" />
+      <path d="M -3.7,-29 Q 0,-31.9 3.7,-29 L 3.8,-27.8 H -3.8 Z" fill="url(#metal)" stroke="#a47a40" stroke-width=".35" />
+      <path d="M -1.55,-30.2 L 0,-32.1 L 1.55,-30.2 L 0,-28.8 Z" fill="url(#gem)" stroke="#e5bf78" stroke-width=".4" />
+      <path d="M -.55,-30.1 L 0,-31.1 L .55,-30.1" fill="none" stroke="#e8fff3" stroke-width=".35" />
+      <path d="M 3.4,-27.2 C 5.1,-25.6 4.9,-21.7 4.35,-19.3" fill="none" stroke="url(#metal)" stroke-width=".85" stroke-linecap="round" />
+    </g>
+  </g>
+</svg>

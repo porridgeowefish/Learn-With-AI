@@ -16,7 +16,7 @@ html {
 }
 
 body {
-  font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   background: var(--bg);
   color: var(--fg);
   min-height: 100vh;
@@ -61,13 +61,13 @@ a:hover {
 
 button {
   cursor: pointer;
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
 }
 
 input,
 select,
 textarea {
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: inherit;
   color: var(--fg);
 }

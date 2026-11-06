@@ -62,6 +62,8 @@ func New(deps Dependencies) *Server {
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/learning/visuals/image", s.handleLearningVisual)
+	mux.HandleFunc("GET /api/learning/visuals/metadata", s.handleLearningVisualMetadata)
 	mux.HandleFunc("GET /api/settings/learning", s.learningProfile)
 	mux.HandleFunc("PUT /api/settings/learning", s.learningProfile)
 	mux.HandleFunc("GET /api/learning-memories", s.learningMemories)

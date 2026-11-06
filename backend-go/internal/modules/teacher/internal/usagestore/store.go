@@ -16,24 +16,30 @@ import (
 )
 
 type Record struct {
-	ConversationID string    `json:"conversationId"`
-	UnitID         string    `json:"unitId"`
-	ResponseID     string    `json:"responseId"`
-	ProviderID     string    `json:"providerId,omitempty"`
-	InputTokens    int       `json:"inputTokens"`
-	OutputTokens   int       `json:"outputTokens"`
-	OccurredAt     time.Time `json:"occurredAt"`
+	ConversationID   string    `json:"conversationId"`
+	UnitID           string    `json:"unitId"`
+	ResponseID       string    `json:"responseId"`
+	ProviderID       string    `json:"providerId,omitempty"`
+	InputTokens      int       `json:"inputTokens"`
+	OutputTokens     int       `json:"outputTokens"`
+	UsageReported    bool      `json:"usageReported,omitempty"`
+	CacheReadTokens  *int      `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens *int      `json:"cacheWriteTokens,omitempty"`
+	CacheMissTokens  *int      `json:"cacheMissTokens,omitempty"`
+	OccurredAt       time.Time `json:"occurredAt"`
 }
 
 type Conversation struct {
-	ProjectSlug    string    `json:"projectSlug"`
-	Title          string    `json:"title"`
-	ConversationID string    `json:"conversationId"`
-	UnitID         string    `json:"unitId"`
-	InputTokens    int       `json:"inputTokens"`
-	OutputTokens   int       `json:"outputTokens"`
-	Turns          []Record  `json:"turns"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	ProjectSlug      string    `json:"projectSlug"`
+	Title            string    `json:"title"`
+	ConversationID   string    `json:"conversationId"`
+	UnitID           string    `json:"unitId"`
+	InputTokens      int       `json:"inputTokens"`
+	OutputTokens     int       `json:"outputTokens"`
+	CacheReadTokens  *int      `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens *int      `json:"cacheWriteTokens,omitempty"`
+	Turns            []Record  `json:"turns"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 var lock sync.Mutex
@@ -43,7 +49,7 @@ func AppendNote(slug string, record Record) error {
 	return appendLedger(slug, record, "note-usage.jsonl")
 }
 func appendLedger(slug string, record Record, filename string) error {
-	if record.ResponseID == "" || record.ConversationID == "" || record.UnitID == "" || (record.InputTokens == 0 && record.OutputTokens == 0) {
+	if record.ResponseID == "" || record.ConversationID == "" || record.UnitID == "" || (!record.UsageReported && record.InputTokens == 0 && record.OutputTokens == 0 && record.CacheReadTokens == nil && record.CacheWriteTokens == nil) {
 		return nil
 	}
 	if record.OccurredAt.IsZero() {
@@ -104,6 +110,8 @@ func ListAll() ([]Conversation, error) {
 			}
 			row.InputTokens += record.InputTokens
 			row.OutputTokens += record.OutputTokens
+			addOptionalTokens(&row.CacheReadTokens, record.CacheReadTokens)
+			addOptionalTokens(&row.CacheWriteTokens, record.CacheWriteTokens)
 			row.Turns = append(row.Turns, record)
 			if record.OccurredAt.After(row.UpdatedAt) {
 				row.UpdatedAt = record.OccurredAt
@@ -115,6 +123,25 @@ func ListAll() ([]Conversation, error) {
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].UpdatedAt.After(rows[j].UpdatedAt) })
 	return rows, nil
+}
+
+// OptionalTokens never substitutes zero for an unreported provider metric.
+func OptionalTokens(metrics map[string]int, name string) *int {
+	value, known := metrics[name]
+	if !known || value < 0 {
+		return nil
+	}
+	return &value
+}
+
+func addOptionalTokens(total **int, value *int) {
+	if value == nil || *value < 0 {
+		return
+	}
+	if *total == nil {
+		*total = new(int)
+	}
+	**total += *value
 }
 
 func read(path string) ([]Record, error) {

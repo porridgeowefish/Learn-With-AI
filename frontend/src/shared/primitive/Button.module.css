@@ -8,7 +8,7 @@
   font-size: 0.82rem;
   cursor: pointer;
   transition: all 0.15s ease;
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   white-space: nowrap;
   user-select: none;
 }

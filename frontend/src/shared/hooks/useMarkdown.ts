@@ -23,6 +23,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { extractLatex } from '@/shared/lib/latexMarkup';
 import { extractMathHTML } from '@/shared/lib/mathMarkup';
+import { renderLearningFigure } from '@/shared/lib/learningVisual';
 
 export interface MermaidBlock {
   id: string;
@@ -206,7 +207,10 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
   };
   const withoutFencedGUI = input.replace(/```[ \t]*html-interactive[ \t]*\r?\n([\s\S]*?)```/gi, (_, code: string) => register(code))
     .replace(/```[ \t]*html-interactive[ \t]*\r?\n[\s\S]*$/i, '<div class="mermaid-placeholder">交互图示正在生成…</div>');
-  const withoutGUI = extractMathHTML(withoutFencedGUI, register);
+  let figureCount = 0;
+  const figures = withoutFencedGUI.replace(/```[ \t]*learning-visual[ \t]*\r?\n([\s\S]*?)```/gi, (_, source: string) => ++figureCount <= 8 ? renderLearningFigure(source) : '<p>本条回答的图示已达到显示上限。</p>')
+    .replace(/```[ \t]*learning-visual[ \t]*\r?\n[\s\S]*$/i, '<p>正在查找教学图示…</p>');
+  const withoutGUI = extractMathHTML(figures, register);
 
   // Step 1: extract math BEFORE marked touches anything.
   const { stripped, placeholders } = extractLatex(withoutGUI);

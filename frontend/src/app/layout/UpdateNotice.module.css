@@ -1,4 +1,4 @@
-.root { display: flex; flex-direction: column; gap: 6px; font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; }
+.root { display: flex; flex-direction: column; gap: 6px; font-family: 'FangSong', '仿宋', 'STFangsong', serif; }
 .card {
   display: flex; flex-direction: column; gap: 6px;
   padding: 10px 12px; border-radius: 10px;
@@ -16,4 +16,4 @@
 }
 .actions .primary:hover { background: var(--accent-ink); }
 .error { color: var(--pink); }
-.version { color: var(--muted); font-size: 0.86667rem; font-family: 'JetBrains Mono', monospace; }
+.version { color: var(--muted); font-size: 0.86667rem; font-family: 'FangSong', '仿宋', 'STFangsong', serif; }

@@ -15,7 +15,7 @@ const textMessage = record({id:string,role:string,content:string,status:string,c
 const block = record({id:string,type:string,source:optional(string),name:optional(string),artifactRef:optional(string)});
 const project = record({
   id:slug,slug,title:string,projectType:v=>['discipline-map','system-learning'].includes(v),
-  status:string,overviewAvailable:bool,createdAt:date,updatedAt:date,systemPrompt:optional(string),
+  status:string,overviewAvailable:bool,createdAt:date,updatedAt:date,systemPrompt:optional(string),learningMode:optional(v=>['general','history','book','concept'].includes(v)),
   scopeSource:optional(record({mapSlug:slug,topicId:string})),
 });
 const folder = record({id:slug,name:string,slugOrder:list(slug),mapProjectSlug:optional(slug)});
@@ -32,7 +32,7 @@ const source = record({
   parsedText:optional(string),jobs:list(record({id:string,status:string})),
 });
 const learning = record({
-  assets:record({review:asset,practice:asset}), mapVersion:string,systemPrompt:string,
+  assets:record({review:asset,practice:asset}), mapVersion:string,systemPrompt:string,learningMode:optional(v=>['general','history','book','concept'].includes(v)),
   topics:list(record({id:string,title:string,chapterTitle:string,goal:string,inScope:strings,outOfScope:strings,
     prerequisites:strings,ownedConcepts:strings,reusedConcepts:strings})),
   plan:record({items:list(record({id:string,topicTitle:string,status:string,addedAt:date})),updatedAt:date}),

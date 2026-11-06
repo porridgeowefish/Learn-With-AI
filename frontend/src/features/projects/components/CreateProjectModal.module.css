@@ -74,6 +74,7 @@
 }
 
 .field input[type='text'],
+.field select,
 .field textarea {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -83,11 +84,12 @@
   resize: vertical;
   outline: none;
   transition: border-color 0.15s;
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   color: var(--fg);
 }
 
 .field input[type='text']:focus,
+.field select:focus,
 .field textarea:focus {
   border-color: var(--accent);
 }

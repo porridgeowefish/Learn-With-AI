@@ -5,7 +5,7 @@
 .header p { max-width: 660px; color: var(--muted); font-size: 0.86667rem; line-height: 1.7; }
 .editorShell { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: 0 12px 36px rgb(var(--shadow-color) / .07); }
 .fileBar { height: 42px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--surface-sunken); }
-.fileBar strong, .fileBar small { font-family: 'Cascadia Code', Consolas, monospace; }
+.fileBar strong, .fileBar small { font-family: 'FangSong', '仿宋', 'STFangsong', serif; }
 .fileBar strong { font-size: 0.73333rem; }
 .fileBar small { color: var(--muted); font-size: 0.6rem; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }

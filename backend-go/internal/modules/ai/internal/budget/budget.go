@@ -143,10 +143,22 @@ func generationBudget(p aiconfig.Provider) Budget {
 	return b
 }
 func (b Budget) TrimInitial(req *gateway.Request) error {
-	// Only complete historical messages are removed, before any tool exchange.
-	// The latest learner turn is mandatory and is never sliced or discarded.
-	for b.Available(*req) < 1024 && len(req.Messages) > 1 {
-		req.Messages = req.Messages[1:]
+	// A large model window is not a reason to resend an unbounded transcript.
+	// This local target does not start a paid summarization request. Keep the
+	// newest learner turn intact even when it alone exceeds the economy target.
+	const historyInputTarget = 24000
+	for b.Available(*req) < 1024 || b.Input(*req) > historyInputTarget {
+		nextTurn := -1
+		for i := 1; i < len(req.Messages); i++ {
+			if req.Messages[i].Role == "user" && req.Messages[i].ToolCallID == "" {
+				nextTurn = i
+				break
+			}
+		}
+		if nextTurn < 0 {
+			break
+		}
+		req.Messages = req.Messages[nextTurn:]
 	}
 	return b.Check(*req)
 }

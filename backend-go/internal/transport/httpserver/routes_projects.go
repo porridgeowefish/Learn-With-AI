@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"github.com/xmz14/lll/backend-go/internal/app/projectservice"
+	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 
@@ -52,6 +53,7 @@ var validEditableFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 // Discipline-map creation ignores them at the workspace boundary.
 type createProjectRequest struct {
 	SystemPrompt string                      `json:"systemPrompt,omitempty"`
+	LearningMode string                      `json:"learningMode,omitempty"`
 	Title        string                      `json:"title"`
 	Slug         string                      `json:"slug,omitempty"`
 	ProjectType  projects.ProjectType        `json:"projectType,omitempty"`
@@ -94,6 +96,10 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "conversation instructions exceed 32768 UTF-8 bytes")
 		return
 	}
+	if !learningprofile.ValidLearningMode(req.LearningMode) {
+		httpx.Error(w, http.StatusBadRequest, "invalid learning mode")
+		return
+	}
 	slug := strings.TrimSpace(req.Slug)
 	if slug == "" {
 		slug = projects.Slugify(title)
@@ -122,6 +128,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 	state, err := s.projectOperations().Create(slug, title, projects.ProjectInput{
 		SystemPrompt:  req.SystemPrompt,
+		LearningMode:  req.LearningMode,
 		ProjectType:   projectType,
 		Why:           req.Why,
 		Current:       req.Current,

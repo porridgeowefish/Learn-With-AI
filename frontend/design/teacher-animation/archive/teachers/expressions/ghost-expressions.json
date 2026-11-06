@@ -1,0 +1,12 @@
+{
+  "thinking": {
+    "duration_ms": 2000,
+    "encoded_frames": 42,
+    "loop": false
+  },
+  "expressions": {
+    "duration_ms": 8000,
+    "encoded_frames": 45,
+    "loop": false
+  }
+}

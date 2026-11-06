@@ -1,3 +1,4 @@
+import { LearnWriting } from '@/shared/primitive/LearnWriting';
 import { useLearningProfile } from '@/features/settings';
 import { memo, useId, useState } from 'react';
 import type { ConversationMessage } from '../api/learningWorkspace';
@@ -20,6 +21,8 @@ interface MessageActions {
 
 export const TeacherMessage = memo(function Message({ slug, message, sourceNames, reasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; sourceNames: Map<string, string>; reasoningOpen: boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
   const teacher = message.role === 'teacher';
+  const hasAnswer = (message.blocks ?? []).some(block => block.type === 'markdown' && teacherMarkdown(block.source ?? '').trim().length > 0);
+  const awaitingAnswer = teacher && streaming && !hasAnswer && message.status !== 'failed';
   const profile = useLearningProfile();
   const [selectedEvidence, setSelectedEvidence] = useState('');
   const citations = message.sourceCitations ?? [];
@@ -29,7 +32,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
   });
   return (
     <article id={`message-${message.id}`} data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
-      {teacher && <div className={s.speaker}>教师</div>}
+      {teacher && <div className={s.speaker}>教师{awaitingAnswer && <span className={s.writing} role="status" aria-label="教师正在思考或调用工具"><LearnWriting /></span>}</div>}
       <div className={s.messageBody} onClick={event => {
         const target = event.target;
         if (!(target instanceof Element)) return;
@@ -40,7 +43,6 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
         event.preventDefault();
         setSelectedEvidence(evidenceId);
       }}>
-        {streaming && !message.blocks?.some((block) => block.type === 'markdown' && block.source) && <span className={s.thinking} role="status">教师正在生成…</span>}
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? (profile.data?.settings.showReasoning !== false && <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} open={reasoningOpen} onOpenChange={setReasoningOpen} />)
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />

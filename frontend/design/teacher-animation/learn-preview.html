@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>learn</title>
+<style>
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:#faf7f1; color:#735547; }
+  main { display:grid; gap:30px; justify-items:center; }
+  .large img { width:min(560px,90vw) !important; height:auto !important; }
+  #message { width:min(700px,90vw); padding:24px; background:var(--card,#fff); border-radius:16px; }
+  #message nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px; }
+</style>
+<main><div id="large" class="large"></div><div id="actual"></div><div id="message"></div></main>
+<script type="module">
+  import React from 'react';
+  import {createRoot} from 'react-dom/client';
+  import {LearnWriting} from '/src/shared/primitive/LearnWriting.tsx';
+  createRoot(document.getElementById('large')).render(React.createElement(LearnWriting));
+  createRoot(document.getElementById('actual')).render(React.createElement(LearnWriting));
+</script>
+<script type="module" src="./teacher-preview.tsx"></script>
+</html>

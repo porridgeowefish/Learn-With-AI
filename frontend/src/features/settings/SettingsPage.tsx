@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useAppearance, useUpdateAppearance } from './appearance';
 import { ModelsPage } from './ModelsPage';
 import { WorkspaceSettings } from './WorkspaceSettings';
@@ -9,17 +11,25 @@ import { UpdatePanel } from './UpdatePanel';
 import s from './SettingsPage.module.css';
 import { FONT_SIZES, useFontSize, type FontSize } from '@/shared/lib/fontSize';
 
+const categories = [ ['general', '常规'], ['appearance', '外观'], ['models', '模型连接'], ['learning', '回复、搜索与记忆'], ['notes', '教师笔记'], ['storage', '存储与数据'], ['usage', 'Token 用量'], ['about', '更新与关于'] ] as const;
 export function SettingsPage() {
-  return <div className={s.host}><div className={s.scroll} data-testid="settings-scroll">
-    <header className={s.header}><h1 className={s.title}>设置</h1></header>
-    <AppearanceSection />
-    <ModelsPage />
-    <LearningSettings />
-    <TeacherNotesSettings />
-    <WorkspaceSettings />
-    <UpdatePanel />
-    <OpenSourceSection />
-  </div></div>;
+  const [params, setParams] = useSearchParams();
+  const [filter, setFilter] = useState('');
+  const section = categories.some(([id]) => id === params.get('section')) ? params.get('section')! : 'general';
+  return <div className={s.host}>
+    <aside className={s.navigation}><h1>设置</h1><input aria-label="搜索设置" placeholder="搜索设置" value={filter} onChange={e => setFilter(e.target.value)} /><nav aria-label="设置分类">{categories.filter(([,name]) => name.includes(filter)).map(([id,name]) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => setParams({section:id})}>{name}</button>)}</nav></aside>
+    <div className={s.scroll} data-testid="settings-scroll" key={section}>
+      <header className={s.header}><h2 className={s.title}>{categories.find(([id]) => id === section)?.[1]}</h2></header>
+      {section === 'general' && <section className={s.appearance}><h2>学习工作台</h2><p>在左侧管理外观、模型、搜索与学习数据。</p><Link to="/settings?section=usage">查看 Token 用量</Link><Link to="/settings?section=learning">管理回复与联网搜索</Link></section>}
+      {section === 'appearance' && <AppearanceSection />}
+      {section === 'models' && <ModelsPage />}
+      {section === 'learning' && <LearningSettings />}
+      {section === 'notes' && <TeacherNotesSettings />}
+      {section === 'storage' && <WorkspaceSettings />}
+      {section === 'usage' && <section className={s.appearance}><h2>Token 用量</h2><p>查看各模型与项目的历史使用情况。</p><Link to="/usage">打开用量统计</Link></section>}
+      {section === 'about' && <><UpdatePanel /><OpenSourceSection /></>}
+    </div>
+  </div>;
 }
 const THEME_OPTIONS: Array<{ id: ThemePreference; name: string; description: string; swatches: string[] }> = [
   { id: 'lychee-paper', name: '荔枝暖纸', description: '温暖、安静的默认阅读主题', swatches: ['#faf8f4', '#fffdf9', '#60775a'] },

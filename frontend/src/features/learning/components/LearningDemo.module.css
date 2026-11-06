@@ -29,7 +29,7 @@
 .annotation h3, .saved h3 { font-size: 0.86667rem; margin-bottom: 10px; }
 .annotation p { font-size: 0.86667rem; line-height: 1.8; margin-top: 12px; }
 .noteField { display: grid; gap: 12px; font-weight: 600; font-size: 0.93333rem; }
-.noteField textarea { min-height: 180px; width: 100%; resize: vertical; padding: 16px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--card); font-family: inherit; font-size: 0.93333rem; line-height: 1.85; font-weight: 400; }
+.noteField textarea { min-height: 180px; width: 100%; resize: vertical; padding: 16px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--card); font-family: 'FangSong', '仿宋', 'STFangsong', serif; font-size: 0.93333rem; line-height: 1.85; font-weight: 400; }
 .resource { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: 8px; line-height: 1.85; font-size: 0.93333rem; }
 .resource summary { cursor: pointer; font-weight: 600; }
 .resource p, .resource ul { margin-top: 14px; }

@@ -43,7 +43,7 @@
 }
 
 .title {
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-style: italic;
   font-weight: 500;
   font-size: 1.42rem;
@@ -271,7 +271,7 @@
   font-size: 0.82rem;
   background: var(--card);
   color: var(--fg);
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
 }
 
 .askDefault {
@@ -431,3 +431,14 @@
 .fontSize strong { display: block; font-size: .9rem; }
 .fontSize small { display: block; margin-top: 5px; color: var(--muted); font-size: .8rem; }
 .fontSize select { max-width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--fg); background: var(--card); }
+
+.host { flex-direction: row; }
+.navigation { width: 224px; flex-shrink: 0; padding: 28px 16px; border-right: 1px solid var(--border); overflow-y: auto; background: var(--surface-translucent); }
+.navigation h1 { font-size: 1.25rem; margin: 0 12px 24px; }
+.navigation input { width: 100%; padding: 10px 14px; border-radius: 24px; border: 1px solid var(--border); background: var(--card); color: var(--fg); margin-bottom: 20px; }
+.navigation nav { display: grid; gap: 6px; }
+.navigation button { text-align: left; padding: 12px; border: 0; border-radius: 9px; background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
+.navigation button[aria-current], .navigation button:hover { background: var(--ink-soft); }
+.scroll { padding: 36px 36px 72px; gap: 28px; }
+.title { font-style: normal; font-size: 1.6rem; }
+@media(max-width: 720px) { .host { flex-direction: column; } .navigation { width: 100%; padding: 12px; border-right: 0; border-bottom: 1px solid var(--border); } .navigation h1 { margin: 0 0 10px; } .navigation input { margin-bottom: 10px; } .navigation nav { display: flex; overflow-x: auto; } .navigation button { white-space: nowrap; } .scroll { padding: 22px 16px 60px; } }

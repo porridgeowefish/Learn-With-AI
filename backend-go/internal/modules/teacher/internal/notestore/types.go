@@ -11,8 +11,12 @@ import (
 type NoteTurn = conversation.NoteTurn
 type AutoNotesSettings = config.AutoNotesSettings
 type NoteUsage struct {
-	InputTokens  int `json:"inputTokens"`
-	OutputTokens int `json:"outputTokens"`
+	InputTokens      int  `json:"inputTokens"`
+	OutputTokens     int  `json:"outputTokens"`
+	UsageReported    bool `json:"usageReported,omitempty"`
+	CacheReadTokens  *int `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens *int `json:"cacheWriteTokens,omitempty"`
+	CacheMissTokens  *int `json:"cacheMissTokens,omitempty"`
 }
 type NoteEntry struct {
 	ID          string    `json:"id"`

@@ -7,6 +7,10 @@ export interface TeacherUsageTurn {
   providerId?: string;
   inputTokens: number;
   outputTokens: number;
+  usageReported?: boolean;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  cacheMissTokens?: number;
   occurredAt: string;
 }
 
@@ -16,6 +20,8 @@ export interface TeacherUsageConversation {
   conversationId: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   updatedAt: string;
   turns: TeacherUsageTurn[];
 }
@@ -34,5 +40,5 @@ export function useTeacherUsage(page = 1) {
   });
 }
 
-export interface ProjectUsage { projectSlug: string; title: string; inputTokens: number; outputTokens: number; noteInputTokens: number; noteOutputTokens: number }
+export interface ProjectUsage { projectSlug: string; title: string; inputTokens: number; outputTokens: number; noteInputTokens: number; noteOutputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number }
 export function useProjectUsage() {return useQuery({queryKey:['usage','projects'],queryFn:()=>http.get<{projects:ProjectUsage[]}>('/api/usage/projects')});}

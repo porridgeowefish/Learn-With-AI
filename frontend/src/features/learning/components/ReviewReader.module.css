@@ -9,7 +9,7 @@
 }
 
 .tocTitle {
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-weight: 600;
   margin-bottom: 8px;
   font-size: 1.02rem;
@@ -180,7 +180,7 @@
 .markdown :global(h1),
 .markdown :global(h2),
 .markdown :global(h3) {
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   margin: 1.3em 0 0.5em;
 }
 
@@ -263,7 +263,7 @@
   content: counter(ctDimension, decimal-leading-zero);
   flex: 0 0 auto;
   color: var(--accent);
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.05em;

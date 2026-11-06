@@ -39,7 +39,7 @@
   padding: 6px 10px;
   font-size: 0.62rem;
   color: var(--muted);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
 }
 
 .section {
@@ -202,7 +202,7 @@
   flex: 1;
   min-width: 0;
   font-size: 0.74rem;
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   padding: 3px 6px;
   border: 1px solid var(--accent);
   border-radius: 4px;
@@ -302,7 +302,7 @@
   color: var(--fg);
   border-radius: 4px;
   cursor: pointer;
-  font-family: inherit;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

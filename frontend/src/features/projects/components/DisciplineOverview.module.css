@@ -18,7 +18,7 @@
 
 .header h1 {
   margin-top: 0;
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 1.55rem;
   font-weight: 600;
 }
@@ -119,7 +119,7 @@
 
 .tableOfContents h2 {
   margin: 0 0 14px;
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 1.2rem;
   font-weight: 600;
 }
@@ -161,7 +161,7 @@
 
 .tocNumber {
   color: var(--muted);
-  font-family: var(--font-mono);
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 0.7rem;
 }
 
@@ -211,7 +211,7 @@
 .markdown h3,
 .markdown h4 {
   margin: 1.35em 0 0.55em;
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
 }
 
 .markdown h1 {
@@ -261,7 +261,7 @@
   border-radius: 2px;
   background: transparent;
   color: var(--accent-ink);
-  font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 0.68rem;
   font-weight: 650;
   line-height: 1.2;
@@ -281,7 +281,7 @@
   border-radius: 2px;
   background: var(--card);
   color: var(--muted);
-  font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 0.68rem;
   font-weight: 650;
   line-height: 1.2;
@@ -351,7 +351,7 @@
 
 .planHeader h2 {
   margin: 4px 0 6px;
-  font-family: 'Lora', Georgia, serif;
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 1.35rem;
 }
 
@@ -374,7 +374,7 @@
 }
 
 .planProgress strong {
-  font-family: var(--font-mono);
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 1.3rem;
 }
 
@@ -405,7 +405,7 @@
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent-ink);
-  font-family: var(--font-mono);
+  font-family: 'FangSong', '仿宋', 'STFangsong', serif;
   font-size: 0.72rem;
   font-weight: 700;
 }

@@ -9,6 +9,7 @@ import (
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -53,6 +54,11 @@ func anthropicRequest(p askaiconfig.Provider, in Request, stream bool) map[strin
 		previousTool = message.ToolCallID != ""
 	}
 	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": stream, "max_tokens": platformconfig.ModelOutputTokens}
+	// Explicit caching is a first-party Anthropic capability. Compatible
+	// providers (including Coding Plan endpoints) retain their accepted schema.
+	if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Scheme == "https" && strings.EqualFold(endpoint.Hostname(), "api.anthropic.com") && in.System != "" {
+		body["system"] = []map[string]any{{"type": "text", "text": in.System, "cache_control": map[string]any{"type": "ephemeral"}}}
+	}
 	// Merely offering tools must not change the configured thinking channel.
 	// Older externally supplied tool history lacking signed blocks still uses
 	// the non-thinking request shape; live tool rounds retain them in memory.

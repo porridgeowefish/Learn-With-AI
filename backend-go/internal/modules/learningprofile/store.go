@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,7 +95,32 @@ func read() (State, error) {
 	}
 	return st, e
 }
-func Read() (State, error) { mu.Lock(); defer mu.Unlock(); return read() }
+func Read() (State, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	st, err := read()
+	if err == nil && st.Settings.Search.Provider == "" {
+		if p := PlanProvider(""); p != nil {
+			st.Settings.Search = SearchSettings{Enabled: true, Provider: "zhipu-plan", ProviderID: p.ID, HasKey: true}
+		}
+	}
+	return st, err
+}
+
+// PlanProvider only recognizes official domestic Coding Plan endpoints.
+func PlanProvider(id string) *ai.ProviderConfig {
+	cfg, err := ai.LoadConfig()
+	if err != nil || cfg == nil {
+		return nil
+	}
+	for _, p := range cfg.Providers {
+		u, e := url.Parse(p.BaseURL)
+		if e == nil && u.Scheme == "https" && u.Host == "open.bigmodel.cn" && (strings.HasPrefix(u.Path, "/api/coding/") || strings.TrimRight(u.Path, "/") == "/api/anthropic") && p.APIKey != "" && (id == "" || id == p.ID) {
+			return &p
+		}
+	}
+	return nil
+}
 func write(st State) error {
 	st.Revision++
 	data, e := json.MarshalIndent(st, "", "  ")
@@ -135,10 +161,10 @@ func SaveSettings(cfg Settings) error {
 	if e != nil {
 		return e
 	}
-	if cfg.Search.APIKey == "" {
+	if cfg.Search.APIKey == "" && cfg.Search.Provider == st.Settings.Search.Provider {
 		cfg.Search.APIKey = st.Settings.Search.APIKey
 	}
-	if cfg.Search.Enabled && !((cfg.Search.Provider == "chatgpt" && cfg.Search.ProviderID != "") || (cfg.Search.Provider == "zhipu" && strings.TrimSpace(cfg.Search.APIKey) != "")) {
+	if cfg.Search.Enabled && !((cfg.Search.Provider == "chatgpt" && cfg.Search.ProviderID != "") || ((cfg.Search.Provider == "zhipu" || cfg.Search.Provider == "deepseek" || cfg.Search.Provider == "yuanbao") && strings.TrimSpace(cfg.Search.APIKey) != "") || (cfg.Search.Provider == "zhipu-plan" && PlanProvider(cfg.Search.ProviderID) != nil)) {
 		return errors.New("请先完成联网搜索配置")
 	}
 	cfg.Search.HasKey = cfg.Search.APIKey != ""

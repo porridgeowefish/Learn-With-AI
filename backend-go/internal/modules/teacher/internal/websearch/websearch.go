@@ -52,6 +52,15 @@ func Configured() Searcher {
 }
 
 func FromSettings(settings learningprofile.SearchSettings) Searcher {
+	if settings.Provider == "zhipu-plan" {
+		if p := learningprofile.PlanProvider(settings.ProviderID); p != nil {
+			return remoteSearch{provider: "zhipu-plan", key: p.APIKey}
+		}
+	}
+	if (settings.Provider == "deepseek" || settings.Provider == "yuanbao") && strings.TrimSpace(settings.APIKey) != "" {
+		return remoteSearch{provider: settings.Provider, key: settings.APIKey}
+	}
+
 	if settings.Provider == "chatgpt" && settings.ProviderID != "" {
 		return chatgpt{settings.ProviderID}
 	}

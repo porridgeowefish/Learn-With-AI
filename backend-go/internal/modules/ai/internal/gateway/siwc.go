@@ -124,13 +124,7 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 			Response struct {
 				Status string
 				Error  *struct{ Code, Message string }
-				Usage  struct {
-					InputTokens   int `json:"input_tokens"`
-					OutputTokens  int `json:"output_tokens"`
-					OutputDetails struct {
-						ReasoningTokens int `json:"reasoning_tokens"`
-					} `json:"output_tokens_details"`
-				}
+				Usage  *responsesUsage `json:"usage"`
 				Output []struct {
 					Type      string `json:"type"`
 					CallID    string `json:"call_id"`
@@ -164,7 +158,9 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 					emitSIWCCall(item.CallID, item.Name, item.Arguments, seenCalls, emit)
 				}
 			}
-			emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": frame.Response.Usage.InputTokens, "outputTokens": frame.Response.Usage.OutputTokens, "reasoningTokens": frame.Response.Usage.OutputDetails.ReasoningTokens}})
+			if frame.Response.Usage != nil {
+				emit(Event{Type: "usage", Usage: frame.Response.Usage.metrics()})
+			}
 			emit(Event{Type: "response-completed"})
 			completed = true
 		case "response.failed", "response.incomplete":

@@ -7,7 +7,6 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -133,6 +132,17 @@ type automaticBudget struct {
 	Requests int   `json:"requests"`
 }
 
+// These IDs are reserved by the OCR resolver. A custom cloud provider whose
+// name merely ends in "-local-ocr" must not bypass billing or recovery limits.
+func IsLocalOCRProvider(providerID string) bool {
+	switch providerID {
+	case "windows-local-ocr", "macos-local-ocr", "linux-local-ocr", "system-local-ocr":
+		return true
+	default:
+		return false
+	}
+}
+
 // The debit is durable before dispatch. Cancellation or provider failure does
 // not refund a request that may have been billed.
 func (s *Store) ReserveStructureRequest(sourceID string, j *StructureJob, page int) error {
@@ -153,10 +163,25 @@ func (s *Store) ReserveStructureRequest(sourceID string, j *StructureJob, page i
 	if j.AllPages {
 		limit = 2000
 	}
-	if len(current.Requests) >= limit {
+	localWhole := current.AllPages && IsLocalOCRProvider(current.ProviderID)
+	if localWhole {
+		validPage := false
+		for _, candidate := range current.Pages {
+			if candidate == page {
+				validPage = true
+				break
+			}
+		}
+		if !validPage || len(current.Pages) > 2000 {
+			return errors.New("invalid-pages")
+		}
+	}
+	// Local retries after a crash consume no paid requests. The bounded page
+	// selection remains authoritative even when a checkpoint must be repeated.
+	if !localWhole && len(current.Requests) >= limit {
 		return errors.New("vision-request-limit")
 	}
-	if j.Automatic && !strings.HasSuffix(j.ProviderID, "-local-ocr") {
+	if j.Automatic && !IsLocalOCRProvider(j.ProviderID) {
 		budgetPath := filepath.Join(filepath.Dir(filepath.Dir(p)), "automatic-budget.json")
 		var b automaticBudget
 		if e = readJSON(budgetPath, &b); e != nil && !errors.Is(e, os.ErrNotExist) {
@@ -286,7 +311,7 @@ func (s *Store) RecoverStructureJob(sourceID, jobID string) (StructureJob, error
 	base := filepath.Join(s.root, sourceID, "revisions", j.RevisionID, "derived")
 	var ptr derivedPointer
 	var m DerivedManifest
-	if j.AllPages && strings.HasSuffix(j.ProviderID, "-local-ocr") {
+	if j.AllPages && IsLocalOCRProvider(j.ProviderID) {
 		if readJSON(filepath.Join(base, "current.json"), &ptr) == nil && safeID(ptr.VersionID, "derived_") && readJSON(filepath.Join(base, "versions", ptr.VersionID, "manifest.json"), &m) == nil && m.JobID == j.ID {
 			j.BaseDerivedVersionID = ptr.VersionID
 		}

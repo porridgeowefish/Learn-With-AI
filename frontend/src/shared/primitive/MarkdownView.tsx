@@ -4,6 +4,7 @@ import { useMarkdown } from '@/shared/hooks/useMarkdown';
 import { mountMermaidBlocks } from '@/shared/lib/mermaidRenderer';
 import { mountInteractiveBlocks } from '@/shared/lib/interactiveMarkdown';
 import { mountDiagramControls } from '@/shared/lib/diagramControls';
+import { mountLearningFigures } from '@/shared/lib/learningVisual';
 import s from './MarkdownView.module.css';
 
 interface MarkdownViewProps {
@@ -37,6 +38,11 @@ export const MarkdownView = forwardRef<HTMLDivElement, MarkdownViewProps>(functi
     const stopDiagrams = mountDiagramControls(hostRef.current);
     return () => { stopGUI(); stopDiagrams(); };
   }, [streaming, html, interactive]);
+
+  useEffect(() => {
+    if (streaming || !hostRef.current) return;
+    return mountLearningFigures(hostRef.current);
+  }, [html, streaming]);
 
   return (
     <div ref={hostRef} className={`${s.body} ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: html }} />

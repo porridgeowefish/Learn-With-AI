@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import base from '../vite.config.ts';
 
 const source = fileURLToPath(new URL('.', import.meta.url));
-const modules = () => ['worker.mjs', 'runtime.mjs', 'page-adapter.mjs', 'projects.mjs', 'learning.mjs', 'settings.mjs', 'snapshot.mjs'];
+const modules = () => ['worker.mjs', 'runtime.mjs', 'page-adapter.mjs', 'projects.mjs', 'learning.mjs', 'settings.mjs', 'snapshot.mjs', 'visuals.mjs'];
 const files = () => [...modules(), 'fflate.mjs', 'treasures.json'];
 const filePath = name => name === 'treasures.json' ? resolve(source, '../../backend-go/internal/modules/treasures/catalog.json') : name === 'fflate.mjs' ? resolve(source, '../node_modules/fflate/esm/browser.js') : resolve(source, name);
 const urlFor = name => name === 'worker.mjs' ? '/design-worker.mjs' : '/__design/' + name;

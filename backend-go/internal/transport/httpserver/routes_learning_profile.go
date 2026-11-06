@@ -21,10 +21,16 @@ func (s *Server) learningProfile(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, 400, "配置格式无效")
 			return
 		}
-		if cfg.Search.APIKey == "" {
+		if cfg.Search.APIKey == "" && cfg.Search.Provider == st.Settings.Search.Provider {
 			cfg.Search.APIKey = st.Settings.Search.APIKey
 		}
-		if cfg.Search.Enabled && (!st.Settings.Search.Enabled || cfg.Search != st.Settings.Search) {
+		// HasKey is a derived response field. In particular, Plan credentials
+		// live on the model connection, so its stored value may differ from GET.
+		// Saving unrelated preferences must not consume search quota or disable
+		// a working search connection when a verification request would fail.
+		requestedSearch, previousSearch := cfg.Search, st.Settings.Search
+		requestedSearch.HasKey, previousSearch.HasKey = false, false
+		if cfg.Search.Enabled && (!previousSearch.Enabled || requestedSearch != previousSearch) {
 			search := teacher.SearchFromSettings(cfg.Search)
 			if search == nil {
 				cfg.Search.Enabled = false
@@ -49,7 +55,7 @@ func (s *Server) learningProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	st.Settings.Search.HasKey = st.Settings.Search.APIKey != ""
+	st.Settings.Search.HasKey = st.Settings.Search.APIKey != "" || (st.Settings.Search.Provider == "zhipu-plan" && learningprofile.PlanProvider(st.Settings.Search.ProviderID) != nil)
 	st.Settings.Search.APIKey = ""
 	capabilities := map[string][]string{}
 	if cfg, e := ai.LoadConfig(); e == nil && cfg != nil {

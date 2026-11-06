@@ -6,6 +6,7 @@ func TransferPaths() []string {
 		"conversation/events.jsonl",
 		"conversation/conversation.json",
 		"conversation/system-prompt.txt",
+		"conversation/learning-mode.json",
 		"conversation/usage.jsonl",
 		"conversation/note-usage.jsonl",
 	}

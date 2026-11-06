@@ -23,28 +23,10 @@ func LocalPageAvailable() bool {
 	return available
 }
 
-// Capture the selected purpose before queueing. Do not run the potentially
-// slow system probe here, and never let a later cloud binding adopt this task.
+// Uploads always use local OCR. Configured document models remain available
+// for explicit requests, without silently billing an upload. Do not run the
+// potentially slow system probe on the upload path.
 func AutomaticPageSelection() (providerID, model string) {
-	settings, err := ai.LoadConfig()
-	if err == nil && settings != nil {
-		binding, exists := settings.Bindings["documentStructure"]
-		if !exists {
-			binding = settings.Bindings["ocr"]
-		}
-		if binding.ProviderID != "" {
-			model = binding.Model
-			if model == "" {
-				for _, provider := range settings.Providers {
-					if provider.ID == binding.ProviderID {
-						model = provider.Model
-						break
-					}
-				}
-			}
-			return binding.ProviderID, model
-		}
-	}
 	return localIdentity()
 }
 

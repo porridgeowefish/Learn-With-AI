@@ -9,6 +9,7 @@ import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ProjectType } from '@/shared/types/domain';
 import type { LearningScopeSource } from '@/shared/types/api';
+import { learningModes } from '@/shared/types/learningMode';
 import { ProjectTypeAdvisorDialog } from './ProjectTypeAdvisorDialog';
 
 import s from './CreateProjectModal.module.css';
@@ -20,6 +21,7 @@ const schema = z.object({
   }),
   title: z.string().trim().min(1, '请填写项目标题'),
   systemPrompt: z.string().optional().default(''),
+  learningMode: z.enum(['general', 'history', 'book', 'concept']).default('general'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -59,6 +61,7 @@ export function CreateProjectModal({
       title: initialTitle,
       projectType: fixedProjectType,
       systemPrompt: '',
+      learningMode: 'general',
     },
   });
 
@@ -69,6 +72,7 @@ export function CreateProjectModal({
         title: initialTitle,
         projectType: fixedProjectType,
         systemPrompt: '',
+        learningMode: 'general',
       });
     } else {
       setAdvisorOpen(false);
@@ -86,6 +90,7 @@ export function CreateProjectModal({
   });
 
   const selectedType = watch('projectType');
+  const selectedMode = watch('learningMode');
 
   const formId = fromDisciplineMap ? 'deep-dive-project-form' : 'create-project-form';
   const currentDraft = getValues();
@@ -158,6 +163,17 @@ export function CreateProjectModal({
           <div className={s.hint}>我们会根据标题自动创建本地项目目录，后续仍可修改显示标题。</div>
           {errors.title && <div className={s.error}>{errors.title.message}</div>}
         </div>
+
+        {selectedType === 'system-learning' && (
+          <div className={s.field}>
+            <label htmlFor="cp-learning-mode">学习方式</label>
+            <select id="cp-learning-mode" {...register('learningMode')} aria-describedby="cp-mode-description cp-mode-note">
+              {learningModes.map(mode => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+            </select>
+            <div id="cp-mode-description" className={s.hint}>{learningModes.find(mode => mode.value === selectedMode)?.description}</div>
+            <div id="cp-mode-note" className={s.hint}>创建后保持不变，作为这个项目的教学参考。对话中仍可随时要求换一种讲法。</div>
+          </div>
+        )}
 
         {selectedType === 'system-learning' && (
           <div className={s.field}>
