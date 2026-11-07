@@ -143,16 +143,17 @@ export async function settings(ctx) {
       downloadUrl:'https://gitee.com/szu-andrew/learn-with-ai/releases/download/v0.8.15/learn-with-ai-0.8.15-windows-amd64.msi',
       releaseNotes:'设计预览：以 Gitee 为更新源，支持检查、下载、取消与安装交接。这里不会下载或执行安装程序。'};
     const update=state.update;
+    if (path.endsWith('/start')) { update.autoInstall=true; update.error=''; update.phase=update.phase==='ready'?'installing':'downloading'; }
     if (path.endsWith('/prepare') && !['ready','installing'].includes(update.phase)) update.phase='downloading';
     if (path.endsWith('/cancel')) {update.phase='idle';update.downloadedBytes=0;}
     if (path.endsWith('/install') && update.phase==='ready') update.phase='installing';
     if (method==='GET' && update.phase==='downloading') {
       update.downloadedBytes=Math.min(update.totalBytes,update.downloadedBytes+12000000);
-      if(update.downloadedBytes===update.totalBytes) update.phase='ready';
+      if(update.downloadedBytes===update.totalBytes) update.phase=update.autoInstall?'installing':'ready';
     }
     return json(update);
   }
-  if (path === '/api/system/speech') return json({languages:[],setupHint:'设计预览使用文字输入。'});
+  if (path === '/api/system/speech') return json({languages:['zh-CN','en-US'],available:true,setupHint:'设计预览仅返回示例转写，不识别真实录音。'});
   if (path === '/api/model-connections/models') return json({models:[{id:'demo',contextWindowTokens:32000}],source:'preset',verifiedAt:new Date().toISOString()});
   if (key === 'ask-ai/probe') return json({ok:true});
   if (key === 'siwc') return json({connected:!!state.siwc,pending:false,email:'设计演示账户'});

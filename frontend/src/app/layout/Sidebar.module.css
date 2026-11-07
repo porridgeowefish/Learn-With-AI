@@ -8,21 +8,6 @@
   overflow: hidden;
 }
 
-.head {
-  display: flex;
-  flex: 0 0 var(--workspace-header-h);
-  justify-content: space-between;
-  align-items: center;
-  height: var(--workspace-header-h);
-  padding: 10px 12px;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  font-weight: 600;
-  border-bottom: 1px solid var(--border);
-}
-
 .scroll {
   flex: 1;
   overflow-y: auto;

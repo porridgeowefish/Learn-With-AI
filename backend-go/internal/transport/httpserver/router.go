@@ -117,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/instructions", s.handleConversationInstructions)
 	mux.HandleFunc("GET /api/system/speech", s.handleSpeechCapability)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/transcribe", s.handleVoiceTranscription)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/attachments", s.handleChatAttachment)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/attachments/{attachmentId}/file", s.handleChatAttachmentFile)
 	mux.HandleFunc("PUT /api/projects/{id}/conversation/instructions", s.handleConversationInstructions)

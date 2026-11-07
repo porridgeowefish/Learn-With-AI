@@ -56,22 +56,24 @@ type releaseAsset struct {
 }
 
 type updater struct {
-	current         string
-	client          *http.Client
-	mu              sync.Mutex
-	checked         time.Time
-	info            UpdateInfo
-	downloadCancel  context.CancelFunc
-	prepared        string
-	preparedHash    string
-	preparedVersion string
-	cacheDir        string
-	install         func(string) error
-	shutdown        func()
-	downloadClient  *http.Client
-	downloads       sync.WaitGroup
-	validate        func(string, string) error
-	closed          bool
+	current           string
+	client            *http.Client
+	mu                sync.Mutex
+	checked           time.Time
+	info              UpdateInfo
+	downloadCancel    context.CancelFunc
+	autoInstall       bool
+	installGeneration uint64
+	prepared          string
+	preparedHash      string
+	preparedVersion   string
+	cacheDir          string
+	install           func(string) error
+	shutdown          func()
+	downloadClient    *http.Client
+	downloads         sync.WaitGroup
+	validate          func(string, string) error
+	closed            bool
 }
 
 func newUpdater(current string) *updater {
@@ -124,7 +126,7 @@ func newerVersion(candidate, current string) bool {
 func (u *updater) check(ctx context.Context, force bool) UpdateInfo {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.info.Phase == "downloading" || u.info.Phase == "ready" || u.info.Phase == "installing" || (!force && !u.checked.IsZero() && time.Since(u.checked) < 30*time.Minute) {
+	if u.info.Phase == "downloading" || u.info.Phase == "waiting" || u.info.Phase == "ready" || u.info.Phase == "installing" || (!force && !u.checked.IsZero() && time.Since(u.checked) < 30*time.Minute) {
 		return u.info
 	}
 	info := UpdateInfo{Current: u.current, NotesURL: giteeReleases, Phase: "idle", CanInstall: installedUpdateSupported()}
@@ -250,6 +252,7 @@ func (u *updater) handler() http.Handler {
 	mux.HandleFunc("GET /api/system/update", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, u.check(r.Context(), r.URL.Query().Get("force") == "1"))
 	})
+	mux.HandleFunc("POST /api/system/update/start", func(w http.ResponseWriter, r *http.Request) { u.action(w, r, "start") })
 	mux.HandleFunc("POST /api/system/update/prepare", func(w http.ResponseWriter, r *http.Request) {
 		u.action(w, r, "prepare")
 	})

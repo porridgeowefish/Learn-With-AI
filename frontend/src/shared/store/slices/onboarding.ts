@@ -20,5 +20,5 @@ export const useOnboardingStore = create<TourState>((set, get) => {
     const { active, step, slug, dismissed } = get();
     try { localStorage.setItem(KEY, JSON.stringify({ active, step, slug, dismissed })); } catch { /* Keep this session usable. */ }
   };
-  return { ...restore(), start: () => { if (!get().dismissed) update({ active: true, step: 0, slug: '' }); }, dismiss: () => update({ active: false, dismissed: true }), finish: () => update({ active: false, step: 0, dismissed: true }), move: step => update({ step: Math.max(0, Math.min(7, step)) }), selectProject: slug => update({ slug, step: 4 }) };
+  return { ...restore(), start: () => update({ active: true, step: 0, slug: '', dismissed: false }), dismiss: () => update({ active: false, dismissed: true }), finish: () => update({ active: false, step: 0, dismissed: true }), move: step => update({ step: Math.max(0, Math.min(7, step)) }), selectProject: slug => update({ slug, step: 4 }) };
 });

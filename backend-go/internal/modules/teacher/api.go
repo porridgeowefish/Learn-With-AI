@@ -79,6 +79,12 @@ type SpeechCapability = speech.Capability
 const MaxChatAttachmentBytes = conversation.MaxAttachmentBytes
 
 func LocalSpeechCapability(ctx context.Context) SpeechCapability { return speech.Probe(ctx) }
+
+// TranscribeVoice recognizes a bounded chunk without creating a chat attachment.
+// A recording may submit any number of chunks; the client owns their order.
+func TranscribeVoice(ctx context.Context, data []byte) (string, error) {
+	return speech.Recognize(ctx, "auto", data)
+}
 func ParseChatAttachment(ctx context.Context, slug, name, language string, data []byte) (ChatAttachment, error) {
 	st, err := conversation.New(slug)
 	if err != nil {

@@ -141,9 +141,6 @@ export function Sidebar() {
 
   return (
     <aside className={s.sidebar} aria-label="应用导航"><Link to="/" className={s.brand}><img src="/app-icon.png" alt=""/>Learn-With-AI</Link>
-      <div className={s.head}>
-        <span>导航</span>
-      </div>
       <div className={s.scroll}>
         <div className={s.section}>快捷入口</div>
         {QUICK_LINKS.map((q) => (

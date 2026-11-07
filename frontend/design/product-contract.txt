@@ -32,6 +32,7 @@ api /api/projects/{}/conversation/queue/{}/steer
 api /api/projects/{}/conversation/responses/active{}
 api /api/projects/{}/conversation/responses/{}/regenerate
 api /api/projects/{}/conversation/responses/{}/stop
+api /api/projects/{}/conversation/transcribe
 api /api/projects/{}/conversation/turns
 api /api/projects/{}/conversation/turns/queue
 api /api/projects/{}/conversation?limit=40&beforeSeq={}

@@ -24,6 +24,10 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   useEffect(() => { if (!searchEnabled) setWebSearch(false); }, [searchEnabled]);
   useEffect(() => { session.configure({ providerId, options: { effort, webSearch: searchEnabled && webSearch } }); }, [session.configure, providerId, effort, webSearch, searchEnabled]);
   const [input, setInput] = useState('');
+  const inputValue = useRef('');
+  const [voiceFinalizing, setVoiceFinalizing] = useState(false);
+  const voiceBusy = useRef(false);
+  const voiceGeneration = useRef(0);
   const [failed, setFailed] = useState<TeacherSubmission>();
   const [pending, setPending] = useState(false);
   const submitting = useRef(false);
@@ -35,6 +39,10 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
+    voiceGeneration.current++; voiceBusy.current = false; setVoiceFinalizing(false);
+    return () => { voiceGeneration.current++; };
+  }, [slug]);
+  useEffect(() => {
     if (!models.some(provider => provider.id === providerId) && models.length) setProviderId(settings.data?.bindings?.teacher?.providerId || settings.data?.default || models[0].id);
   }, [providerId, settings.data, models]);
   useLayoutEffect(() => {
@@ -42,11 +50,11 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     if (element) { element.style.height = 'auto'; element.style.height = `${Math.min(150, Math.max(28, element.scrollHeight))}px`; }
   }, [input]);
 
-  const send = async (text: string, retry?: TeacherSubmission) => {
-    if ((submitting.current && submittingVersion.current === version.current) || media.pending || media.recording || composing.current) return;
+  const send = async (text: string, retry?: TeacherSubmission, voiceDraft?: { version: number; input: string; generation: number }) => {
+    if (!voiceDraft && ((submitting.current && submittingVersion.current === version.current) || media.pending || media.hasRecording || voiceBusy.current || composing.current)) return;
     const content = text.trim() || (media.attachments.some(a => a.kind === 'source') ? '请结合附件继续讲解。' : '');
     if (!content && !media.attachments.length && !retry?.attachments.length) return;
-    const snapshot = version.current;
+    const snapshot = voiceDraft?.version ?? version.current;
     const selectedProviderId = providerId || undefined;
     const sameFailure = failed && failed.content === content && failed.attachments.map(a => a.attachmentId).join() === media.attachments.map(a => a.attachmentId).join();
     const previous = retry ?? (sameFailure ? failed : undefined);
@@ -63,15 +71,46 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     const result = await session.send(item, () => {
       accepted = true; release();
       if (!mounted.current) return;
-      if (version.current === snapshot && input.trim() === item.content) { version.current++; setInput(''); }
+      if (voiceDraft) {
+        if (voiceDraft.generation !== voiceGeneration.current) return;
+        voiceBusy.current = false; setVoiceFinalizing(false);
+      }
+      if (version.current === snapshot && (voiceDraft ? inputValue.current === voiceDraft.input : inputValue.current.trim() === item.content)) { version.current++; inputValue.current = ''; setInput(''); }
       // Only consume attachments sealed into this request.
       item.attachments.forEach(a => media.remove(a.attachmentId));
       setFailed(current => current?.operationId === item.operationId ? undefined : current);
     });
     if (!mounted.current) return;
+    if (voiceDraft && voiceDraft.generation !== voiceGeneration.current) return;
     if (!accepted) {
       release();
-      if (!result) setFailed(item);
+      if (!result) {
+        setFailed(item);
+        if (voiceDraft && version.current === snapshot && inputValue.current === voiceDraft.input) {
+          version.current++; inputValue.current = item.content; setInput(item.content);
+        }
+      }
+    }
+  };
+  const finishVoice = async (direct: boolean) => {
+    if (voiceBusy.current || pending) return;
+    voiceBusy.current = true; setVoiceFinalizing(true);
+    const token = ++voiceGeneration.current;
+    const snapshot = { version: version.current, input: inputValue.current, generation: token };
+    const item: TeacherSubmission = { operationId: crypto.randomUUID(), content: '', attachments: [...media.attachments], providerId: providerId || undefined, options: { effort, webSearch: searchEnabled && webSearch } };
+    try {
+      const text = await media.stopRecording();
+      if (!mounted.current || token !== voiceGeneration.current || text === undefined) return;
+      if (direct) {
+        item.content = [snapshot.input.trim(), text.trim()].filter(Boolean).join('\n');
+        await send(item.content, item, snapshot);
+      } else {
+        const combined = [inputValue.current.trimEnd(), text.trim()].filter(Boolean).join('\n');
+        version.current++; inputValue.current = combined; setInput(combined);
+        requestAnimationFrame(() => textarea.current?.focus());
+      }
+    } finally {
+      if (mounted.current && token === voiceGeneration.current) { voiceBusy.current = false; setVoiceFinalizing(false); }
     }
   };
   useImperativeHandle(ref, () => ({ sendText: text => { void send(text); } }));
@@ -83,10 +122,10 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
       <button type="button" onClick={() => setFailed(undefined)}>关闭</button>
     </div>}
     <form data-tour="teacher-composer" className={s.composer}
-      onSubmit={event => { event.preventDefault(); void send(input); }}
+      onSubmit={event => { event.preventDefault(); if (media.hasRecording) void finishVoice(true); else void send(input); }}
       onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }} onDrop={media.onDrop} onPaste={media.onPaste}>
       <textarea ref={textarea} title="Enter 发送 · Shift + Enter 换行" value={input}
-        onChange={event => { version.current++; setPending(false); setInput(event.target.value); }}
+        onChange={event => { version.current++; setPending(false); inputValue.current = event.target.value; setInput(event.target.value); }}
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={event => {
           if (event.key === 'Enter' && !event.shiftKey && !composing.current && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
@@ -98,18 +137,22 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
         <input type="checkbox" role="switch" aria-label="联网搜索" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} />
         <span className={s.searchTrack} aria-hidden="true" />
       </label>}>
-        {models.length > 0 && <select className={s.modelSelect} aria-label="选择教师模型" title="选择教师模型" value={providerId} onChange={event => {
+        {!media.hasRecording && !media.voicePending && models.length > 0 && <select className={s.modelSelect} aria-label="选择教师模型" title="选择教师模型" value={providerId} onChange={event => {
           setProviderId(event.target.value); localStorage.setItem(`lll.teacher.provider.${slug}`, event.target.value);
         }}>{models.map(provider => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}</select>}
-        <span className={s.reasoningControl}>
+        {!media.hasRecording && !media.voicePending && <span className={s.reasoningControl}>
           <select className={s.modelSelect} aria-label="思考强度" title={capabilities.length ? '使用模型原生思考参数，从下次发送开始生效' : '当前模型不支持调节思考强度'} disabled={!capabilities.length || !profile.data} value={effort} onChange={event => {
             setChosenEffort(event.target.value); localStorage.setItem(`lll.teacher.effort.${slug}`, event.target.value);
           }}>{!capabilities.length && <option value="">思考：不可调节</option>}{capabilities.map(value => <option key={value} value={value}>思考：{effortNames[value]}</option>)}</select>
-        </span>
-        <ChatMicrophone media={media} />
+        </span>}
+        <ChatMicrophone media={media} onStop={() => void finishVoice(false)} />
         {session.live?.responseId && <button type="button" className={s.stop} aria-label="停止" title="停止回答并暂停队列" onClick={() => void session.stop()}><StopIcon size={21} /></button>}
-        <button type="submit" className={s.send} aria-label={session.live || session.conversation.data?.queuePaused ? '排队' : '发送'} title={session.live ? '加入等待队列' : '发送'} disabled={!profile.data || pending || (!input.trim() && !media.attachments.length) || media.pending || media.recording}><SendIcon size={22} /></button>
+        <button type="submit" className={s.send} aria-label={media.hasRecording ? '转写并发送' : session.live || session.conversation.data?.queuePaused ? '排队' : '发送'} title={media.hasRecording ? '结束录音，转写后直接发送' : session.live ? '加入等待队列' : '发送'} disabled={!profile.data || pending || voiceFinalizing || (!input.trim() && !media.attachments.length && !media.hasRecording) || media.pending}><SendIcon size={22} /></button>
       </ChatMediaInput>
+      {(media.hasRecording || media.voicePending) && <div className={s.voiceStatus}>
+        <span>{media.recording ? '录音中 · 停止转写可编辑，也可直接发送' : media.voicePending ? '正在完成转写…' : '录音已停止，可重试转写'}</span>
+        <button type="button" onClick={() => { voiceGeneration.current++; voiceBusy.current = false; setVoiceFinalizing(false); media.cancelRecording(); }}>取消录音</button>
+      </div>}
       {profile.isError && <div className={s.composerMeta} role="alert">回复设置读取失败，请刷新后重试。</div>}
       {sourceCount > 0 && <div className={s.composerMeta}><span className={s.materialStatus}>有 {sourceCount} 份附件可查阅</span></div>}
     </form>

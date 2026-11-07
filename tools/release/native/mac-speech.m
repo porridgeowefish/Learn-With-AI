@@ -40,14 +40,22 @@ int main(void) {
         recognition.shouldReportPartialResults = NO;
         __block BOOL done = NO;
         __block NSString *text = @"";
+        __block float confidence = 0;
         __block BOOL failed = NO;
         SFSpeechRecognitionTask *task = [recognizer recognitionTaskWithRequest:recognition resultHandler:^(SFSpeechRecognitionResult *result, NSError *error) {
-            if (result.isFinal) { text = result.bestTranscription.formattedString ?: @""; done = YES; }
+            if (result.isFinal) {
+                text = result.bestTranscription.formattedString ?: @"";
+                float sum = 0;
+                for (SFTranscriptionSegment *segment in result.bestTranscription.segments) sum += segment.confidence;
+                NSUInteger count = result.bestTranscription.segments.count;
+                confidence = count ? sum / count : 0;
+                done = YES;
+            }
             if (error) { failed = YES; done = YES; }
         }];
         if (!waitUntil(^BOOL { return done; }, 65)) { [task cancel]; output(@{@"error":@"timeout"}); return 0; }
         // Apple's no-speech result is surfaced as an empty transcription.
-        output(failed ? @{@"error":@"recognition-failed"} : @{@"text":text});
+        output(failed ? @{@"error":@"recognition-failed"} : @{@"text":text, @"confidence":@(confidence)});
     }
     return 0;
 }

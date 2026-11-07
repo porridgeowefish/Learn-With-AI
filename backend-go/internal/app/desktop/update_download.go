@@ -71,6 +71,8 @@ func (u *updater) action(w http.ResponseWriter, r *http.Request, action string) 
 	}
 	var e error
 	switch action {
+	case "start":
+		e = u.prepare(true)
 	case "prepare":
 		e = u.prepare()
 	case "cancel":
@@ -89,13 +91,24 @@ func (u *updater) action(w http.ResponseWriter, r *http.Request, action string) 
 	writeJSON(w, 200, u.snapshot())
 }
 
-func (u *updater) prepare() error {
+func (u *updater) prepare(automatic ...bool) error {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if u.closed {
 		return errors.New("应用正在退出")
 	}
-	if u.info.Phase == "downloading" || u.info.Phase == "ready" {
+	auto := len(automatic) > 0 && automatic[0]
+	if u.info.Phase == "waiting" {
+		return nil
+	}
+	if u.info.Phase == "downloading" {
+		u.autoInstall = u.autoInstall || auto
+		return nil
+	}
+	if u.info.Phase == "ready" {
+		if auto {
+			u.startInstallationLocked()
+		}
 		return nil
 	}
 	if u.info.Phase == "installing" {
@@ -112,6 +125,8 @@ func (u *updater) prepare() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	u.downloadCancel = cancel
+	u.autoInstall = auto
+	u.installGeneration++
 	u.info.Phase = "downloading"
 	u.info.Error = ""
 	u.info.DownloadedBytes = 0
@@ -153,6 +168,9 @@ func (u *updater) download(ctx context.Context, target UpdateInfo) {
 		u.prepared = file
 		u.preparedVersion = target.Latest
 		u.info.Phase = "ready"
+		if u.autoInstall && !u.closed {
+			u.startInstallationLocked()
+		}
 	}()
 	cache := u.cacheDir
 	if cache == "" {
@@ -270,14 +288,40 @@ func (u *updater) downloadPart(ctx context.Context, part releaseAsset, dst io.Wr
 	return nil
 }
 
-func (u *updater) apply(ctx context.Context) error {
+// The download worker or start endpoint owns this continuation, never the page.
+// mu is held and the worker is registered before exposing waiting.
+func (u *updater) startInstallationLocked() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	u.downloadCancel = cancel
+	u.installGeneration++
+	generation := u.installGeneration
+	u.info.Phase = "waiting"
+	u.info.Error = ""
+	u.downloads.Add(1)
+	go func() {
+		defer u.downloads.Done()
+		defer cancel()
+		_ = u.applyMode(ctx, true)
+		u.mu.Lock()
+		if u.installGeneration == generation {
+			u.downloadCancel = nil
+		}
+		u.mu.Unlock()
+	}()
+}
+
+func (u *updater) apply(ctx context.Context) error { return u.applyMode(ctx, false) }
+
+func (u *updater) applyMode(ctx context.Context, automatic bool) error {
 	u.mu.Lock()
-	if u.info.Phase != "ready" || !u.info.CanInstall || !newerVersion(u.preparedVersion, u.current) {
+	if u.closed || (u.info.Phase != "ready" && !(automatic && u.info.Phase == "waiting")) || !u.info.CanInstall || !newerVersion(u.preparedVersion, u.current) {
 		u.mu.Unlock()
 		return errors.New("请先下载可用的新版本")
 	}
 	file, expected := u.prepared, u.preparedHash
-	u.info.Phase = "installing"
+	if !automatic {
+		u.info.Phase = "installing"
+	}
 	u.mu.Unlock()
 	fail := func(e error) error {
 		u.mu.Lock()
@@ -310,12 +354,27 @@ func (u *updater) apply(ctx context.Context) error {
 	if e = u.validate(file, u.preparedVersion); e != nil {
 		return invalid(e)
 	}
-	wait, cancel := context.WithTimeout(ctx, 2*time.Second)
+	timeout := 2 * time.Second
+	if automatic {
+		timeout = 30 * time.Minute
+	}
+	wait, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	release, e := workspacegate.Exclusive(wait)
 	if e != nil {
-		return fail(errors.New("仍有学习或资料任务运行，请结束后重试安装"))
+		if ctx.Err() != nil {
+			return fail(errors.New("自动更新已取消或等待超时，可重试更新"))
+		}
+		return fail(errors.New("仍有学习或资料任务运行，请结束后重试更新"))
 	}
+	if e = ctx.Err(); e != nil {
+		release(false)
+		return fail(errors.New("自动更新已取消"))
+	}
+	u.mu.Lock()
+	u.info.Phase = "installing"
+	u.info.Error = ""
+	u.mu.Unlock()
 	if e = u.install(file); e != nil {
 		release(false)
 		return fail(e)

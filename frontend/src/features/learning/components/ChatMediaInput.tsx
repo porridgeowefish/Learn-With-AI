@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { learningWorkspaceKeys, MAX_SOURCE_FILE_BYTES } from '../api/learningWorkspace';
 import { UploadIcon, MicrophoneIcon, StopIcon } from '@/shared/primitive/Icons';
 import type { ReactNode } from 'react';
-import { http } from '@/shared/client';
-import { audioFileToWave, encodeWave } from './chatAudio';
+import { audioFileToWave } from './chatAudio';
 import s from './ChatMediaInput.module.css';
+import { useVoiceInput } from './useVoiceInput';
 
 export interface ChatAttachment {
   attachmentId: string;
@@ -18,33 +18,22 @@ export const chatAttachmentURL = (slug: string, id: string) => `/api/projects/${
 
 export function useChatMedia(slug: string) {
   const queryClient = useQueryClient();
+  const voice = useVoiceInput(slug);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
-  const [language, setLanguage] = useState('zh-CN');
+  const language = 'auto';
   const [pending, setPending] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [error, setError] = useState('');
-  const [seconds, setSeconds] = useState(0);
   const count = useRef(0);
   const failedUpload = useRef<{ files: File[]; language: string } | null>(null);
   const uploadController = useRef<AbortController | null>(null);
   const generation = useRef(0);
-  const capture = useRef<{ context: AudioContext; stream: MediaStream; source: MediaStreamAudioSourceNode; processor: ScriptProcessorNode; mute: GainNode; timer: number; chunks: Float32Array[]; rate: number; language: string } | null>(null);
-  const releaseCapture = useCallback(() => {
-    const current = capture.current; capture.current = null;
-    if (current) {
-      clearInterval(current.timer); current.processor.onaudioprocess = null;
-      current.processor.disconnect(); current.source.disconnect(); current.mute.disconnect();
-      current.stream.getTracks().forEach(track => track.stop()); void current.context.close();
-    }
-    return current;
-  }, []);
   useEffect(() => {
-    setAttachments([]); count.current = 0; failedUpload.current = null; setPending(false); setRecording(false); setError('');
-    return () => { generation.current++; uploadController.current?.abort(); uploadController.current = null; releaseCapture(); };
-  }, [slug, releaseCapture]);
+    setAttachments([]); count.current = 0; failedUpload.current = null; setPending(false); setError('');
+    return () => { generation.current++; uploadController.current?.abort(); uploadController.current = null; };
+  }, [slug]);
 
   const addFiles = async (files: File[], selectedLanguage = language) => {
-    if (uploadController.current || capture.current) return;
+    if (uploadController.current || voice.hasRecording || voice.pending) return;
     if (count.current + files.length > 4) { setError('每条消息最多4个附件'); return; }
     const token = generation.current;
     const controller = new AbortController(); uploadController.current = controller;
@@ -70,7 +59,7 @@ export function useChatMedia(slug: string) {
         const isAudio = original.type.startsWith('audio/') || /\.(wav|mp3|m4a|ogg|webm|flac)$/i.test(original.name);
         const file = isAudio ? await audioFileToWave(original) : original;
         if (token !== generation.current || controller.signal.aborted) return;
-        const body = new FormData(); body.append('file', file); body.append('language', selectedLanguage);
+        const body = new FormData(); body.append('file', file); body.append('language', isAudio ? selectedLanguage : 'zh-CN');
         const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/attachments`, { method: 'POST', body, signal: controller.signal });
         const data = await response.json();
         if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : '附件解析失败，请重试');
@@ -81,57 +70,11 @@ export function useChatMedia(slug: string) {
     finally { if (uploadController.current === controller) { uploadController.current = null; setPending(false); } }
   };
 
-  const stopRecording = async () => {
-    const current = releaseCapture(); setRecording(false);
-    if (!current) return;
-    try {
-      const length = current.chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const samples = new Float32Array(length); let offset = 0;
-      for (const chunk of current.chunks) { samples.set(chunk, offset); offset += chunk.length; }
-      const wave = new File([encodeWave(samples, current.rate)], '录音.wav', { type: 'audio/wav' });
-      await addFiles([wave], current.language);
-    } catch (cause) { setError((cause as Error).message); }
-  };
-  const startRecording = async () => {
-    if (pending || recording || uploadController.current || capture.current) return;
-    if (count.current >= 4) { setError('每条消息最多4个附件'); return; }
-    if (!window.confirm('是否允许使用系统麦克风录音？最长60秒，停止后仅在本机转写中文或英文，发送前可移除。')) return;
-    if (!navigator.mediaDevices?.getUserMedia) { setError('当前环境无法访问麦克风，请检查系统和浏览器权限'); return; }
-    const token = generation.current;
-    failedUpload.current = null;
-    setPending(true); setError('');
-    let stream: MediaStream | null = null;
-    let context: AudioContext | null = null;
-    try {
-      const capability = await http.get<{ languages: string[]; setupHint: string }>('/api/system/speech');
-      if (token !== generation.current) return;
-      if (!capability.languages?.includes(language)) throw new Error(capability.setupHint || '系统未安装所选语言的本地语音识别');
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false });
-      if (token !== generation.current) { stream.getTracks().forEach(track => track.stop()); return; }
-      context = new AudioContext(); await context.resume();
-      if (token !== generation.current) { stream.getTracks().forEach(track => track.stop()); await context.close(); return; }
-      const source = context.createMediaStreamSource(stream);
-      const processor = context.createScriptProcessor(4096, 1, 1);
-      const mute = context.createGain(); mute.gain.value = 0;
-      const chunks: Float32Array[] = []; let total = 0;
-      processor.onaudioprocess = event => {
-        const data = event.inputBuffer.getChannelData(0);
-        const remaining = Math.max(0, Math.floor(context!.sampleRate * 60) - total);
-        if (remaining) { const chunk = new Float32Array(data.subarray(0, remaining)); chunks.push(chunk); total += chunk.length; }
-      };
-      source.connect(processor); processor.connect(mute); mute.connect(context.destination);
-      let elapsed = 0; setSeconds(0);
-      const timer = window.setInterval(() => { elapsed++; setSeconds(elapsed); if (elapsed >= 60) void stopRecording(); }, 1000);
-      capture.current = { stream, context, source, processor, mute, chunks, timer, rate: context.sampleRate, language };
-      setRecording(true);
-    } catch (cause) {
-      stream?.getTracks().forEach(track => track.stop()); if (context && context.state !== 'closed') void context.close();
-      if (token === generation.current) setError((cause as Error).name === 'NotAllowedError' ? '麦克风权限未获允许，请在系统或浏览器设置中授权后重试' : (cause as Error).message);
-    } finally { if (token === generation.current) setPending(false); }
-  };
-
   return {
-    attachments, language, setLanguage, pending, recording, seconds, error, addFiles, startRecording, stopRecording,
+    attachments, pending: pending || voice.pending, recording: voice.recording, hasRecording: voice.hasRecording,
+    voicePending: voice.pending, seconds: voice.seconds, error: error || voice.error, addFiles,
+    startRecording: () => { if (uploadController.current) return Promise.resolve(); setError(''); return voice.startRecording(); },
+    stopRecording: voice.stopRecording, cancelRecording: voice.cancelRecording,
     canRetry: Boolean(failedUpload.current),
     retryUpload: () => { const failed = failedUpload.current; if (failed) void addFiles(failed.files, failed.language); },
     clear: () => { count.current = 0; setAttachments([]); },
@@ -150,11 +93,10 @@ export function ChatMediaInput({ media, children, leadingActions }: { media: Ret
     </div>)}</div>}
     <div className={s.controls}>
       <input ref={input} hidden type="file" multiple accept="image/png,image/jpeg,image/gif,audio/*,.pdf,.md,.markdown,.txt,.pptx,.docx,.xlsx,.csv" aria-label="上传附件" onChange={event => { void media.addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
-      <button type="button" className={s.upload} aria-label="上传图片、音频或附件" title="上传图片、音频或附件" disabled={media.pending || media.recording} onClick={() => input.current?.click()}><UploadIcon size={21} /></button>
+      <button type="button" className={s.upload} aria-label="上传图片、音频或附件" title="上传图片、音频或附件" disabled={media.pending || media.hasRecording} onClick={() => input.current?.click()}><UploadIcon size={21} /></button>
       {leadingActions}
-      {media.pending && <span role="status" className={s.status}>正在处理附件…</span>}
+      {media.pending && <span role="status" className={s.status}>{media.voicePending ? '正在转写…' : '正在处理附件…'}</span>}
       <div className={s.actions}>
-        <select aria-label="识别语言" title="识别语言" value={media.language} disabled={media.pending || media.recording} onChange={event => media.setLanguage(event.target.value)}><option value="zh-CN">中文</option><option value="en-US">English</option></select>
         {children}
       </div>
     </div>
@@ -162,10 +104,12 @@ export function ChatMediaInput({ media, children, leadingActions }: { media: Ret
   </div>;
 }
 
-export function ChatMicrophone({ media }: { media: ReturnType<typeof useChatMedia> }) {
-  const label = media.recording ? '停止录音' : '开始录音';
-  return <button type="button" className={s.microphone} data-recording={media.recording || undefined} aria-label={label} title={label} disabled={media.pending} onClick={() => void (media.recording ? media.stopRecording() : media.startRecording())}>
-    {media.recording ? <><StopIcon size={20} /><span role="status">{media.seconds}s</span></> : <MicrophoneIcon size={21} />}
+export function ChatMicrophone({ media, onStop }: { media: ReturnType<typeof useChatMedia>; onStop?: () => void }) {
+  const label = media.hasRecording ? media.recording ? '停止转写' : '重试转写' : '开始录音';
+  const minutes = Math.floor(media.seconds / 60);
+  const duration = `${minutes}:${String(media.seconds % 60).padStart(2, '0')}`;
+  return <button type="button" className={s.microphone} data-recording={media.recording || undefined} aria-label={label} title={label} disabled={media.pending} onClick={() => void (media.hasRecording ? onStop ? onStop() : media.stopRecording() : media.startRecording())}>
+    {media.recording ? <><StopIcon size={20} /><span role="status">{duration}</span></> : <MicrophoneIcon size={21} />}
   </button>;
 }
 

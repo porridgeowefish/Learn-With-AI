@@ -283,6 +283,7 @@ function conversation(ctx, s, parts, b) {
       s.messages.flatMap((m) => m.blocks.map((x) => x.source)).join('\n\n'),
       { headers: { 'Content-Type': 'text/markdown; charset=utf-8' } },
     );
+  if (action === 'transcribe' && method === 'POST') return json({text:'这是语音输入的设计示例。'});
   if (action === 'attachments') {
     if (method === 'POST') {
       const attachmentId = id();

@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useHealth } from '@/app/api/health';
 import { useProjects } from '@/features/projects/api/projects';
-import { useOnboardingStore } from '@/shared/store/slices/onboarding';
 import { useUiStore } from '@/shared/store/slices/ui';
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
@@ -17,7 +15,6 @@ import s from './HomePage.module.css';
 
 export function HomePage() {
   const navigate = useNavigate();
-  const tour = useOnboardingStore();
   const modalOpen = useUiStore((s) => s.createProjectModalOpen);
   const openModal = useUiStore((s) => s.openCreateProjectModal);
   const closeModal = useUiStore((s) => s.closeCreateProjectModal);
@@ -35,7 +32,6 @@ export function HomePage() {
     requestAnimationFrame(() => { (demoOpener.current?.isConnected ? demoOpener.current : replayButton.current)?.focus(); });
   };
 
-  const { data: health } = useHealth();
   const { data: projectsData, isLoading: projectsLoading } = useProjects();
 
   const projects = (projectsData?.projects ?? []).filter(project => project.projectType === 'discipline-map');
@@ -47,7 +43,7 @@ export function HomePage() {
           <div>
             <h1 className={s.title}>学习主页</h1>
             <p className={s.subtitle}>
-              本地学习工作台 · 当前工作区 <code>{health?.workspace ?? '…'}</code>
+              从一个问题开始，继续你的学习。
             </p>
           </div>
           <div className={s.headerActions}>
@@ -58,10 +54,6 @@ export function HomePage() {
           </div>
         </header>
 
-        {!tour.dismissed && !tour.active && <section className={s.onboarding} aria-label="新用户引导">
-          <div><h2>从第一次配置，到第一次学会</h2><p>让屏幕向导带你找到每一步的实际入口：连接模型、写偏好、创建项目，再到提问、复习和附件。</p></div>
-          <div className={s.onboardingActions}><Button variant="primary" onClick={tour.start}>开始屏幕向导</Button><Button variant="ghost" onClick={tour.dismiss}>不再显示</Button></div>
-        </section>}
 
         <LearningRhythm projects={projects} />
 

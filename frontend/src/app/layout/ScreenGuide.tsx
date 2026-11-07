@@ -8,7 +8,7 @@ import s from './ScreenGuide.module.css';
 
 const steps = [
  { title: '欢迎，先认识你的学习工作台', target: 'welcome', route: '/', body: '接下来会带你操作真实界面。关闭向导后不会再次显示；离线体验示例仍可使用。', next: '开始配置' },
- { title: '连接你的教师模型', target: 'model-connections', route: '/settings', body: '选择“API 连接”，点击“添加 API 连接”，填写你自己的模型与 Key，检测并保存。也可以选择登录连接。向导不会读取或填写密钥。', next: '已保存连接，继续' },
+ { title: '连接你的教师模型', target: 'model-connections', route: '/settings?section=models', body: '选择“API 连接”，点击“添加 API 连接”，填写你自己的模型与 Key，检测并保存。也可以选择登录连接。向导不会读取或填写密钥。', next: '已保存连接，继续' },
  { title: '告诉教师，你希望怎样学习', target: 'preferences', route: '/preferences', body: '在下方填写你喜欢的讲解方式，例如“先讲直觉，多给例子”，再点击“保存偏好”。这是选填项，可以直接继续。', next: '去创建学习项目' },
  { title: '创建第一个系统学习项目', target: 'create-project', route: '/', body: '点击“新建项目”，选择“系统学习”，输入一个具体主题，然后点击“创建项目”。也可以从向导下方选择已有的系统学习项目继续。', next: '等待你进入学习项目' },
  { title: '向教师提出第一个问题', target: 'teacher-composer', body: '在高亮输入框写下问题并发送。左侧加号可上传附件，右侧可以选择模型或使用麦克风。教师回答期间，后续问题会进入等待队列。', next: '去看笔记与复习' },

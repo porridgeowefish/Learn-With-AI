@@ -21,6 +21,8 @@ try {
     $engine.InitialSilenceTimeout = [TimeSpan]::FromSeconds(60)
     $engine.BabbleTimeout = [TimeSpan]::FromSeconds(60)
     $lines = [Collections.Generic.List[string]]::new()
+    $confidenceSum = 0.0
+    $wordCount = 0
     while ($true) {
         try { $result = $engine.Recognize([TimeSpan]::FromSeconds(65)) }
         catch {
@@ -30,7 +32,11 @@ try {
             throw
         }
         if ($null -eq $result) { break }
-        if ($result.Text) { $lines.Add($result.Text) }
+        if ($result.Text) {
+            $lines.Add($result.Text)
+            foreach ($word in $result.Words) { $confidenceSum += $word.Confidence; $wordCount++ }
+        }
     }
-    @{ text = ($lines -join "`n") } | ConvertTo-Json -Compress
+    $confidence = if ($wordCount -gt 0) { $confidenceSum / $wordCount } else { 0.0 }
+    @{ text = ($lines -join "`n"); confidence = $confidence } | ConvertTo-Json -Compress
 } finally { $engine.Dispose() }

@@ -11,7 +11,7 @@ export interface UpdateInfo {
   releaseNotes?: string;
   downloadUrl?: string;
   canInstall?: boolean;
-  phase?: 'idle' | 'downloading' | 'ready' | 'installing' | 'error';
+  phase?: 'idle' | 'downloading' | 'ready' | 'waiting' | 'installing' | 'error';
   downloadedBytes?: number;
   totalBytes?: number;
   installResult?: string;
@@ -35,7 +35,7 @@ export function useUpdateInfo() {
     queryKey: updateKey,
     queryFn: () => fetchUpdate(false),
     staleTime: 30 * 60 * 1000,
-    refetchInterval: query => query.state.data?.phase === 'downloading' ? 1000 : 6 * 60 * 60 * 1000,
+    refetchInterval: query => ['downloading', 'waiting', 'installing'].includes(query.state.data?.phase ?? '') ? 1000 : 6 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -44,7 +44,7 @@ export function useUpdateInfo() {
 export function useUpdateAction() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (action: 'check' | 'prepare' | 'cancel' | 'install') => action === 'check'
+    mutationFn: (action: 'check' | 'start' | 'prepare' | 'cancel' | 'install') => action === 'check'
       ? fetchUpdate(true)
       : http.post<UpdateInfo>(`/api/system/update/${action}`, {}),
     onSuccess: info => client.setQueryData(updateKey, info),

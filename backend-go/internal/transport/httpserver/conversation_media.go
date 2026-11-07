@@ -15,6 +15,38 @@ func (s *Server) handleSpeechCapability(w http.ResponseWriter, r *http.Request) 
 	httpx.WriteJSON(w, http.StatusOK, teacher.LocalSpeechCapability(r.Context()))
 }
 
+func (s *Server) handleVoiceTranscription(w http.ResponseWriter, r *http.Request) {
+	origin, err := url.Parse(r.Header.Get("Origin"))
+	if err != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host != r.Host {
+		httpx.Error(w, http.StatusForbidden, "请从应用页面使用语音输入")
+		return
+	}
+	if _, err := teacher.NewConversation(r.PathValue("id")); err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	// This bounds each transport chunk, not the duration of the recording.
+	const maxChunkBytes = 60*32000 + 4096
+	r.Body = http.MaxBytesReader(w, r.Body, maxChunkBytes)
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "语音分段过大，请重试")
+		return
+	}
+	lock := s.chatMediaLock(r.PathValue("id"))
+	lock.Lock()
+	defer lock.Unlock()
+	ctx, cancel := context.WithTimeout(r.Context(), 100*time.Second)
+	defer cancel()
+	text, err := teacher.TranscribeVoice(ctx, data)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"text": text})
+}
+
 func (s *Server) handleChatAttachment(w http.ResponseWriter, r *http.Request) {
 	lock := s.chatMediaLock(r.PathValue("id"))
 	lock.Lock()

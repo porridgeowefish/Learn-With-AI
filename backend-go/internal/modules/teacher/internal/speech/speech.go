@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -17,12 +18,15 @@ type Capability struct {
 }
 
 type Result struct {
-	Languages []string `json:"languages"`
-	Text      string   `json:"text"`
-	Error     string   `json:"error"`
+	Languages  []string `json:"languages"`
+	Text       string   `json:"text"`
+	Error      string   `json:"error"`
+	Confidence float64  `json:"confidence"`
 }
 
-func ValidLanguage(language string) bool { return language == "zh-CN" || language == "en-US" }
+func ValidLanguage(language string) bool {
+	return language == "auto" || language == "zh-CN" || language == "en-US"
+}
 
 func Probe(ctx context.Context) Capability {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -47,7 +51,13 @@ func Recognize(ctx context.Context, language string, data []byte) (string, error
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	result, err := run(ctx, "recognize", language, data)
+	var result Result
+	var err error
+	if language == "auto" {
+		result, err = recognizeAuto(ctx, data, run)
+	} else {
+		result, err = run(ctx, "recognize", language, data)
+	}
 	if ctx.Err() != nil {
 		return "", errors.New("语音解析超时或已取消，请重试")
 	}
@@ -68,6 +78,62 @@ func Recognize(ctx context.Context, language string, data []byte) (string, error
 	default:
 		return "", errors.New("系统语音解析失败，请检查音频或重试")
 	}
+}
+
+// Native engines are language-specific. Compare their local hypotheses without
+// sending audio to a model service. This selects a dominant language, not a
+// guarantee of accurate code-switching within a sentence.
+func recognizeAuto(ctx context.Context, data []byte, runner func(context.Context, string, string, []byte) (Result, error)) (Result, error) {
+	capability, err := runner(ctx, "probe", "", nil)
+	if err != nil {
+		return Result{}, err
+	}
+	type candidate struct {
+		result Result
+		err    error
+	}
+	var languages []string
+	for _, language := range []string{"zh-CN", "en-US"} {
+		for _, installed := range capability.Languages {
+			if installed == language {
+				languages = append(languages, language)
+				break
+			}
+		}
+	}
+	if len(languages) == 0 {
+		return Result{Error: "language-unavailable"}, nil
+	}
+	results := make([]chan candidate, len(languages))
+	for i, language := range languages {
+		results[i] = make(chan candidate, 1)
+		go func(ch chan candidate, language string) {
+			r, e := runner(ctx, "recognize", language, data)
+			ch <- candidate{r, e}
+		}(results[i], language)
+	}
+	best := Result{}
+	var failure candidate
+	succeeded := false
+	for _, ch := range results {
+		select {
+		case <-ctx.Done():
+			return Result{}, ctx.Err()
+		case c := <-ch:
+			if c.err != nil || c.result.Error != "" {
+				failure = c
+				continue
+			}
+			succeeded = true
+			if strings.TrimSpace(c.result.Text) != "" && (best.Text == "" || c.result.Confidence > best.Confidence) {
+				best = c.result
+			}
+		}
+	}
+	if succeeded {
+		return best, nil
+	}
+	return failure.result, failure.err
 }
 
 // Exact digital silence is an empty input, independent of installed recognizers.
