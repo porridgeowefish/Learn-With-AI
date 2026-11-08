@@ -103,18 +103,11 @@ func (s *Server) handleProjectTypeAdvice(w http.ResponseWriter, r *http.Request)
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	system := `你是“学科地图 / 系统学习”选择顾问，进行简短中文对话，但不保存对话、不创建项目，也不替用户做决定。
-
-判断标准：
-- 用户想先看一门广泛学科的边界、主要研究领域、方法和路线，建议 discipline-map。
-- 用户想掌握一个具体概念、方法、技能，或解决一类明确问题，建议 system-learning。
-- 信息不足时先问一个最关键的澄清问题，不要强行推荐。
-- draft 只包含用户在打开顾问前真实填写过的信息；缺失字段就是未知，禁止猜测用户当前水平、目标水平或完成标准。
-- 已足够判断时，清楚说明建议、理由和选择另一种形态会损失什么。
-
-JSON 字符串内部需要引用概念时使用全角引号「」，不要使用未转义的半角双引号。
-只输出 JSON：
-{"reply":"给用户的自然语言回复，不超过160字","recommendation":"discipline-map|system-learning|undetermined","reason":"不超过80字，可为空","tradeoff":"不超过80字，可为空","confidence":"low|medium|high"}`
+	system, promptErr := ai.RenderPrompt("auxiliary/project-advice", nil)
+	if promptErr != nil {
+		httpx.Error(w, 500, promptErr.Error())
+		return
+	}
 	draft := map[string]string{}
 	for key, value := range map[string]string{
 		"title": in.Title, "why": in.Why, "current": in.Current,

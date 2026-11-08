@@ -22,7 +22,7 @@ func (s *Store) LearningGuideline() (learningprofile.LearningGuideline, error) {
 		return learningprofile.LearningGuideline{}, err
 	}
 	var saved learningprofile.LearningGuideline
-	if len(data) > 32*1024 || !utf8.Valid(data) || json.Unmarshal(data, &saved) != nil || !learningprofile.ValidLearningMode(saved.LearningMode) || saved.Version != 1 || saved.Guideline == "" {
+	if len(data) > 32*1024 || !utf8.Valid(data) || json.Unmarshal(data, &saved) != nil || !learningprofile.ValidLearningMode(saved.LearningMode) || (saved.Version != 1 && saved.Version != 2) || saved.Guideline == "" {
 		return saved, errors.New("invalid saved learning guideline")
 	}
 	return saved, nil

@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/xmz14/lll/backend-go/internal/modules/ai"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	config "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
@@ -136,6 +136,10 @@ func ExtractPage(ctx context.Context, p PageProvider, image []byte) (PageResult,
 	}
 	ctx, c := context.WithTimeout(ctx, 120*time.Second)
 	defer c()
+	extractionPrompt, promptErr := ai.RenderPrompt("auxiliary/ocr", nil)
+	if promptErr != nil {
+		return PageResult{}, promptErr
+	}
 	encoded := base64.StdEncoding.EncodeToString(image)
 	url := strings.TrimRight(p.BaseURL, "/") + "/chat/completions"
 	payload := map[string]any{"model": p.Model, "max_tokens": config.ModelOutputTokens, "messages": []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": extractionPrompt}, map[string]any{"type": "image_url", "image_url": map[string]string{"url": "data:image/png;base64," + encoded}}}}}}

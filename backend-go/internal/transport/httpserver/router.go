@@ -28,6 +28,7 @@ type Server struct {
 	lifecycle       *teacher.Lifecycle
 	tools           *teacher.LearningTools
 	notes           *teacher.NoteService
+	summaries       *teacher.SummaryService
 	sourceProcessor *sources.Processor
 	broadcaster     *httpx.Broadcaster
 	cache           *projects.Index
@@ -62,6 +63,8 @@ func New(deps Dependencies) *Server {
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/projects/{id}/teaching-summaries", s.teachingSummaries)
+	mux.HandleFunc("POST /api/projects/{id}/teaching-summaries/{summaryId}/{action}", s.teachingSummaries)
 	mux.HandleFunc("GET /api/learning/visuals/image", s.handleLearningVisual)
 	mux.HandleFunc("GET /api/learning/visuals/metadata", s.handleLearningVisualMetadata)
 	mux.HandleFunc("GET /api/settings/learning", s.learningProfile)
@@ -199,9 +202,13 @@ func (s *Server) Handler() http.Handler {
 		mux.ServeHTTP(w, r)
 	}))
 }
-func (s *Server) SetShutdownFunc(fn func())              { s.mu.Lock(); s.shutdown = fn; s.mu.Unlock() }
-func (s *Server) AttachNotes(notes *teacher.NoteService) { s.notes = notes }
+func (s *Server) SetShutdownFunc(fn func())                         { s.mu.Lock(); s.shutdown = fn; s.mu.Unlock() }
+func (s *Server) AttachNotes(notes *teacher.NoteService)            { s.notes = notes }
+func (s *Server) AttachSummaries(summaries *teacher.SummaryService) { s.summaries = summaries }
 func (s *Server) Close() {
+	if s.summaries != nil {
+		_ = s.summaries.Close()
+	}
 	s.teachingLifecycle().Close()
 	s.learningTools().Close()
 	if s.generation != nil {

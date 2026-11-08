@@ -2,6 +2,7 @@
 package askaiconfig
 
 import (
+	"fmt"
 	"strings"
 
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
@@ -9,6 +10,7 @@ import (
 
 // Provider is one configured Ask-AI model source.
 type Provider struct {
+	MaxConcurrency      int    `json:"maxConcurrency,omitempty"`
 	ID                  string `json:"id"`
 	Kind                string `json:"kind"` // "openai" | "anthropic"
 	Name                string `json:"name"`
@@ -23,10 +25,12 @@ type Provider struct {
 
 // Config is the askAiProviders section.
 type Config struct {
-	Default      string             `json:"default"`
-	SearchEngine string             `json:"searchEngine"` // "google" | "bing"
-	Providers    []Provider         `json:"providers"`
-	Bindings     map[string]Binding `json:"bindings,omitempty"`
+	ForegroundConcurrency int                `json:"foregroundConcurrency,omitempty"`
+	BackgroundConcurrency int                `json:"backgroundConcurrency,omitempty"`
+	Default               string             `json:"default"`
+	SearchEngine          string             `json:"searchEngine"` // "google" | "bing"
+	Providers             []Provider         `json:"providers"`
+	Bindings              map[string]Binding `json:"bindings,omitempty"`
 }
 
 type Binding struct {
@@ -120,12 +124,12 @@ func Load() (*Config, error) {
 	if !ok {
 		return nil, nil
 	}
-	cfg := Config{Default: settings.Default, SearchEngine: settings.SearchEngine, Bindings: make(map[string]Binding, len(settings.Bindings))}
+	cfg := Config{ForegroundConcurrency: settings.ForegroundConcurrency, BackgroundConcurrency: settings.BackgroundConcurrency, Default: settings.Default, SearchEngine: settings.SearchEngine, Bindings: make(map[string]Binding, len(settings.Bindings))}
 	for name, binding := range settings.Bindings {
 		cfg.Bindings[name] = Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
 	for _, provider := range settings.Providers {
-		cfg.Providers = append(cfg.Providers, Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.ResolveAPIKey(), APIKeyEnv: provider.APIKeyEnv, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
+		cfg.Providers = append(cfg.Providers, Provider{MaxConcurrency: provider.MaxConcurrency, ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.ResolveAPIKey(), APIKeyEnv: provider.APIKeyEnv, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
 	}
 	cfg.Default = strings.TrimSpace(cfg.Default)
 	cfg.SearchEngine = strings.TrimSpace(cfg.SearchEngine)
@@ -144,6 +148,14 @@ func Load() (*Config, error) {
 // Save writes the askAiProviders section back to config.local.json, preserving
 // all other top-level keys via a raw-JSON round-trip. Atomic write.
 func Save(cfg Config) error {
+	if cfg.ForegroundConcurrency < 0 || cfg.ForegroundConcurrency > 32 || cfg.BackgroundConcurrency < 0 || cfg.BackgroundConcurrency > 32 {
+		return fmt.Errorf("invalid concurrency limits")
+	}
+	for _, p := range cfg.Providers {
+		if p.MaxConcurrency < 0 || p.MaxConcurrency > 64 {
+			return fmt.Errorf("invalid provider concurrency limit")
+		}
+	}
 	old, _, err := platformconfig.LoadAI()
 	if err != nil {
 		return err
@@ -152,7 +164,7 @@ func Save(cfg Config) error {
 	for _, p := range old.Providers {
 		oldByID[p.ID] = p
 	}
-	settings := platformconfig.AISettings{Default: cfg.Default, SearchEngine: cfg.SearchEngine, Bindings: make(map[string]platformconfig.Binding, len(cfg.Bindings))}
+	settings := platformconfig.AISettings{ForegroundConcurrency: cfg.ForegroundConcurrency, BackgroundConcurrency: cfg.BackgroundConcurrency, Default: cfg.Default, SearchEngine: cfg.SearchEngine, Bindings: make(map[string]platformconfig.Binding, len(cfg.Bindings))}
 	for name, binding := range cfg.Bindings {
 		settings.Bindings[name] = platformconfig.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
@@ -161,7 +173,7 @@ func Save(cfg Config) error {
 		if ok && provider.APIKey == previous.ResolveAPIKey() && previous.APIKeyEnv != "" && provider.APIKeyEnv == previous.APIKeyEnv {
 			provider.APIKey = previous.APIKey
 		}
-		settings.Providers = append(settings.Providers, platformconfig.Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
+		settings.Providers = append(settings.Providers, platformconfig.Provider{MaxConcurrency: provider.MaxConcurrency, ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
 	}
 	return platformconfig.SaveAI(settings)
 }

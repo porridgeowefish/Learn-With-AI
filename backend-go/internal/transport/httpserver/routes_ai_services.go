@@ -144,7 +144,12 @@ func (s *Server) handleProbeAIServices(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	started := time.Now()
-	_, err := ai.Complete(r.Context(), ai.Provider{Kind: provider.Kind, BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: provider.Model}, "Reply with ok.", []ai.AIMessage{{Role: "user", Content: "ping"}})
+	prompt, promptErr := ai.RenderPrompt("auxiliary/provider-probe", nil)
+	if promptErr != nil {
+		httpx.Error(w, 500, promptErr.Error())
+		return
+	}
+	_, err := ai.Complete(r.Context(), ai.Provider{ID: provider.ID, Kind: provider.Kind, BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: provider.Model}, prompt, []ai.AIMessage{{Role: "user", Content: "ping"}})
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": false, "latencyMs": time.Since(started).Milliseconds(), "error": "provider probe failed"})
 		return

@@ -26,6 +26,7 @@ import (
 // the openai tool_calls/role=tool shape and the anthropic tool_use/tool_result
 // blocks when present.
 type Message struct {
+	Pinned     bool `json:"-"`
 	Role       string
 	Content    string
 	ToolCalls  []ToolCall

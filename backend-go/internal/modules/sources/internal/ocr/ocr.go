@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"io"
 	"net/http"
 	"os"
@@ -33,14 +34,6 @@ type visionProvider struct {
 	APIKey  string
 	Model   string
 }
-
-const extractionPrompt = `你是资料数字化助手。请把图片中的全部文字内容逐字提取为 Markdown：
-- 保留原有的标题层级、段落与列表结构；
-- 表格用 Markdown 表格还原；
-- 数学公式用 $...$（行内）或 $$...$$（独立行）输出 LaTeX；
-- 手写或印刷不清的内容用 [?] 标注，不要猜测编造；
-- 图片中的图表（非文字）在结尾用一行“图表：<一句话描述>”说明；
-- 不要输出与提取内容无关的任何解释。`
 
 // Configured reports whether the ocr binding resolves to a usable provider.
 func Configured() bool {
@@ -128,6 +121,10 @@ func ProcessImageOCR(slug string, store *impl.Store, sourceID, revisionID string
 }
 
 func extract(ctx context.Context, provider visionProvider, mediaType string, image []byte) (string, error) {
+	extractionPrompt, promptErr := ai.RenderPrompt("auxiliary/ocr", nil)
+	if promptErr != nil {
+		return "", promptErr
+	}
 	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 	encoded := base64.StdEncoding.EncodeToString(image)

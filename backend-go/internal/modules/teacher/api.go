@@ -21,7 +21,6 @@ import (
 
 const (
 	ConversationSchemaVersion = conversation.SchemaVersion
-	SystemPrompt              = service.SystemPrompt
 )
 
 type (
@@ -57,8 +56,9 @@ func New(gateway ai.Gateway) *Service { return service.New(gateway) }
 
 const (
 	FeynmanFinishRequest = service.FeynmanFinishRequest
-	FeynmanOpening       = service.FeynmanOpening
 )
+
+var FeynmanOpening = service.FeynmanOpening
 
 func FeynmanSystemPrompt(review string) string { return service.FeynmanSystemPrompt(review) }
 
@@ -143,3 +143,9 @@ func PrepareImportedConversation(root string) error {
 }
 
 var IsExtractedMediaText = conversation.IsExtractedMediaText
+
+var SystemPrompt = service.SystemPrompt
+
+func BuildFeynmanComposition(ctx context.Context, review string) (ai.ComposedPrompt, error) {
+	return service.BuildFeynmanComposition(ctx, review)
+}

@@ -1,0 +1,144 @@
+{
+  "slots": [
+    {
+      "resource": "teaching/teacherBasePrompt"
+    },
+    {
+      "resource": "teaching/teacherReasoningPrompt"
+    },
+    {
+      "resource": "teaching/diagramPrompt"
+    },
+    {
+      "resource": "teaching/mathFormattingPrompt"
+    },
+    {
+      "resource": "teaching/mathTeachingPrompt"
+    },
+    {
+      "contextBinding": "course_framework"
+    },
+    {
+      "contextBinding": "prior_knowledge"
+    },
+    {
+      "contextBinding": "preferences"
+    },
+    {
+      "contextBinding": "scope"
+    },
+    {
+      "contextBinding": "instructions"
+    },
+    {
+      "contextBinding": "guideline"
+    },
+    {
+      "resource": "teaching/length-short",
+      "when": {
+        "equals": "short",
+        "fact": "length"
+      }
+    },
+    {
+      "resource": "teaching/length-medium",
+      "when": {
+        "equals": "medium",
+        "fact": "length"
+      }
+    },
+    {
+      "resource": "teaching/length-long",
+      "when": {
+        "equals": "long",
+        "fact": "length"
+      }
+    },
+    {
+      "resource": "tools/web-search-instructions",
+      "when": {
+        "equals": "true",
+        "fact": "webSearchEnabled"
+      }
+    },
+    {
+      "resource": "tools/source-instructions",
+      "when": {
+        "equals": "true",
+        "fact": "sourcesEnabled"
+      }
+    },
+    {
+      "resource": "tools/visual-instructions"
+    },
+    {
+      "history": true
+    }
+  ],
+  "tools": [
+    "search_web",
+    "find_learning_visual",
+    "list_source_documents",
+    "get_source_outline",
+    "search_source",
+    "read_source"
+  ],
+  "schemaVersion": 1,
+  "sceneID": "teacher/general",
+  "contextBindings": {
+    "instructions": {
+      "role": "context",
+      "required": true,
+      "sourceID": "instructions",
+      "template": "teaching/context-reference"
+    },
+    "guideline": {
+      "role": "context",
+      "required": true,
+      "sourceID": "guideline",
+      "template": "teaching/context-reference"
+    },
+    "scope": {
+      "role": "context",
+      "required": true,
+      "sourceID": "scope",
+      "template": "teaching/scope"
+    },
+    "preferences": {
+      "role": "context",
+      "required": true,
+      "sourceID": "preferences",
+      "template": "teaching/preferences"
+    },
+    "course_framework": {
+      "role": "context",
+      "required": true,
+      "sourceID": "course_framework",
+      "when": {
+        "fact": "hasCourse",
+        "equals": "true"
+      },
+      "template": "teaching/context-reference"
+    },
+    "prior_knowledge": {
+      "role": "context",
+      "required": true,
+      "sourceID": "prior_knowledge",
+      "when": {
+        "fact": "hasCourse",
+        "equals": "true"
+      },
+      "template": "teaching/context-reference"
+    }
+  },
+  "budgets": {},
+  "facts": {
+    "learningMode": "string",
+    "webSearchEnabled": "boolean",
+    "isOpening": "boolean",
+    "hasCourse": "boolean",
+    "sourcesEnabled": "boolean",
+    "sectionID": "string",
+    "length": "string"
+  }
+}

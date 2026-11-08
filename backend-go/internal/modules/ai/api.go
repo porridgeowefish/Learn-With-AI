@@ -43,3 +43,5 @@ func Complete(ctx context.Context, p Provider, system string, messages []AIMessa
 }
 
 var ErrContextBudgetExhausted = budget.ErrContextBudgetExhausted
+
+func WithBackgroundRequest(ctx context.Context) context.Context { return gateway.WithBackground(ctx) }

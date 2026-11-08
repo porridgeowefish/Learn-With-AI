@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,12 +36,7 @@ type mapPointer struct {
 	VersionID     string `json:"versionId"`
 }
 
-var mapLocks sync.Map
-
-func mapLock(root string) *sync.Mutex {
-	v, _ := mapLocks.LoadOrStore(root, &sync.Mutex{})
-	return v.(*sync.Mutex)
-}
+func mapLock(root string) *sync.Mutex { return projects.MapLock(root) }
 func ReadMap(slug, version string) (MapProjection, error) {
 	root, e := projects.ProjectRootForSlug(slug)
 	if e != nil {
@@ -74,52 +69,31 @@ func readMapLocked(root, version string) (MapProjection, error) {
 		}
 		version = pointer.VersionID
 	}
-	dir := filepath.Join(root, "map", "versions", version)
-	var m mapManifest
-	if e := readJSON(filepath.Join(dir, "manifest.json"), &m); e != nil {
-		return MapProjection{}, problem("map-version-unavailable", 404)
-	}
-	overview, e := os.ReadFile(filepath.Join(dir, "overview.md"))
+	manifest, overview, topics, e := projects.ReadMapVersion(root, version)
 	if e != nil {
 		return MapProjection{}, problem("map-recovery-required", 409)
 	}
-	topics, e := os.ReadFile(filepath.Join(dir, "topics.json"))
-	if e != nil || hash(string(overview)) != m.OverviewHash || hash(string(topics)) != m.TopicsHash || m.VersionID != version {
+	var coverage Coverage
+	if len(manifest.Coverage) > 0 && json.Unmarshal(manifest.Coverage, &coverage) != nil {
 		return MapProjection{}, problem("map-recovery-required", 409)
 	}
 	var catalog projects.Catalog
 	if json.Unmarshal(topics, &catalog) != nil {
 		catalog = projects.EmptyCatalog()
 	}
-	return MapProjection{MapVersionID: version, Format: m.Format, OverviewMarkdown: string(overview), Topics: catalog, Coverage: m.Coverage}, nil
+	return MapProjection{MapVersionID: version, Format: manifest.Format, OverviewMarkdown: string(overview), Topics: catalog, Coverage: coverage}, nil
 }
 func writeMapVersion(root, id, job, format string, overview, topics []byte, coverage Coverage) error {
-	dir := filepath.Join(root, "map", "versions", id)
-	if e := os.MkdirAll(dir, 0755); e != nil {
+	b, e := json.Marshal(coverage)
+	if e != nil {
 		return e
 	}
-	if e := filesystem.AtomicWriteFile(filepath.Join(dir, "overview.md"), overview, 0600); e != nil {
-		return e
-	}
-	if e := filesystem.AtomicWriteFile(filepath.Join(dir, "topics.json"), topics, 0600); e != nil {
-		return e
-	}
-	return writeJSON(filepath.Join(dir, "manifest.json"), mapManifest{SchemaVersion: 1, VersionID: id, JobID: job, Format: format, OverviewHash: hash(string(overview)), TopicsHash: hash(string(topics)), Coverage: coverage, CreatedAt: time.Now().UTC()})
+	return projects.WriteMapVersion(root, id, job, format, overview, topics, b)
 }
 func publishMapLocked(slug, job, base string, out MapProjection) (string, error) {
 	root, e := projects.ProjectRootForSlug(slug)
 	if e != nil {
 		return "", e
-	}
-	mu := mapLock(root)
-	mu.Lock()
-	defer mu.Unlock()
-	current, e := readMapLocked(root, "")
-	if e != nil && !errors.Is(e, os.ErrNotExist) {
-		return "", e
-	}
-	if current.MapVersionID != base {
-		return "", problem("map-version-conflict", 409)
 	}
 	if e = validateNewMap(&out); e != nil {
 		return "", e
@@ -130,10 +104,14 @@ func publishMapLocked(slug, job, base string, out MapProjection) (string, error)
 	if e != nil {
 		return "", e
 	}
-	if e = writeMapVersion(root, id, job, "structured", []byte(out.OverviewMarkdown), topics, out.Coverage); e != nil {
+	coverage, e := json.Marshal(out.Coverage)
+	if e != nil {
 		return "", e
 	}
-	if e = writeJSON(filepath.Join(root, "map", "current.json"), mapPointer{SchemaVersion: 1, VersionID: id}); e != nil {
+	if e = projects.PublishCourseMap(root, base, id, job, "structured", []byte(out.OverviewMarkdown), topics, coverage); e != nil {
+		if e.Error() == "map-version-conflict" {
+			return "", problem("map-version-conflict", 409)
+		}
 		return "", e
 	}
 	return id, nil

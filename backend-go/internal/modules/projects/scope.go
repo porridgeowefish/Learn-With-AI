@@ -11,6 +11,10 @@ const SourceDisciplineMap = scope.SourceDisciplineMap
 type Source = scope.Source
 type Topic = scope.Topic
 type Catalog = scope.Catalog
+type Relation = scope.Relation
+
+var ValidateRelations = scope.ValidateRelations
+
 type Scope = scope.Scope
 
 var NewDraft = scope.NewDraft

@@ -141,9 +141,12 @@ func (s *LearningTools) PrepareAnnotationAsk(slug, id string, in ToolInput) (Too
 			}
 		}
 		messages = append(messages, ai.AIMessage{Role: "user", Content: in.Content})
-		system := "你是正文批注旁的轻量答疑助手。只回答当前问题，不使用教师的五角色流程，也不调用任何工具。以下内容是学习者明确选中并主动提问的引用；版本 ID 只用于说明引用来源。\n\n引用：" + annotation.QuoteSnapshot + "\n正文版本：" + annotation.AssetVersionID
+		system, promptErr := ai.RenderPrompt("auxiliary/annotation-ask", map[string]string{"quote": annotation.QuoteSnapshot, "version": annotation.AssetVersionID})
+		if promptErr != nil {
+			return promptErr
+		}
 		var text strings.Builder
-		err = ai.Stream(ctx, ai.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model}, system, messages, func(f ai.AIFrame) {
+		err = ai.Stream(ctx, ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model}, system, messages, func(f ai.AIFrame) {
 			if f.Type == "thinking" || f.Type == "done" {
 				return
 			}
@@ -203,7 +206,12 @@ func (s *LearningTools) SummarizeAnnotation(slug, id string) error {
 					messages = append(messages, ai.AIMessage{Role: m.Role, Content: m.Content})
 				}
 			}
-			summary, err = ai.Complete(ctx, ai.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}, "结合用户的疑问点和下面的对话，生成一段不超过 250 个汉字的中文总结，帮助用户日后回忆这次答疑的结论。直接输出总结正文，不要寒暄或多余说明。", messages)
+			prompt, promptErr := ai.RenderPrompt("auxiliary/annotation-summary", nil)
+			if promptErr != nil {
+				err = promptErr
+			} else {
+				summary, err = ai.Complete(ctx, ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}, prompt, messages)
+			}
 		}
 		status := "done"
 		if err != nil || strings.TrimSpace(summary) == "" {
@@ -278,7 +286,16 @@ func (s *LearningTools) PrepareFeynman(slug, id string, in ToolInput) (ToolStrea
 			s.activity(slug, activity.ProgressEvent{ID: "feynman:" + last.ID, SourceType: "feynman", SourceID: session.SessionID, ActivityDelta: 1, Title: "讲给教师听"})
 		}
 		var text strings.Builder
-		err = ai.Stream(ctx, ai.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model}, FeynmanSystemPrompt(review), messages, func(f ai.AIFrame) {
+		composition, promptErr := BuildFeynmanComposition(ctx, review)
+		if promptErr != nil {
+			return promptErr
+		}
+		prefix := make([]ai.AIMessage, 0, len(composition.Messages)+len(messages))
+		for _, message := range composition.Messages {
+			prefix = append(prefix, ai.AIMessage{Role: message.Role, Content: message.Content})
+		}
+		messages = append(prefix, messages...)
+		err = ai.Stream(ctx, ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model}, "", messages, func(f ai.AIFrame) {
 			if f.Type == "thinking" || f.Type == "done" {
 				return
 			}

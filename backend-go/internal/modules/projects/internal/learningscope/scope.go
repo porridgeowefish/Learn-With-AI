@@ -26,6 +26,7 @@ var topicIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 // Source records where a learning scope came from. Map-origin projects keep a
 // copied snapshot, so regenerating the map does not silently mutate them.
 type Source struct {
+	MapID        string `json:"mapId,omitempty"`
 	Type         string `json:"type"`
 	MapSlug      string `json:"mapSlug,omitempty"`
 	TopicID      string `json:"topicId,omitempty"`
@@ -50,9 +51,68 @@ type Topic struct {
 
 // Catalog is written next to overview.md by the encyclopedia Agent.
 type Catalog struct {
-	SchemaVersion int     `json:"schemaVersion"`
-	Topics        []Topic `json:"topics"`
-	UpdatedAt     string  `json:"updatedAt"`
+	SchemaVersion int        `json:"schemaVersion"`
+	Topics        []Topic    `json:"topics"`
+	UpdatedAt     string     `json:"updatedAt"`
+	Relations     []Relation `json:"relations,omitempty"`
+}
+
+// Relation is an explicit authored edge; free text prerequisites never create edges.
+type Relation struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	Type string `json:"type"`
+}
+
+func ValidateRelations(catalog Catalog) error {
+	ids := map[string]bool{}
+	for _, topic := range catalog.Topics {
+		ids[topic.ID] = true
+	}
+	edges := map[string][]string{}
+	seen := map[string]bool{}
+	for _, r := range catalog.Relations {
+		if !ids[r.From] || !ids[r.To] || r.From == r.To {
+			return errors.New("invalid_course_relation_endpoint")
+		}
+		switch r.Type {
+		case "prerequisite", "builds_on", "applies", "related":
+		default:
+			return errors.New("invalid_course_relation_type")
+		}
+		key := r.From + "\x00" + r.To + "\x00" + r.Type
+		if seen[key] {
+			return errors.New("duplicate_course_relation")
+		}
+		seen[key] = true
+		if r.Type == "prerequisite" {
+			edges[r.From] = append(edges[r.From], r.To)
+		}
+	}
+	color := map[string]int{}
+	var visit func(string) bool
+	visit = func(id string) bool {
+		if color[id] == 1 {
+			return false
+		}
+		if color[id] == 2 {
+			return true
+		}
+		color[id] = 1
+		for _, next := range edges[id] {
+			if !visit(next) {
+				return false
+			}
+		}
+		color[id] = 2
+		return true
+	}
+	for id := range ids {
+		if !visit(id) {
+			return errors.New("cyclic_course_prerequisite")
+		}
+	}
+	return nil
 }
 
 // Scope is copied into every system-learning project as learning-scope.json.
@@ -186,7 +246,7 @@ func ValidateCatalog(catalog *Catalog) error {
 			ownedBy[key] = topic.ID
 		}
 	}
-	return nil
+	return ValidateRelations(*catalog)
 }
 
 // ValidateAgainstOverview ensures the structured catalog is not a second,

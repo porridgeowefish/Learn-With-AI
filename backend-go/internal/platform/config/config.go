@@ -31,6 +31,7 @@ type Workspace struct {
 }
 
 type Provider struct {
+	MaxConcurrency      int    `json:"maxConcurrency,omitempty"`
 	ID                  string `json:"id"`
 	Kind                string `json:"kind"` // "openai" | "anthropic"
 	Name                string `json:"name"`

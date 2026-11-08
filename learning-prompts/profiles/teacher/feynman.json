@@ -1,0 +1,38 @@
+{
+  "budgets": {},
+  "contextBindings": {
+    "review": {
+      "required": true,
+      "template": "feynman/review",
+      "sourceID": "review",
+      "role": "context"
+    }
+  },
+  "sceneID": "teacher/feynman",
+  "schemaVersion": 1,
+  "tools": [],
+  "slots": [
+    {
+      "resource": "feynman/base"
+    },
+    {
+      "resource": "teaching/diagramPrompt"
+    },
+    {
+      "resource": "teaching/mathFormattingPrompt"
+    },
+    {
+      "contextBinding": "review"
+    },
+    {
+      "when": {
+        "equals": "true",
+        "fact": "reviewTruncated"
+      },
+      "resource": "feynman/review-truncated"
+    }
+  ],
+  "facts": {
+    "reviewTruncated": "boolean"
+  }
+}

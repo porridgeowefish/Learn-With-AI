@@ -149,8 +149,13 @@ func (b Budget) TrimInitial(req *gateway.Request) error {
 	const historyInputTarget = 24000
 	for b.Available(*req) < 1024 || b.Input(*req) > historyInputTarget {
 		nextTurn := -1
-		for i := 1; i < len(req.Messages); i++ {
-			if req.Messages[i].Role == "user" && req.Messages[i].ToolCallID == "" {
+		firstTurn := -1
+		for i := 0; i < len(req.Messages); i++ {
+			if !req.Messages[i].Pinned && req.Messages[i].Role == "user" && req.Messages[i].ToolCallID == "" {
+				if firstTurn < 0 {
+					firstTurn = i
+					continue
+				}
 				nextTurn = i
 				break
 			}
@@ -158,7 +163,13 @@ func (b Budget) TrimInitial(req *gateway.Request) error {
 		if nextTurn < 0 {
 			break
 		}
-		req.Messages = req.Messages[nextTurn:]
+		retained := make([]gateway.Message, 0, len(req.Messages))
+		for i, m := range req.Messages {
+			if i >= nextTurn || m.Pinned {
+				retained = append(retained, m)
+			}
+		}
+		req.Messages = retained
 	}
 	return b.Check(*req)
 }

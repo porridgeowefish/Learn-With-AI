@@ -1,0 +1,18 @@
+{
+  "tools": [],
+  "sceneID": "generation/practice",
+  "slots": [
+    {
+      "resource": "common"
+    },
+    {
+      "resource": "practice"
+    },
+    {
+      "resource": "primitives/transfer"
+    }
+  ],
+  "schemaVersion": 1,
+  "contextBindings": {},
+  "budgets": {}
+}

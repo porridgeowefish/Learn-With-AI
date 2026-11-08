@@ -15,6 +15,7 @@ type Service struct {
 	Teaching   *teacher.Lifecycle
 	Tools      *teacher.LearningTools
 	Notes      *teacher.NoteService
+	Summaries  *teacher.SummaryService
 	Generation Generation
 }
 
@@ -42,6 +43,9 @@ func (s *Service) Create(slug, title string, in projects.ProjectInput) (*project
 	if s.Notes != nil {
 		s.Notes.ReviveProject(slug)
 	}
+	if s.Summaries != nil {
+		s.Summaries.ReviveProject(slug)
+	}
 	return projects.ReadProjectState(slug)
 }
 func (s *Service) Delete(slug string) error {
@@ -56,6 +60,10 @@ func (s *Service) Delete(slug string) error {
 	if s.Tools != nil {
 		next := remove
 		remove = func(slug string) error { return s.Tools.DeleteProject(slug, next) }
+	}
+	if s.Summaries != nil {
+		next := remove
+		remove = func(slug string) error { return s.Summaries.DeleteProject(slug, next) }
 	}
 	if s.Teaching != nil {
 		next := remove

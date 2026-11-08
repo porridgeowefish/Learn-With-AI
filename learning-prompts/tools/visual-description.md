@@ -1,0 +1,1 @@
+无需API Key的开放教学图示。diagram检索Commons SVG；molecule查询PubChem化学结构；manufacturing按中英文主题从精选芯片/自动化目录在线核验分阶段图组，非全网搜索。返回少量元数据和缺口，不发送用户文件。

@@ -1,0 +1,15 @@
+{
+  "tools": [],
+  "sceneID": "generation/discipline-map",
+  "slots": [
+    {
+      "resource": "common"
+    },
+    {
+      "resource": "discipline-map"
+    }
+  ],
+  "schemaVersion": 1,
+  "contextBindings": {},
+  "budgets": {}
+}

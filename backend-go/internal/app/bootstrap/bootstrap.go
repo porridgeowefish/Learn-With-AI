@@ -70,6 +70,13 @@ func Build() *App {
 		println("notes startup:", err.Error())
 	}
 	server.AttachNotes(notes)
+	summaries := teacher.NewSummaryService(teaching.Gateway)
+	summaries.OnError = func(slug string, err error) { println("teaching summary:", slug, err.Error()) }
+	if err := summaries.Start(context.Background()); err != nil {
+		println("summary startup:", err.Error())
+	}
+	teaching.Summaries = summaries
+	server.AttachSummaries(summaries)
 	teaching.OnCompleted = func(slug, responseID string) {
 		if store, err := teacher.NewConversation(slug); err == nil {
 			if info, found, err := store.ResponseByID(responseID); err == nil && found {

@@ -42,8 +42,19 @@ func openAIRequest(p askaiconfig.Provider, in Request, stream bool) map[string]a
 
 func anthropicRequest(p askaiconfig.Provider, in Request, stream bool) map[string]any {
 	var messages []map[string]any
+	// Anthropic accepts fixed instructions only in its top-level system field.
+	// Preserve instruction order while projecting ordered composition slots;
+	// reference data remains user content and is never promoted with them.
+	var systemParts []string
+	if in.System != "" {
+		systemParts = append(systemParts, in.System)
+	}
 	previousTool := false
 	for _, message := range in.Messages {
+		if message.Role == "system" {
+			systemParts = append(systemParts, message.Content)
+			continue
+		}
 		mapped := anthropicMessage(message)
 		if message.ToolCallID != "" && previousTool && len(messages) > 0 {
 			last := messages[len(messages)-1]
@@ -53,11 +64,12 @@ func anthropicRequest(p askaiconfig.Provider, in Request, stream bool) map[strin
 		}
 		previousTool = message.ToolCallID != ""
 	}
-	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": stream, "max_tokens": platformconfig.ModelOutputTokens}
+	system := strings.Join(systemParts, "\n\n")
+	body := map[string]any{"model": p.Model, "system": system, "messages": messages, "stream": stream, "max_tokens": platformconfig.ModelOutputTokens}
 	// Explicit caching is a first-party Anthropic capability. Compatible
 	// providers (including Coding Plan endpoints) retain their accepted schema.
-	if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Scheme == "https" && strings.EqualFold(endpoint.Hostname(), "api.anthropic.com") && in.System != "" {
-		body["system"] = []map[string]any{{"type": "text", "text": in.System, "cache_control": map[string]any{"type": "ephemeral"}}}
+	if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Scheme == "https" && strings.EqualFold(endpoint.Hostname(), "api.anthropic.com") && system != "" {
+		body["system"] = []map[string]any{{"type": "text", "text": system, "cache_control": map[string]any{"type": "ephemeral"}}}
 	}
 	// Merely offering tools must not change the configured thinking channel.
 	// Older externally supplied tool history lacking signed blocks still uses
@@ -118,6 +130,11 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 
 // StreamProvider uses the same protocol implementation for configured and explicit connections.
 func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+	release, err := acquireProvider(ctx, p)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if err := validateEffort(p, in); err != nil {
 		return err
 	}
@@ -135,6 +152,11 @@ func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emi
 
 // CompleteProvider shares request mapping and transport with streaming calls.
 func CompleteProvider(ctx context.Context, p askaiconfig.Provider, in Request) (string, error) {
+	release, admissionErr := acquireProvider(ctx, p)
+	if admissionErr != nil {
+		return "", admissionErr
+	}
+	defer release()
 	if p.Kind == "siwc" {
 		var out strings.Builder
 		err := streamSIWC(ctx, p, in, func(event Event) {

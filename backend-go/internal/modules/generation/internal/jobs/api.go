@@ -288,39 +288,11 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 	return chosen, nil
 }
 func prompt(kind string) (string, string, error) {
-	names := []string{"common", kind}
-	if kind == "review" {
-		for _, p := range []string{"research_question_frame", "prerequisite_scaffold", "misconception", "boundary_map", "analogy", "mece_decompose", "first_principles", "concept_graph"} {
-			names = append(names, "primitives/"+p)
-		}
-	}
-	if kind == "practice" {
-		names = append(names, "primitives/transfer")
-	}
-	var manifest struct {
-		Version   string `json:"version"`
-		Resources []struct {
-			Path   string `json:"path"`
-			SHA256 string `json:"sha256"`
-		} `json:"resources"`
-	}
-	if e := readJSON(filepath.Join(filesystem.PROJECT_ROOT, "learning-prompts", "manifest.json"), &manifest); e != nil {
+	composed, err := ai.ComposePrompt(context.Background(), "generation/"+kind, nil, nil)
+	if err != nil {
 		return "", "", problem("prompt-resource-unavailable", 503)
 	}
-	hashes := map[string]string{}
-	for _, r := range manifest.Resources {
-		hashes[r.Path] = r.SHA256
-	}
-	var b strings.Builder
-	for _, n := range names {
-		data, e := os.ReadFile(filepath.Join(filesystem.PROJECT_ROOT, "learning-prompts", n+".md"))
-		if e != nil || hashes["learning-prompts/"+n+".md"] != hash(string(data)) {
-			return "", "", problem("prompt-resource-unavailable", 503)
-		}
-		b.Write(data)
-		b.WriteString("\n\n")
-	}
-	return b.String(), manifest.Version, nil
+	return composed.Text, composed.ResourceVersion, nil
 }
 func hash(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
 

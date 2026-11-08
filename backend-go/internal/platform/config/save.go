@@ -45,10 +45,12 @@ func SaveUI(theme string) error {
 
 // AISettings mirrors ai.Config for the settings flows.
 type AISettings struct {
-	Default      string             `json:"default"`
-	SearchEngine string             `json:"searchEngine"`
-	Providers    []Provider         `json:"providers"`
-	Bindings     map[string]Binding `json:"bindings,omitempty"`
+	ForegroundConcurrency int                `json:"foregroundConcurrency,omitempty"`
+	BackgroundConcurrency int                `json:"backgroundConcurrency,omitempty"`
+	Default               string             `json:"default"`
+	SearchEngine          string             `json:"searchEngine"`
+	Providers             []Provider         `json:"providers"`
+	Bindings              map[string]Binding `json:"bindings,omitempty"`
 }
 
 // SaveAI writes the askAiProviders section under its legacy key so the

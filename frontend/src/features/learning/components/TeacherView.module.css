@@ -195,3 +195,4 @@
 .voiceStatus { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 0.73rem; }
 .voiceStatus span { min-width: 0; }
 .voiceStatus button { flex-shrink: 0; border: 0; background: transparent; color: var(--fg); font: inherit; cursor: pointer; padding: 6px 0 6px 6px; }
+.thinking { margin: 0 0 12px; color: var(--text-muted); font-size: 0.86667rem; }

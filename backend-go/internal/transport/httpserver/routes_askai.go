@@ -98,8 +98,13 @@ func (s *Server) handleProbeAskAi(w http.ResponseWriter, r *http.Request) {
 	}
 	probeCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	prov := ai.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
-	_, err := ai.Complete(probeCtx, prov, "Reply with the single word: ok", []ai.AIMessage{{Role: "user", Content: "ping"}})
+	prov := ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
+	prompt, promptErr := ai.RenderPrompt("auxiliary/provider-probe", nil)
+	if promptErr != nil {
+		httpx.Error(w, 500, promptErr.Error())
+		return
+	}
+	_, err := ai.Complete(probeCtx, prov, prompt, []ai.AIMessage{{Role: "user", Content: "ping"}})
 	if err != nil {
 		message := err.Error()
 		if pc.APIKey != "" {

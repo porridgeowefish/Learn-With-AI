@@ -297,7 +297,11 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	}
 	req := ai.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: outputBudget, MaxThinkingTokens: thinkingBudget}
 	if len(f.Sources) > 0 {
-		req.Tools = sources.Tools()
+		req.Tools, e = sources.CheckedTools()
+		if e != nil {
+			s.fail(slug, j, "tool-instructions-unavailable")
+			return
+		}
 	}
 	var searcher teacher.WebSearcher
 	if f.WebSearchEnabled {
@@ -611,48 +615,7 @@ func (s *Service) failLocked(slug, root string, j Job, code string) {
 	_ = s.saveLocked(slug, root, &j)
 }
 func executeSource(ctx context.Context, r *sources.Reader, docs []sources.SourceDocument, call ai.ToolCall, budget int) sources.SourceResult {
-	decode := func(out any) error {
-		raw, e := json.Marshal(call.Arguments)
-		if e != nil {
-			return e
-		}
-		d := json.NewDecoder(bytes.NewReader(raw))
-		d.DisallowUnknownFields()
-		return d.Decode(out)
-	}
-	invalid := sources.SourceResult{Status: "error", Error: &sources.SourceToolError{Code: "invalid_arguments", Message: "资料参数无效"}}
-	switch call.ToolName {
-	case "list_source_documents":
-		var a sources.ListSourceArgs
-		if decode(&a) != nil {
-			return invalid
-		}
-		a.MaxTokens = budget / 2
-		return r.List(ctx, docs, a)
-	case "get_source_outline":
-		var a sources.OutlineSourceArgs
-		if decode(&a) != nil {
-			return invalid
-		}
-		a.MaxTokens = budget / 2
-		return r.Outline(ctx, docs, a)
-	case "search_source":
-		var a sources.SearchSourceArgs
-		if decode(&a) != nil {
-			return invalid
-		}
-		a.MaxTokens = max(1, (budget-700)/2)
-		return r.Search(ctx, docs, a)
-	case "read_source":
-		var a sources.ReadSourceArgs
-		if decode(&a) != nil || a.MaxTokens < 0 || a.MaxTokens > 4000 {
-			return invalid
-		}
-		a.MaxTokens = min(max(1, a.MaxTokens), max(1, (budget-800)/2))
-		return r.Read(ctx, docs, a)
-	default:
-		return sources.SourceResult{Status: "error", Error: &sources.SourceToolError{Code: "invalid_tool", Message: "未开放此工具"}}
-	}
+	return sources.ExecuteTool(ctx, r, docs, call, sources.ToolPolicy{Budget: budget})
 }
 func cleanOutput(s string) string {
 	s = strings.TrimSpace(s)

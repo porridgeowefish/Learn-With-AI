@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LLL prompt scene",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sceneID",
+    "slots",
+    "contextBindings",
+    "tools",
+    "budgets"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "sceneID": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$"
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "resource": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "contextBinding": {
+            "type": "string"
+          },
+          "history": {
+            "type": "boolean"
+          },
+          "when": {
+            "$ref": "#/$defs/condition"
+          }
+        }
+      }
+    },
+    "contextBindings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceID",
+          "role",
+          "required"
+        ],
+        "properties": {
+          "sourceID": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "context"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "when": {
+            "$ref": "#/$defs/condition"
+          },
+          "args": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "string",
+          "boolean"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fact": {
+          "type": "string"
+        },
+        "equals": {
+          "type": "string"
+        },
+        "all": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "any": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "not": {
+          "$ref": "#/$defs/condition"
+        },
+        "in": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

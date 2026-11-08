@@ -33,6 +33,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
   return (
     <article id={`message-${message.id}`} data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
       {teacher && <div className={s.speaker}>教师{awaitingAnswer && <span className={s.writing} role="status" aria-label="教师正在思考或调用工具"><LearnWriting /></span>}</div>}
+      {awaitingAnswer && <div className={s.thinking}>思考中</div>}
       <div className={s.messageBody} onClick={event => {
         const target = event.target;
         if (!(target instanceof Element)) return;
