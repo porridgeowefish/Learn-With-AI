@@ -53,6 +53,7 @@ function run(title, command, args, opts = {}) {
 
 // ---- shared fast layer ----
 run('repository hygiene', 'node', ['tools/check/check-repository-hygiene.js']);
+run('prompt resources', 'node', ['tools/check/check-prompt-resources.js']);
 
 (function gofmtAssert() {
   console.log('\n=== gofmt check ===');

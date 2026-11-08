@@ -13,6 +13,7 @@ function run(bin, args, options = {}) {
   if (result.error || result.status !== 0) throw result.error || new Error(`${bin} failed: ${result.status}`);
 }
 function main() {
+  require('../check/check-prompt-resources').checkPromptResources(repoRoot);
   const version = validateVersion(value('--version', require('../../package.json').version));
   const selected = value('--targets', targets.join(',')).split(',');
   if (!selected.length || selected.some(target => !targets.includes(target))) throw new Error('Invalid release targets');

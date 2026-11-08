@@ -110,16 +110,16 @@
       "sha256": "ef58a9ccf85f25003b83d39ee4454761a71ca02684491676964b3e8e5d68156d"
     },
     {
-      "variables": [],
-      "path": "learning-prompts/feynman/review-truncated.md",
-      "sha256": "407a19adde6614befebe3472305b3c1761cbb93d252fbc5a79c9a8bb10e7004a"
-    },
-    {
       "variables": [
         "content"
       ],
       "path": "learning-prompts/feynman/review.md",
       "sha256": "42077face56392a8eba8e3d283fb69cd30402588c265d172c88dfb1709ff2111"
+    },
+    {
+      "variables": [],
+      "path": "learning-prompts/feynman/review-truncated.md",
+      "sha256": "407a19adde6614befebe3472305b3c1761cbb93d252fbc5a79c9a8bb10e7004a"
     },
     {
       "variables": [],
@@ -214,47 +214,47 @@
     {
       "variables": [],
       "path": "learning-prompts/profiles/auxiliary/section-summary.json",
-      "sha256": "7248da6bb22ed5d444deeff08ea83fbb340774ab8dafb56b2fc415ad84db32d4"
+      "sha256": "076eab8de1d1eec0fdd3ad6a5ae2e64dba2062b2492d419cfb8c659eab5cdcdc"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/generation/discipline-map.json",
-      "sha256": "6ecf945cc81c3a21f621866b94f51ae7334ae163ab835b7a44875bbf1af9880a"
+      "sha256": "be077c4baedb9be5c2c82998fa416ef939202760319e81a0f361fde9c00f3d2a"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/generation/practice.json",
-      "sha256": "90dc67cb3b70d2f483f1169bfaf415cc5db86dcf7bd1a71f43f498779815d660"
+      "sha256": "b9bf2e4bf0a78b20559cc9b7b1d31ce946b19a40b3aa1f5806ead29cb6637bff"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/generation/review.json",
-      "sha256": "24806260b5f1d8f10456a513ed6adceb6c80b504d9011d032cbe23d92ab991bc"
+      "sha256": "e36395d6eb776f0784c3ebb0568d230d6e49df284c8cf182e98e5c1dd14804c9"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/schema.json",
-      "sha256": "d3f45bc4f7526ee50feba577e6c9bb9e9f662bce89b8dc319a9e8a5515666a7e"
+      "sha256": "179e5a92546b18653da2563c875ac4649723980fd5e9637d1200b75f9157721e"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/teacher/confirmed-end.json",
-      "sha256": "6a59906e45cfc48f978215abc86f9ec368f98e184e13f1e4a281803025acd04c"
+      "sha256": "a14bbfb2a0e9b9d560029e3fe50cd74458323c502800c55711c598a7bd640661"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/teacher/feynman.json",
-      "sha256": "c47cf366144bad36332ecf9d60806def96c50ecdeed5d0adbf10fbe81cfbb624"
+      "sha256": "48da02993bed48e8517e3adb62dcf441a3653cf74eba6ef37a6dd71cd9f307a2"
     },
     {
       "variables": [],
       "path": "learning-prompts/profiles/teacher/general.json",
-      "sha256": "6249bd784bc3d22e13cca16537ae2813b29c938ccddc8574d8f012b1b04a16d7"
+      "sha256": "3cf5317627088f78ac02e19ec3f21d478a160383e2e8d82ce015a0a9b7d92993"
     },
     {
       "variables": [],
       "path": "learning-prompts/README.md",
-      "sha256": "d7c4e51a2022d69d2dbfe413b20a58d6970f48aa18ad5f7639c5020027ad94c8"
+      "sha256": "25e706b41c75e8de7b2a52f2d7dc601d58ce62778d187b58febdb742cf4ab4f1"
     },
     {
       "variables": [],
@@ -281,7 +281,7 @@
     {
       "variables": [],
       "path": "learning-prompts/teaching/end-confirmation-failed.md",
-      "sha256": "2122f37d2d3cfe5e1151174ec22fee68bb63c0b246816a27f8ab69d82250985b"
+      "sha256": "7933e8dbd508ef129377e9a2688c695231fb523ba212c7d91b2975e5fea01e37"
     },
     {
       "variables": [],
@@ -342,7 +342,7 @@
       "variables": [
         "content"
       ],
-      "path": "learning-prompts/teaching/preferences.md",
+      "path": "learning-prompts/teaching/preferences-template.md",
       "sha256": "8ef0d1ed3373410c4c427e215eb3b8feed25b13cad9c3a5a1175578cc11619a7"
     },
     {
@@ -375,16 +375,16 @@
       "sha256": "387245a36bceae49b213b6b8e4b0be8845dcba91210eb387d78aa7142a628844"
     },
     {
+      "variables": [],
+      "path": "learning-prompts/teaching/tools-finished.md",
+      "sha256": "38c0986a065dbda9892cb319e42174b561f3bc1444ea704edd4646978b7a69aa"
+    },
+    {
       "variables": [
         "tools"
       ],
       "path": "learning-prompts/teaching/tool-unavailable.md",
       "sha256": "3b4f1b250d1034bfec0f389fc9ad693ef9877635e7187bab28a8800e259b62f5"
-    },
-    {
-      "variables": [],
-      "path": "learning-prompts/teaching/tools-finished.md",
-      "sha256": "38c0986a065dbda9892cb319e42174b561f3bc1444ea704edd4646978b7a69aa"
     },
     {
       "variables": [
@@ -396,7 +396,7 @@
     {
       "variables": [],
       "path": "learning-prompts/tools/source-get-source-outline.md",
-      "sha256": "07d8c135da07a184f5e34b4ab3e49e0f4a43cbdabc26a1b627f4e72aaa373404"
+      "sha256": "c980594eeb4130b44bcf4fb6f39076d07e5e94e1272465ed725a48cfbe14aae4"
     },
     {
       "variables": [],
@@ -406,17 +406,17 @@
     {
       "variables": [],
       "path": "learning-prompts/tools/source-list-source-documents.md",
-      "sha256": "b2fa38120bc5d0bfa304ca8ca27f913a59621c4626c46f626efcab94d795dcd5"
+      "sha256": "a9ab29f59cae38f43e28eac3ffb04bbf4c3212fe042a9465eef003fd13aaf15b"
     },
     {
       "variables": [],
       "path": "learning-prompts/tools/source-read-source.md",
-      "sha256": "226ceb4ab6243c29ea5e607a589a3850803ac9e28fc5340b1d05c3d1878c8832"
+      "sha256": "f51d74e5cfe245d5bd56374dc3d7fbdb4bfe075d183a7c634563e4bd92ed7b3b"
     },
     {
       "variables": [],
       "path": "learning-prompts/tools/source-search-source.md",
-      "sha256": "a86ee0a97c5374c7a5d79a950b8f03375bef3d63f280dcea997a59fc0180a929"
+      "sha256": "f3cd56401815644d9eb51778d99f07f4b0122436c40fc3e8eba27ed2e80426b0"
     },
     {
       "variables": [],

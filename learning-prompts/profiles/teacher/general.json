@@ -108,7 +108,7 @@
       "role": "context",
       "required": true,
       "sourceID": "preferences",
-      "template": "teaching/preferences"
+      "template": "teaching/preferences-template"
     },
     "course_framework": {
       "role": "context",

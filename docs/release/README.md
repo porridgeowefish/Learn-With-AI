@@ -4,8 +4,8 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 | 系统 | 分发文件 | 安装与打开 |
 | --- | --- | --- |
-| Windows Intel / AMD 64 位 | learn-with-ai-0.10.0-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
-| Windows ARM64 | learn-with-ai-0.10.0-windows-arm64.msi | 同上，需要 Windows ARM64 |
+| Windows Intel / AMD 64 位 | learn-with-ai-0.10.1-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
+| Windows ARM64 | learn-with-ai-0.10.1-windows-arm64.msi | 同上，需要 Windows ARM64 |
 | macOS | darwin-…-app.tar.gz / 原生 CI 生成的 .pkg | 放进 Applications 后打开；当前 macOS 版本仍使用默认浏览器界面 |
 | Debian / Ubuntu | linux-….deb | sudo apt install ./文件名.deb；当前 Linux 版本仍使用默认浏览器界面 |
 | 其他 Linux | linux-…-install.tar.gz | 解压后运行 ./install.sh，从应用菜单打开；界面同上 |
