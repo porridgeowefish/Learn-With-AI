@@ -141,7 +141,7 @@ func (s *LearningTools) PrepareAnnotationAsk(slug, id string, in ToolInput) (Too
 			}
 		}
 		messages = append(messages, ai.AIMessage{Role: "user", Content: in.Content})
-		system, promptErr := ai.RenderPrompt("auxiliary/annotation-ask", map[string]string{"quote": annotation.QuoteSnapshot, "version": annotation.AssetVersionID})
+		system, promptErr := ai.RenderPrompt("auxiliary/annotation/ask", map[string]string{"quote": annotation.QuoteSnapshot, "version": annotation.AssetVersionID})
 		if promptErr != nil {
 			return promptErr
 		}
@@ -206,7 +206,7 @@ func (s *LearningTools) SummarizeAnnotation(slug, id string) error {
 					messages = append(messages, ai.AIMessage{Role: m.Role, Content: m.Content})
 				}
 			}
-			prompt, promptErr := ai.RenderPrompt("auxiliary/annotation-summary", nil)
+			prompt, promptErr := ai.RenderPrompt("auxiliary/annotation/summary", nil)
 			if promptErr != nil {
 				err = promptErr
 			} else {

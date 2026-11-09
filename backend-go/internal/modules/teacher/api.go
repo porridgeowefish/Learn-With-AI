@@ -144,8 +144,6 @@ func PrepareImportedConversation(root string) error {
 
 var IsExtractedMediaText = conversation.IsExtractedMediaText
 
-var SystemPrompt = service.SystemPrompt
-
 func BuildFeynmanComposition(ctx context.Context, review string) (ai.ComposedPrompt, error) {
 	return service.BuildFeynmanComposition(ctx, review)
 }

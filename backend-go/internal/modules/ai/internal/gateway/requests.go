@@ -144,6 +144,9 @@ func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emi
 	if p.Kind == "siwc" {
 		return streamSIWC(ctx, p, in, emit)
 	}
+	if usesOpenAIResponses(p) {
+		return streamResponses(ctx, p, in, emit)
+	}
 	if p.Kind == "anthropic" {
 		return streamAnthropic(ctx, p, in, emit)
 	}
@@ -157,9 +160,13 @@ func CompleteProvider(ctx context.Context, p askaiconfig.Provider, in Request) (
 		return "", admissionErr
 	}
 	defer release()
-	if p.Kind == "siwc" {
+	if p.Kind == "siwc" || usesOpenAIResponses(p) {
 		var out strings.Builder
-		err := streamSIWC(ctx, p, in, func(event Event) {
+		stream := streamSIWC
+		if usesOpenAIResponses(p) {
+			stream = streamResponses
+		}
+		err := stream(ctx, p, in, func(event Event) {
 			if event.Type == "text-delta" {
 				out.WriteString(event.Delta)
 			}

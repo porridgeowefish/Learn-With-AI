@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-var sourceToolInstructions = promptText("tools/source-instructions")
+var sourceToolInstructions = promptText("tools/sources/instructions")
 
 func isSourceTool(name string) bool {
 	switch name {

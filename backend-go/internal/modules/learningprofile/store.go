@@ -294,7 +294,7 @@ func Context(slug string) string {
 		return ""
 	}
 	data, _ := json.Marshal(lines)
-	text, err := ai.RenderPrompt("teaching/memory-reference", map[string]string{"content": string(data)})
+	text, err := ai.RenderPrompt("teaching/context/memory", map[string]string{"content": string(data)})
 	if err != nil {
 		panic(err)
 	}
@@ -304,7 +304,7 @@ func LengthPrompt(length string) string {
 	if length != "short" && length != "medium" && length != "long" {
 		length = "medium"
 	}
-	text, err := ai.RenderPrompt("teaching/length-"+length, nil)
+	text, err := ai.RenderPrompt("teaching/response-length/"+length, nil)
 	if err != nil {
 		panic(err)
 	}

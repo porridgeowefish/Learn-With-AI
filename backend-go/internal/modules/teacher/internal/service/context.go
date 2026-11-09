@@ -130,7 +130,7 @@ func toProviderMessages(slug string, messages []conversationstore.SequencedMessa
 				continue
 			}
 			if block.Type == "chat-image" || block.Type == "chat-audio" {
-				content.WriteString(promptText("teaching/attachment-text"))
+				content.WriteString(promptText("teaching/context/attachment-text"))
 			}
 			if block.Source != "" {
 				content.WriteString(stripLegacyMessageIDPrefix(block.Source))

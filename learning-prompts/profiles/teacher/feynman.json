@@ -3,7 +3,7 @@
   "contextBindings": {
     "review": {
       "required": true,
-      "template": "feynman/review",
+      "template": "feynman/context/review",
       "sourceID": "review",
       "role": "context"
     }
@@ -16,10 +16,7 @@
       "resource": "feynman/base"
     },
     {
-      "resource": "teaching/diagramPrompt"
-    },
-    {
-      "resource": "teaching/mathFormattingPrompt"
+      "resource": "teaching/formatting"
     },
     {
       "contextBinding": "review"
@@ -29,7 +26,7 @@
         "equals": "true",
         "fact": "reviewTruncated"
       },
-      "resource": "feynman/review-truncated"
+      "resource": "feynman/context/review-truncated"
     }
   ],
   "facts": {

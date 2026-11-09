@@ -88,7 +88,7 @@ func BindTools(reader *Reader, docs []SourceDocument, policy ToolPolicy) (*ai.Bo
 	}
 	for _, definition := range definitions {
 		name := definition.Name
-		err := registry.Register(ai.ToolSpec{Definition: definition, DescriptionRef: "tools/source-" + strings.ReplaceAll(name, "_", "-"), SideEffects: "read", Authorize: func(ctx context.Context) error {
+		err := registry.Register(ai.ToolSpec{Definition: definition, DescriptionRef: "tools/sources/" + strings.ReplaceAll(name, "_", "-"), SideEffects: "read", Authorize: func(ctx context.Context) error {
 			if reader == nil {
 				return fmt.Errorf("source reader unavailable")
 			}

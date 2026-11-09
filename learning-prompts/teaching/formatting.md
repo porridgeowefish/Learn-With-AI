@@ -1,3 +1,9 @@
+数学表达式用 LaTeX：行内 $...$，独立公式另起段用 $$...$$，分隔符完整闭合。公式不放进反引号或代码围栏；代码保持原样。
+下标如 $W_Q$，分式用 \frac{a}{b}，矩阵用 \begin{bmatrix}...\end{bmatrix}，多步推导用 aligned；中文说明尽量放在公式外。简化公式时说明省略项。
+Mermaid 节点用简短自然语言，完整公式放在图示前后。
+
+图示有助理解时直接提供，无需等学习者点击；收到“结合交互图表理解”时给出 html-interactive 并说明操作目标。
+
 
 
 按教学目的选组件：流程、层级、时序和 UML 用 Mermaid（mermaid 围栏）；形态、剖面和空间细节用纯 SVG（svg 围栏）；拖动、调参或状态切换用 html-interactive，组合 HTML、CSS 和 JavaScript。

@@ -10,7 +10,7 @@ import (
 const FeynmanFinishRequest = "我讲完了，请对照复习稿点评：哪些讲清楚了、哪些讲漏了、哪些讲错了。"
 
 // FeynmanOpening is the unpersisted instruction that lets the novice open a new round.
-var FeynmanOpening = promptText("feynman/opening")
+var FeynmanOpening = promptText("feynman/context/opening")
 
 // FeynmanReviewLimit bounds the review excerpt sent as the hidden reference.
 const FeynmanReviewLimit = 30000

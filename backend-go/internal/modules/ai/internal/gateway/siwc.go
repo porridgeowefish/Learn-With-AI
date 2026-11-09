@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
@@ -21,9 +23,19 @@ var siwcAccessToken = siwc.AccessToken
 var siwcHTTPClient = &http.Client{Transport: netproxy.Transport()}
 
 func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
-	token, err := siwcAccessToken(ctx)
-	if err != nil {
-		return err
+	p.Kind = "siwc"
+	return streamResponses(ctx, p, in, emit)
+}
+func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+	token := p.APIKey
+	endpoint := strings.TrimRight(p.BaseURL, "/") + "/responses"
+	if p.Kind == "siwc" {
+		var err error
+		token, err = siwcAccessToken(ctx)
+		if err != nil {
+			return err
+		}
+		endpoint = "https://api.openai.com/v1/responses"
 	}
 	input := make([]map[string]any, 0, len(in.Messages)*2)
 	for _, m := range in.Messages {
@@ -48,6 +60,9 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 		input = append(input, map[string]any{"role": role, "content": m.Content})
 	}
 	body := map[string]any{"model": p.Model, "input": input, "store": false, "stream": true}
+	if p.Kind != "siwc" {
+		body["max_output_tokens"] = platformconfig.ModelOutputTokens
+	}
 	if supportsSIWCReasoningSummary(p.Model) {
 		reasoning := map[string]any{}
 		if in.ShowReasoning == nil || *in.ShowReasoning {
@@ -78,7 +93,7 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/responses", bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(raw))
 	if err != nil {
 		return err
 	}
@@ -91,7 +106,7 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
-		return fmt.Errorf("ChatGPT request status %d: %s", res.StatusCode, strings.TrimSpace(string(detail)))
+		return fmt.Errorf("OpenAI request status %d: %s", res.StatusCode, strings.TrimSpace(string(detail)))
 	}
 	scanner := bufio.NewScanner(res.Body)
 	scanner.Buffer(make([]byte, 64<<10), 4<<20)
@@ -165,9 +180,9 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 			completed = true
 		case "response.failed", "response.incomplete":
 			if frame.Response.Error != nil {
-				return fmt.Errorf("ChatGPT response %s: %s", frame.Response.Error.Code, frame.Response.Error.Message)
+				return fmt.Errorf("OpenAI response %s: %s", frame.Response.Error.Code, frame.Response.Error.Message)
 			}
-			return fmt.Errorf("ChatGPT response %s", frame.Type)
+			return fmt.Errorf("OpenAI response %s", frame.Type)
 		}
 		if completed {
 			break
@@ -177,7 +192,7 @@ func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit fu
 		return err
 	}
 	if !completed {
-		return errors.New("ChatGPT stream ended before response.completed")
+		return errors.New("OpenAI stream ended before response.completed")
 	}
 	if in.WebSearch && !searchCompleted {
 		return errors.New("当前连接未完成联网搜索，请核对模型和账户权限")
@@ -201,4 +216,13 @@ func emitSIWCCall(id, name, args string, seen map[string]bool, emit func(Event))
 		arguments = map[string]any{"__invalid_arguments": true}
 	}
 	emit(Event{Type: "tool-call-ready", ToolCall: &ToolCall{CallID: idgen.New("call"), ProviderCallID: id, ToolName: name, Arguments: arguments}})
+}
+
+func usesOpenAIResponses(p askaiconfig.Provider) bool {
+	endpoint, err := url.Parse(p.BaseURL)
+	if err != nil || endpoint.Scheme != "https" || endpoint.Hostname() != "api.openai.com" {
+		return false
+	}
+	model := strings.ToLower(strings.TrimSpace(p.Model))
+	return p.Kind == "openai" && (model == "gpt-6.1-sol" || strings.HasPrefix(model, "gpt-6.1-sol-"))
 }

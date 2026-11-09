@@ -7,30 +7,6 @@
     },
     {
       "resource": "review"
-    },
-    {
-      "resource": "primitives/research_question_frame"
-    },
-    {
-      "resource": "primitives/prerequisite_scaffold"
-    },
-    {
-      "resource": "primitives/misconception"
-    },
-    {
-      "resource": "primitives/boundary_map"
-    },
-    {
-      "resource": "primitives/analogy"
-    },
-    {
-      "resource": "primitives/mece_decompose"
-    },
-    {
-      "resource": "primitives/first_principles"
-    },
-    {
-      "resource": "primitives/concept_graph"
     }
   ],
   "schemaVersion": 1,

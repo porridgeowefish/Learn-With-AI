@@ -7,9 +7,6 @@
     },
     {
       "resource": "practice"
-    },
-    {
-      "resource": "primitives/transfer"
     }
   ],
   "schemaVersion": 1,

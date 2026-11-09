@@ -93,9 +93,8 @@ async function main(binary){
       if(input.mapMode==='sources')assert(input.sourceVerificationSamples?.some(sample=>sample.body.includes('没有 Markdown 目录')),'source map omitted OCR body');
     }
     const system=request.messages.find(m=>m.role==='system')?.content;assert.equal(typeof system,'string');
-    const resources=['common',kind];
-    if(kind==='review')resources.push(...['research_question_frame','prerequisite_scaffold','misconception','boundary_map','analogy','mece_decompose','first_principles','concept_graph'].map(n=>'primitives/'+n));
-    if(kind==='practice')resources.push('primitives/transfer');
+    const profile=JSON.parse(fs.readFileSync(path.join(promptRoot,"profiles","generation",kind+".json"),"utf8"));
+    const resources=profile.slots.filter(slot=>slot.resource).map(slot=>slot.resource);
     for(const resource of resources)assert(system.includes(fs.readFileSync(path.join(promptRoot,resource+'.md'),'utf8').trim()),'packaged prompt missing '+resource);
     assert.equal(request.stream,true);
     res.setHeader('Content-Type','text/event-stream');

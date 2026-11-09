@@ -84,7 +84,7 @@ func (s chatgpt) Search(ctx context.Context, query string) ([]Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	var out strings.Builder
-	prompt, promptErr := ai.RenderPrompt("tools/web-search-system", nil)
+	prompt, promptErr := ai.RenderPrompt("tools/web-search/system", nil)
 	if promptErr != nil {
 		return nil, promptErr
 	}

@@ -12,13 +12,13 @@ import (
 var searchFigures = visuals.Search
 var searchManufacturing = visuals.SearchManufacturing
 
-var visualTool = ai.Tool{Name: "find_learning_visual", Description: promptText("tools/visual-description"), Schema: map[string]any{
+var visualTool = ai.Tool{Name: "find_learning_visual", Description: promptText("tools/visual/description"), Schema: map[string]any{
 	"type": "object", "additionalProperties": false,
 	"properties": map[string]any{"kind": map[string]any{"type": "string", "enum": []string{"diagram", "molecule", "manufacturing"}}, "query": map[string]any{"type": "string", "maxLength": 120}},
 	"required":   []string{"kind", "query"},
 }}
 
-var visualInstructions = promptText("tools/visual-instructions")
+var visualInstructions = promptText("tools/visual/instructions")
 
 func executeVisualTool(ctx context.Context, args map[string]any, room int, emit func(StreamFrame)) (string, string) {
 	kind, _ := args["kind"].(string)

@@ -44,6 +44,20 @@ marked.setOptions({
   async: false,
 });
 
+// Chinese prose commonly places punctuation inside bold immediately before
+// another Han character. Support that narrow boundary without rewriting code,
+// escaped delimiters, or the source Markdown.
+marked.use({ extensions: [{
+  name: 'cjkPunctuationStrong',
+  level: 'inline',
+  start: source => source.indexOf('**'),
+  tokenizer(source) {
+    const match = /^\*\*([^*\n]+?[。！？；：，、）》」』】])\*\*(?=\p{Script=Han})/u.exec(source);
+    if (!match || /^\s/.test(match[1])) return undefined;
+    return { type: 'strong', raw: match[0], text: match[1], tokens: this.lexer.inlineTokens(match[1]) };
+  },
+}] });
+
 const svgPurifier = DOMPurify(window);
 svgPurifier.addHook('uponSanitizeAttribute', (_node, data) => {
   const name = data.attrName.toLowerCase();

@@ -243,7 +243,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	}
 	turnContext := learningprofile.Context(slug)
 	if steerNote != "" {
-		steering, e := ai.RenderPrompt("teaching/steering", map[string]string{"content": steerNote})
+		steering, e := ai.RenderPrompt("teaching/runtime/steering", map[string]string{"content": steerNote})
 		if e != nil {
 			return e
 		}
@@ -259,7 +259,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		searcher = nil
 	}
 	if searcher != nil {
-		tools = append(tools, ai.Tool{Name: "search_web", Description: promptText("tools/web-search-description"), Schema: map[string]any{
+		tools = append(tools, ai.Tool{Name: "search_web", Description: promptText("tools/web-search/description"), Schema: map[string]any{
 			"type": "object", "additionalProperties": false,
 			"properties": map[string]any{
 				"query": map[string]any{"type": "string", "maxLength": maxSearchQueryRunes, "description": "不超过70个字符的简短检索词，用最可能命中的自然语言关键词。"},
@@ -292,7 +292,15 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	allowSources := selected["list_source_documents"]
 	var plannedCalls []ai.ToolCall
 	if learner.Role == "learner" && ctx.Err() == nil {
-		plan, intentUsage, intentErr := s.inferToolIntent(ctx, effectiveProviderID, effectiveModel, learnerText, providerMessages)
+		var plan toolIntent
+		var intentUsage map[string]int
+		var intentErr error
+		if explicitTeachingEnd(learnerText) {
+			plan.EndDecision = "confirm_end"
+			plan.Evidence = learnerText
+		} else {
+			plan, intentUsage, intentErr = s.inferToolIntent(ctx, effectiveProviderID, effectiveModel, learnerText, providerMessages)
+		}
 		for k, v := range intentUsage {
 			usage[k] += v
 		}
@@ -306,13 +314,13 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				}
 			}
 			_, _ = conversation.Append("tool-intent-evaluated", map[string]any{"responseId": responseID, "status": "fallback"})
-			systemPrompt += "\n" + promptText("teaching/intent-unavailable")
+			systemPrompt += "\n" + promptText("teaching/runtime/intent-unavailable")
 		} else {
 			if s.Summaries != nil && ctx.Value(skipMemoryObservation{}) == nil {
 				if confirmedTeachingEnd(plan, learnerText, providerMessages) {
 					job, summaryErr := s.Summaries.EnqueueConfirmed(ctx, slug, learner.ID, teacherMessageID, learnerSeq)
 					if summaryErr == nil {
-						ending, resourceErr := ai.RenderPrompt("teaching/end-confirmed", nil)
+						ending, resourceErr := ai.RenderPrompt("teaching/runtime/end-confirmed", nil)
 						if resourceErr != nil {
 							return resourceErr
 						}
@@ -323,7 +331,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 							return err
 						}
 						_, _ = conversation.Append("teaching-summary-failed", map[string]any{"confirmationMessageId": learner.ID, "error": summaryErr.Error()})
-						failureInstruction, resourceErr := ai.RenderPrompt("teaching/end-confirmation-failed", nil)
+						failureInstruction, resourceErr := ai.RenderPrompt("teaching/runtime/end-confirmation-failed", nil)
 						if resourceErr != nil {
 							return resourceErr
 						}
@@ -345,7 +353,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			plannedCalls, unavailable = plan.calls(tools)
 			_, _ = conversation.Append("tool-intent-evaluated", map[string]any{"responseId": responseID, "status": "evaluated", "required": plan.Required, "forbidden": plan.Forbidden, "unavailable": unavailable})
 			if len(unavailable) > 0 {
-				notice, e := ai.RenderPrompt("teaching/tool-unavailable", map[string]string{"tools": strings.Join(unavailable, ", ")})
+				notice, e := ai.RenderPrompt("teaching/runtime/tool-unavailable", map[string]string{"tools": strings.Join(unavailable, ", ")})
 				if e != nil {
 					return e
 				}
@@ -380,7 +388,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	if strings.TrimSpace(turnContext) != "" {
 		// Keep changing memory, source snapshots and retrieval evidence after
 		// stable instructions and history, once per turn (also across tool rounds).
-		reference, e := ai.RenderPrompt("teaching/turn-reference", map[string]string{"content": turnContext})
+		reference, e := ai.RenderPrompt("teaching/context/turn", map[string]string{"content": turnContext})
 		if e != nil {
 			return e
 		}
@@ -495,7 +503,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			tools = nil
 			// Discard the complete invalid provider candidate, including its tool history.
 			// Prior valid exchanges are kept; this candidate never becomes teaching text.
-			systemPrompt += "\n" + promptText("teaching/no-more-tools")
+			systemPrompt += "\n" + promptText("teaching/runtime/no-more-tools")
 			continue
 		}
 		assistant := ai.GatewayMessage{Role: "assistant", Content: text.String()[roundTextStart:], ThinkingBlocks: roundThinking, ToolCalls: pending, ProviderContent: roundProviderContent.String(), ReasoningContent: roundProviderReasoning.String()}
@@ -532,7 +540,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			if plannedRound {
 				// These results were requested by the application policy, not a
 				// provider assistant. Do not fabricate signed/reasoning tool history.
-				wrapped, e := ai.RenderPrompt("teaching/planner-tool-result", map[string]string{"tool": call.ToolName, "content": resultText})
+				wrapped, e := ai.RenderPrompt("teaching/runtime/planner-tool-result", map[string]string{"tool": call.ToolName, "content": resultText})
 				if e != nil {
 					return e
 				}
@@ -552,7 +560,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 		if forceFinal || requestNumber >= 6 {
 			tools = nil
-			systemPrompt += "\n" + promptText("teaching/tools-finished")
+			systemPrompt += "\n" + promptText("teaching/runtime/tools-finished")
 		}
 	}
 	status := "completed"

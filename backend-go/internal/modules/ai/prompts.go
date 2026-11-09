@@ -168,10 +168,26 @@ func snapshotFile(snapshot map[string][]byte, name, extension string) ([]byte, e
 		return nil, fmt.Errorf("invalid prompt resource %q", name)
 	}
 	b, ok := snapshot[name+extension]
-	if !ok {
-		return nil, fmt.Errorf("unregistered prompt resource %s", name)
+	if ok {
+		return b, nil
 	}
-	return b, nil
+	// A bundle is stored once; only the explicitly selected entry is rendered.
+	if extension == ".md" {
+		if slash := strings.LastIndex(name, "/"); slash > 0 {
+			if data, found := snapshot[name[:slash]+".json"]; found {
+				var bundle struct {
+					Prompts map[string]string `json:"prompts"`
+				}
+				if err := json.Unmarshal(data, &bundle); err != nil {
+					return nil, fmt.Errorf("invalid prompt bundle %s: %w", name[:slash], err)
+				}
+				if value, found := bundle.Prompts[name[slash+1:]]; found {
+					return []byte(value), nil
+				}
+			}
+		}
+	}
+	return nil, fmt.Errorf("unregistered prompt resource %s", name)
 }
 func RenderPrompt(name string, variables map[string]string) (string, error) {
 	snapshot, err := promptSnapshot()
