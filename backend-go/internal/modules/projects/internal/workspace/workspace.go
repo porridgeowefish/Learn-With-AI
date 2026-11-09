@@ -175,6 +175,14 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	if !learningprofile.ValidLearningMode(in.LearningMode) {
 		return errors.New("invalid learning mode")
 	}
+	if in.LearningScope != nil && in.LearningScope.Source.Type == learningscope.SourceDisciplineMap {
+		copied := *in.LearningScope
+		if copied.Source.BindingVersion > 1 || copied.Source.MapID == "" || copied.Source.MapVersionID == "" || copied.Source.TopicID == "" {
+			return errors.New("new map lesson requires a complete current course binding")
+		}
+		copied.Source.BindingVersion, copied.Source.BindingStatus = 1, "linked"
+		in.LearningScope = &copied
+	}
 
 	// Folder tree. Discipline maps deliberately do not own learning zones.
 	dirs := []string{"", "assets"}

@@ -13,6 +13,8 @@ import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { assignProject, type FolderLayout } from '@/features/projects/lib/folders';
 import { GenerationControl, SourceImportControl, SourcesView } from '@/features/learning';
 import { useDisciplineMap } from '../api/disciplineMap';
+import { useCourseSummaries } from '../api/courseSummaries';
+import { CourseSummaryModal } from './CourseSummaryModal';
 import type {
   DisciplineLearningPlanResponse,
   DisciplineLearningTask,
@@ -103,6 +105,9 @@ function cleanHeading(value: string): string {
 export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
   const navigate = useNavigate();
   const projection = useDisciplineMap(slug);
+  const courseSummaries = useCourseSummaries(slug, projection.data?.mapVersionId);
+  const [summaryTopic, setSummaryTopic] = useState<string>();
+  const lessons = useMemo(() => courseSummaries.data?.lessons ?? [], [courseSummaries.data?.lessons]);
   const overview = { ...projection, data: projection.data ? {content: projection.data.overviewMarkdown} : undefined };
   const disciplineTopics = {data: projection.data?.topics};
   const learningPlan = useDisciplineLearningPlan(slug);
@@ -205,7 +210,18 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
       const handleClick = () => startDeepDive(item.title, topicCatalogByTitle.get(item.title)?.id);
       button.addEventListener('click', handleClick);
       heading.appendChild(button);
+      const topicId = topicCatalogByTitle.get(item.title)?.id;
+      const summaryButton = document.createElement('button');
+      summaryButton.type = 'button';
+      summaryButton.className = s.inlinePlan;
+      summaryButton.textContent = '概括';
+      summaryButton.setAttribute('aria-label', `查看概括：${item.title}`);
+      const handleSummary = () => setSummaryTopic(topicId);
+      summaryButton.addEventListener('click', handleSummary);
+      if (topicId) heading.appendChild(summaryButton);
       cleanups.push(() => {
+        summaryButton.removeEventListener('click', handleSummary);
+        summaryButton.remove();
         planButton.removeEventListener('click', handlePlanClick);
         planButton.remove();
         button.removeEventListener('click', handleClick);
@@ -216,7 +232,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
       });
     });
     return () => cleanups.forEach((cleanup) => cleanup());
-  }, [outline, plannedTopics, addTopicToPlan, saveLearningPlan.isPending, topicCatalogByTitle, activeView]);
+  }, [outline, plannedTopics, addTopicToPlan, saveLearningPlan.isPending, topicCatalogByTitle, activeView, lessons]);
 
   const scrollToOutline = (id: string) => {
     articleRef.current
@@ -263,6 +279,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
       </header>
 
       {launchNotice&&<p role="status">{launchNotice}</p>}
+      {courseSummaries.error && <p role="alert">暂时无法读取学习概括，请稍后刷新。</p>}
       <main className={s.scroll}>
         {activeView === 'sources' ? <SourcesView slug={slug}/> : activeView === 'plan' ? (
           learningPlan.isLoading ? (
@@ -303,7 +320,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
                     >
                       <button type="button" onClick={() => scrollToOutline(item.id)}>
                         <span className={s.tocNumber}>{item.number}</span>
-                        <span>{item.title}</span>
+                        <span>{item.title}{item.actionable && lessons.some(l => l.topicId === topicCatalogByTitle.get(item.title)?.id && l.summaries?.some(summary => summary.status === 'completed')) && <span className={s.summaryMark} aria-label="已学">✓</span>}</span>
                         <i aria-hidden="true" />
                       </button>
                     </li>
@@ -318,6 +335,11 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
         )}
       </main>
 
+      {summaryTopic && <CourseSummaryModal mapSlug={slug}
+        mapVersionId={projection.data?.mapVersionId ?? ''}
+        title={disciplineTopics.data?.topics.find(t => t.id === summaryTopic)?.title ?? '本节'}
+        lessons={lessons.filter(l => l.topicId === summaryTopic)} open
+        onOpenChange={open => { if (!open) setSummaryTopic(undefined); }} />}
       <CreateProjectModal
         open={createOpen}
         onOpenChange={(nextOpen) => {
@@ -400,9 +422,9 @@ function LearningTaskList({
           <h2>学习任务清单</h2>
           <p>按加入顺序学习，也可以随时调整。完成一个任务后在这里打卡。</p>
         </div>
-        <div className={s.planProgress} aria-label={`已完成 ${completed} 项，共 ${items.length} 项`}>
+        <div className={s.planProgress} aria-label={`已打卡 ${completed} 项，共 ${items.length} 项`}>
           <strong>{completed}/{items.length}</strong>
-          <span>已完成</span>
+          <span>已打卡</span>
         </div>
       </header>
 

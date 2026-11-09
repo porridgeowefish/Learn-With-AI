@@ -36,6 +36,8 @@ api /api/projects/{}/conversation/transcribe
 api /api/projects/{}/conversation/turns
 api /api/projects/{}/conversation/turns/queue
 api /api/projects/{}/conversation?limit=40&beforeSeq={}
+api /api/projects/{}/course-binding
+api /api/projects/{}/course-summaries?versionId={}
 api /api/projects/{}/discipline-map
 api /api/projects/{}/feynman/sessions
 api /api/projects/{}/feynman/sessions/{}/stream
@@ -50,6 +52,7 @@ api /api/projects/{}/sources/{}/permanent-delete
 api /api/projects/{}/sources/{}/retry
 api /api/projects/{}/sources/{}/revisions/{}/files/{}
 api /api/projects/{}/sources/{}/structure-jobs
+api /api/projects/{}/teaching-summaries/{}/retry
 api /api/settings/appearance
 api /api/settings/ask-ai
 api /api/settings/ask-ai/probe

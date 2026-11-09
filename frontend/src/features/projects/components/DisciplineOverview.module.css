@@ -6,6 +6,12 @@
   overflow: hidden;
 }
 
+.tableOfContents .summaryMark {
+  margin-left: 8px;
+  color: var(--success);
+  font-weight: 700;
+}
+
 .header {
   display: flex;
   justify-content: space-between;

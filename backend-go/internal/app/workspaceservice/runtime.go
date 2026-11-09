@@ -2,6 +2,7 @@ package workspaceservice
 
 import (
 	"errors"
+	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"os"
 	"path/filepath"
 
@@ -21,6 +22,9 @@ func OpenRuntime(opts config.Options, defaultRoot string) (config.Config, *paths
 		err = RecoverMove(lease.Root)
 		if err == nil {
 			err = RecoverImport(lease.Root)
+		}
+		if err == nil {
+			err = projects.MigrateCourseBindings(filepath.Join(lease.Root, "projects"))
 		}
 		if err == nil {
 			return cfg, lease, nil

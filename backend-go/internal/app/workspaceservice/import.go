@@ -420,6 +420,9 @@ func importArchive(ctx context.Context, root, zipPath string, publish func(strin
 	if err = validateCandidate(ctx, stage); err != nil {
 		return
 	}
+	if err = projects.MigrateCourseBindings(filepath.Join(stage, "projects")); err != nil {
+		return
+	}
 	current, oldIDs, e := entries(root)
 	if e != nil {
 		return nil, e

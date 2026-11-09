@@ -1,6 +1,8 @@
 import { previewFigureAnswer, previewManufacturingAnswer } from '/__design/visuals.mjs';
 
 const now = () => new Date().toISOString();
+const retriedSummaries = new Set();
+const confirmedBindings = new Set();
 const id = () => crypto.randomUUID();
 const reply =
   '向量加法表示连续发生的位移。把第二个向量的起点移到第一个向量的终点，再连接最初的起点和最后的终点，就得到合位移。';
@@ -624,6 +626,9 @@ export async function learning(ctx) {
       'assets',
       'notes',
       'discipline-map',
+      'course-summaries',
+        'course-binding',
+      'teaching-summaries',
       'learning-plan',
       'generation-jobs',
       'feynman',
@@ -662,6 +667,14 @@ export async function learning(ctx) {
     if (method === 'PUT') s.plan = b;
     return json(s.plan);
   }
+  if (feature === 'course-summaries') return json({ lessons: s.topics.slice(0, 3).map((topic, index) => ({
+    projectSlug: index === 1 ? 'physics' : 'math', title: topic.title, topicId: topic.id, linked: index !== 1 || confirmedBindings.has(topic.id),
+    needsConfirmation: index === 1 && !confirmedBindings.has(topic.id),
+    summaries: index === 0 ? [{ id: 'summary-demo', status: 'completed', concepts: ['向量', '线性变换'], scenario: '用平面箭头的拉伸和旋转说明变换前后的关系。' }]
+      : index === 1 ? [{ id: 'summary-pending', status: 'pending' }] : [{ id: 'summary-failed', status: retriedSummaries.has('summary-failed') ? 'completed' : 'failed', concepts: ['机械能守恒'] }],
+  })) });
+  if (feature === 'course-binding' && method === 'POST') { confirmedBindings.add(b.topicId); return json({ linked: true }); }
+  if (feature === 'teaching-summaries') { if (method === 'POST' && parts[1] === 'retry') retriedSummaries.add(parts[0]); return json({ summaries: [] }); }
   if (feature === 'discipline-map')
     return json({
       mapVersionId: s.mapVersion,

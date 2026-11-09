@@ -64,6 +64,8 @@ func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/projects/{id}/teaching-summaries", s.teachingSummaries)
+	mux.HandleFunc("GET /api/projects/{id}/course-summaries", s.courseSummaries)
+	mux.HandleFunc("POST /api/projects/{id}/course-binding", s.confirmCourseBinding)
 	mux.HandleFunc("POST /api/projects/{id}/teaching-summaries/{summaryId}/{action}", s.teachingSummaries)
 	mux.HandleFunc("GET /api/learning/visuals/image", s.handleLearningVisual)
 	mux.HandleFunc("GET /api/learning/visuals/metadata", s.handleLearningVisualMetadata)

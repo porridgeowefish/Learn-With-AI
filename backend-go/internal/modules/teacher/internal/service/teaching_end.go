@@ -26,6 +26,11 @@ func confirmedTeachingEnd(plan toolIntent, learner string, history []ai.GatewayM
 	if explicit {
 		return true
 	}
+	for _, done := range []string{"我学完了", "学完了", "本节学完了", "这一节学完了", "我已经学完了", "本章学完了", "这一章学完了"} {
+		if strings.Trim(text, " 。！!\n\r") == done {
+			return true
+		}
+	}
 	// Short assent is only meaningful in response to an actual assistant ending
 	// question. Context messages and earlier unrelated questions cannot authorize.
 	last := ""

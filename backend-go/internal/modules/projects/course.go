@@ -73,13 +73,13 @@ func projectCourseSource(slug string) (Source, error) {
 	return scope.Source, nil
 }
 func CourseForProject(slug string) (Course, error) {
-	source, err := projectCourseSource(slug)
+	source, err := CourseSource(slug)
 	if err != nil {
 		return Course{}, err
 	}
-	// Legacy snapshots without a stable map identity remain usable as standalone
+	// Unresolved legacy snapshots remain usable as standalone
 	// teaching scopes, but cannot safely claim continuity with a recreated map.
-	if source.Type != SourceDisciplineMap || source.MapVersionID == "" || source.MapID == "" {
+	if source.Type != SourceDisciplineMap || source.BindingStatus == "unresolved" || source.MapVersionID == "" || source.MapID == "" {
 		return Course{}, nil
 	}
 	course, err := ReadCourseMap(source.MapSlug, source.MapVersionID)
@@ -108,11 +108,11 @@ func CourseMembers(slug string) ([]CourseMember, error) {
 	members := []CourseMember{}
 	counts := map[string]int{}
 	for _, p := range all {
-		source, e := projectCourseSource(p.Slug)
+		source, e := CourseSource(p.Slug)
 		if e != nil {
 			continue
 		}
-		if source.Type != SourceDisciplineMap || source.MapSlug != course.MapSlug || source.MapVersionID != course.MapVersionID || source.MapID != course.ID {
+		if source.Type != SourceDisciplineMap || source.BindingStatus == "unresolved" || source.MapSlug != course.MapSlug || source.MapVersionID != course.MapVersionID || source.MapID != course.ID {
 			continue
 		}
 		if _, ok := FindTopic(course.Topics, source.TopicID); !ok {
@@ -128,4 +128,13 @@ func CourseMembers(slug string) ([]CourseMember, error) {
 		}
 	}
 	return result, nil
+}
+
+// CourseSource reads the persisted binding. Compatibility belongs to migration.
+func CourseSource(slug string) (Source, error) {
+	source, err := projectCourseSource(slug)
+	if source.BindingVersion > 1 {
+		return Source{}, errors.New("unsupported course binding version")
+	}
+	return source, err
 }
