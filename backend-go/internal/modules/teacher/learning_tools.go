@@ -291,10 +291,16 @@ func (s *LearningTools) PrepareFeynman(slug, id string, in ToolInput) (ToolStrea
 			return promptErr
 		}
 		prefix := make([]ai.AIMessage, 0, len(composition.Messages)+len(messages))
+		var references []ai.AIMessage
 		for _, message := range composition.Messages {
-			prefix = append(prefix, ai.AIMessage{Role: message.Role, Content: message.Content})
+			converted := ai.AIMessage{Role: message.Role, Content: message.Content}
+			if message.Role == "system" {
+				prefix = append(prefix, converted)
+			} else {
+				references = append(references, converted)
+			}
 		}
-		messages = append(prefix, messages...)
+		messages = append(append(prefix, messages...), references...)
 		err = ai.Stream(ctx, ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model}, "", messages, func(f ai.AIFrame) {
 			if f.Type == "thinking" || f.Type == "done" {
 				return

@@ -237,7 +237,7 @@ npm run start
 
 也可从 Gitee 克隆：`git clone https://gitee.com/szu-andrew/learn-with-ai.git`，进入 `learn-with-ai` 后执行相同构建命令。
 
-构建产物位于 `frontend/dist/` 与 `dist/dev/`；源码服务默认打开 `http://127.0.0.1:8787/`。数据默认写入仓库内被 Git 忽略的 `workspace/`，可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
+构建产物位于 `frontend/dist/` 与 `dist/dev/`。源码服务默认打开 `http://127.0.0.1:8787/`。数据默认写入仓库内被 Git 忽略的 `workspace/`。可用 `--workspace` 或 `LWA_WORKSPACE_ROOT` 指定其他目录。
 
 | 命令 | 用途 |
 | --- | --- |
@@ -264,9 +264,9 @@ flowchart LR
 ## 常见问题
 
 <details>
-<summary><b>原来的 LLL_life_long_learn 链接还能用吗？</b></summary>
+<summary><b>原来的仓库链接还能用吗？</b></summary>
 
-可以。Learn-With-AI 原仓库名为 LLL_life_long_learn，旧仓库链接继续跳转到当前项目。用户名和现有仓库地址保持不变。
+可以。旧仓库链接会跳转到现在的 Learn-With-AI 仓库。
 
 </details>
 

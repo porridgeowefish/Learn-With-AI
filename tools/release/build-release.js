@@ -12,11 +12,29 @@ function run(bin, args, options = {}) {
   const result = spawnSync(bin, args, { cwd: repoRoot, stdio: 'inherit', windowsHide: true, ...options });
   if (result.error || result.status !== 0) throw result.error || new Error(`${bin} failed: ${result.status}`);
 }
+function releaseLinkerFlags(goos, version, promptPublicKey = '') {
+  const flags = [
+    ...(goos === 'windows' ? ['-H windowsgui'] : []),
+    '-s -w',
+    '-X github.com/xmz14/lll/backend-go/internal/platform/filesystem.BuildMode=release',
+    `-X main.Version=${version}`,
+  ];
+  if (promptPublicKey) {
+    const decoded = Buffer.from(promptPublicKey, 'base64');
+    if (decoded.length !== 32 || decoded.toString('base64') !== promptPublicKey) {
+      throw new Error('LWA_CLOUD_PROMPT_PUBLIC_KEY must be a Base64 Ed25519 public key');
+    }
+    flags.push(`-X github.com/xmz14/lll/backend-go/internal/platform/llmcloud.PromptPublicKey=${promptPublicKey}`);
+  }
+  return flags.join(' ');
+}
 function main() {
   require('../check/check-prompt-resources').checkPromptResources(repoRoot);
   const version = validateVersion(value('--version', require('../../package.json').version));
   const selected = value('--targets', targets.join(',')).split(',');
   if (!selected.length || selected.some(target => !targets.includes(target))) throw new Error('Invalid release targets');
+  const publicKey = process.env.LWA_CLOUD_PROMPT_PUBLIC_KEY || process.env.LLL_CLOUD_PROMPT_PUBLIC_KEY;
+  const flags = selected.map(target => releaseLinkerFlags(target.split('/')[0], version, publicKey));
   if (!process.argv.includes('--skip-frontend')) run('npm', ['--prefix', 'frontend', 'run', 'build'], { shell: process.platform === 'win32' });
   const releaseRoot = path.resolve(repoRoot, 'dist', 'releases', version);
   for (const directory of [path.join(repoRoot,'dist'),path.join(repoRoot,'dist','releases'),releaseRoot,path.join(releaseRoot,'.staging')]) {
@@ -24,7 +42,7 @@ function main() {
     }
   fs.mkdirSync(releaseRoot, { recursive: true });
   if (fs.lstatSync(releaseRoot).isSymbolicLink()) throw new Error('Linked release directory forbidden');
-  for (const target of selected) {
+  for (const [index, target] of selected.entries()) {
     const [goos, arch] = target.split('/');
     const prefix = `learn-with-ai-${version}-${goos}-${arch}`;
     const staging = path.resolve(releaseRoot, '.staging', prefix);
@@ -38,7 +56,7 @@ function main() {
     const names = packagePaths(goos, arch);
     const binary = path.join(staging, names[0]);
     console.log(`Building ${target}`);
-    run('go', ['build', '-trimpath', '-ldflags', `${goos === 'windows' ? '-H windowsgui ' : ''}-s -w -X github.com/xmz14/lll/backend-go/internal/platform/filesystem.BuildMode=release -X main.Version=${version}`, '-o', binary, goos === 'windows' ? './backend-go/cmd/desktop' : './backend-go/cmd/lll'], { env: { ...process.env, CGO_ENABLED: '0', GOOS: goos, GOARCH: arch } });
+    run('go', ['build', '-trimpath', '-ldflags', flags[index], '-o', binary, goos === 'windows' ? './backend-go/cmd/desktop' : './backend-go/cmd/lll'], { env: { ...process.env, CGO_ENABLED: '0', GOOS: goos, GOARCH: arch } });
     if (goos === 'windows') {
       if (process.platform !== 'win32') throw new Error('Windows GUI resource embedding requires Windows');
       run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'windows-manifest.ps1'), '-Executable', binary, '-IconPath', path.join(repoRoot, 'scripts', 'assets', 'learn-with-ai.ico'), '-Version', version]);
@@ -77,3 +95,4 @@ function main() {
   }
 }
 if (require.main === module) main();
+module.exports = { releaseLinkerFlags };

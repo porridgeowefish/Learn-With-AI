@@ -16,6 +16,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
 type SourceMessage struct {
@@ -24,23 +25,27 @@ type SourceMessage struct {
 	Text string `json:"text"`
 }
 type Summary struct {
-	ID                string          `json:"id"`
-	SessionID         string          `json:"teachingSessionId"`
-	ConfirmationID    string          `json:"confirmationMessageId"`
-	AcknowledgementID string          `json:"acknowledgementMessageId"`
-	FromSeq           uint64          `json:"fromSeq"`
-	ThroughSeq        uint64          `json:"throughSeq"`
-	SourceHash        string          `json:"sourceHash"`
-	Input             []SourceMessage `json:"input,omitempty"`
-	Prompt            string          `json:"prompt,omitempty"`
-	ConfirmationHash  string          `json:"confirmationHash"`
-	PromptHash        string          `json:"promptHash,omitempty"`
-	Status            string          `json:"status"`
-	Concepts          []string        `json:"concepts,omitempty"`
-	Scenario          string          `json:"scenario,omitempty"`
-	Error             string          `json:"error,omitempty"`
-	CreatedAt         time.Time       `json:"createdAt"`
-	CompletedAt       *time.Time      `json:"completedAt,omitempty"`
+	ID                string                `json:"id"`
+	SessionID         string                `json:"teachingSessionId"`
+	ConfirmationID    string                `json:"confirmationMessageId"`
+	AcknowledgementID string                `json:"acknowledgementMessageId"`
+	FromSeq           uint64                `json:"fromSeq"`
+	ThroughSeq        uint64                `json:"throughSeq"`
+	SourceHash        string                `json:"sourceHash"`
+	Input             []SourceMessage       `json:"input,omitempty"`
+	SourceProviderID  string                `json:"sourceProviderId,omitempty"`
+	ProviderID        string                `json:"providerId,omitempty"`
+	Model             string                `json:"model,omitempty"`
+	Prompt            string                `json:"prompt,omitempty"`
+	PromptReference   *promptpack.Reference `json:"promptReference,omitempty"`
+	ConfirmationHash  string                `json:"confirmationHash"`
+	PromptHash        string                `json:"promptHash,omitempty"`
+	Status            string                `json:"status"`
+	Concepts          []string              `json:"concepts,omitempty"`
+	Scenario          string                `json:"scenario,omitempty"`
+	Error             string                `json:"error,omitempty"`
+	CreatedAt         time.Time             `json:"createdAt"`
+	CompletedAt       *time.Time            `json:"completedAt,omitempty"`
 }
 type session struct {
 	ID      string `json:"id"`
@@ -154,7 +159,7 @@ func Begin(slug string, seq uint64) error {
 
 // Confirm atomically seals one session and its pending job. Replayed confirmations
 // return the same record, even when the learner sends another confirmation message.
-func Confirm(slug, learnerID, ackID string, learnerSeq uint64, frozenPrompt ...string) (Summary, error) {
+func Confirm(slug, learnerID, ackID string, learnerSeq uint64, sourceProviderID ...string) (Summary, error) {
 	mu := lockFor(slug)
 	mu.Lock()
 	defer mu.Unlock()
@@ -211,9 +216,8 @@ func Confirm(slug, learnerID, ackID string, learnerSeq uint64, frozenPrompt ...s
 		return Summary{}, errors.New("no completed teaching to summarize")
 	}
 	v := Summary{ID: idgen.New("summary"), SessionID: s.Active.ID, ConfirmationID: learnerID, AcknowledgementID: ackID, FromSeq: s.Active.FromSeq, ThroughSeq: learnerSeq - 1, SourceHash: hash(input), Input: input, Status: "pending", CreatedAt: time.Now().UTC()}
-	if len(frozenPrompt) > 0 {
-		v.Prompt = frozenPrompt[0]
-		v.PromptHash = hash(v.Prompt)
+	if len(sourceProviderID) > 0 {
+		v.SourceProviderID = sourceProviderID[0]
 	}
 	v.ConfirmationHash = hash(m)
 	s.Summaries = append(s.Summaries, v)
@@ -280,6 +284,7 @@ func List(slug string) ([]Summary, error) {
 		}
 		v.Input = nil
 		v.Prompt = ""
+		v.PromptReference = nil
 		out = append(out, v)
 	}
 	return out, nil

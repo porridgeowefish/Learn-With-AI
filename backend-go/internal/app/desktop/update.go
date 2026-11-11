@@ -149,7 +149,7 @@ func (u *updater) check(ctx context.Context, force bool) UpdateInfo {
 	}
 	if info.DownloadURL == "" && runtime.GOOS == "windows" {
 		name := updateAssetName(rel.Tag, runtime.GOOS, runtime.GOARCH)
-		marker := regexp.MustCompile(`<!-- LLL-UPDATE-PARTS: ` + regexp.QuoteMeta(name) + ` ([0-9]+) ([0-9]+) -->`).FindStringSubmatch(rel.Body)
+		marker := regexp.MustCompile(`<!-- (?:LWA|LLL)-UPDATE-PARTS: ` + regexp.QuoteMeta(name) + ` ([0-9]+) ([0-9]+) -->`).FindStringSubmatch(rel.Body)
 		if len(marker) == 3 {
 			count, _ := strconv.Atoi(marker[1])
 			total, _ := strconv.ParseInt(marker[2], 10, 64)

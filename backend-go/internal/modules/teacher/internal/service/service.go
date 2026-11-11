@@ -232,13 +232,14 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	}
 	emit(StreamFrame{Type: "message-started", Data: map[string]any{"teacherMessageId": teacherMessageID}})
 
-	composition, err := buildTeacherComposition(ctx, slug, conversation, map[string]string{"webSearchEnabled": strconv.FormatBool(options.WebSearch && profile.Settings.Search.Enabled), "sourcesEnabled": "true"}, providerID)
-	systemPrompt, providerMessages := "", composition.Messages
+	promptCtx := ai.ManagedPromptContext(ctx, effectiveProviderID, "teacher/general")
+	composition, err := buildTeacherComposition(promptCtx, slug, conversation, map[string]string{"webSearchEnabled": strconv.FormatBool(options.WebSearch && profile.Settings.Search.Enabled), "sourcesEnabled": "true"}, providerID)
+	turnInstructions, providerMessages := "", composition.Messages
 	if err != nil {
-		message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: "failed", Blocks: []conversationstore.Block{}, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
+		message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: "failed", FailureCode: "context_preparation_failed", Blocks: []conversationstore.Block{}, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
 		_, _ = conversation.RecordMessage(message)
 		_, _ = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": teacherMessageID, "status": "failed"})
-		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": "context_preparation_failed", "partialPreserved": false}})
+		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": message.FailureCode, "partialPreserved": false}})
 		return err
 	}
 	turnContext := learningprofile.Context(slug)
@@ -288,18 +289,33 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 	}
 	usage := map[string]int{}
+	var creditUsage *conversationstore.CreditUsage
+	recordCredit := func(receipt *ai.CreditSettlement) {
+		if !ai.IsManagedProvider(effectiveProviderID) || receipt == nil || receipt.Units < 0 {
+			return
+		}
+		if creditUsage == nil {
+			creditUsage = &conversationstore.CreditUsage{}
+		}
+		creditUsage.Units += receipt.Units
+		creditUsage.Pending = creditUsage.Pending || receipt.Pending
+		if receipt.Pending && receipt.RequestID != "" {
+			creditUsage.PendingRequests = append(creditUsage.PendingRequests, receipt.RequestID)
+		}
+	}
 	var providerErr error
+	var lessonEndID string
 	allowSources := selected["list_source_documents"]
 	var plannedCalls []ai.ToolCall
 	if learner.Role == "learner" && ctx.Err() == nil {
 		var plan toolIntent
 		var intentUsage map[string]int
 		var intentErr error
-		if explicitTeachingEnd(learnerText) {
+		if explicitTeachingEnd(learnerText) || noMoreTeachingQuestions(learnerText, providerMessages) {
 			plan.EndDecision = "confirm_end"
 			plan.Evidence = learnerText
 		} else {
-			plan, intentUsage, intentErr = s.inferToolIntent(ctx, effectiveProviderID, effectiveModel, learnerText, providerMessages)
+			plan, intentUsage, intentErr = s.inferToolIntent(ctx, effectiveProviderID, effectiveModel, learnerText, providerMessages, recordCredit)
 		}
 		for k, v := range intentUsage {
 			usage[k] += v
@@ -314,17 +330,18 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				}
 			}
 			_, _ = conversation.Append("tool-intent-evaluated", map[string]any{"responseId": responseID, "status": "fallback"})
-			systemPrompt += "\n" + promptText("teaching/runtime/intent-unavailable")
+			turnInstructions += "\n" + promptText("teaching/runtime/intent-unavailable")
 		} else {
 			if s.Summaries != nil && ctx.Value(skipMemoryObservation{}) == nil {
 				if confirmedTeachingEnd(plan, learnerText, providerMessages) {
-					job, summaryErr := s.Summaries.EnqueueConfirmed(ctx, slug, learner.ID, teacherMessageID, learnerSeq)
+					job, summaryErr := s.Summaries.EnqueueConfirmed(ctx, slug, learner.ID, teacherMessageID, learnerSeq, effectiveProviderID)
 					if summaryErr == nil {
+						lessonEndID = job.ID
 						ending, resourceErr := ai.RenderPrompt("teaching/runtime/end-confirmed", nil)
 						if resourceErr != nil {
 							return resourceErr
 						}
-						systemPrompt += "\n\n" + ending
+						turnInstructions += "\n\n" + ending
 						_, _ = conversation.Append("teaching-end-confirmed", map[string]any{"summaryId": job.ID, "confirmationMessageId": learner.ID, "status": job.Status})
 					} else {
 						if err := continuity.Begin(slug, learnerSeq); err != nil {
@@ -335,7 +352,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 						if resourceErr != nil {
 							return resourceErr
 						}
-						systemPrompt += "\n\n" + failureInstruction
+						turnInstructions += "\n\n" + failureInstruction
 					}
 				} else if err := continuity.Begin(slug, learnerSeq); err != nil {
 					return err
@@ -357,14 +374,14 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				if e != nil {
 					return e
 				}
-				systemPrompt += "\n" + notice
+				turnInstructions += "\n" + notice
 			}
 		}
 	}
 
 	// Reserve dynamic context while trimming history, without putting it in
 	// the provider's stable system prefix. The final request places it last.
-	initial := ai.GatewayRequest{System: systemPrompt + turnContext, Messages: providerMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
+	initial := ai.GatewayRequest{System: turnContext, TurnInstructions: turnInstructions, Messages: providerMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
 	budgetErr := budget.TrimInitial(&initial)
 	providerMessages = initial.Messages
 	sourceLimit := min(12000, budget.Window/4, max(0, budget.Available(initial)-1024))
@@ -421,7 +438,9 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			}
 			tools = filtered
 		}
-		request := ai.GatewayRequest{ReasoningEffort: options.Effort, ShowReasoning: &profile.Settings.ShowReasoning, System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
+		request := ai.GatewayRequest{ReasoningEffort: options.Effort, ShowReasoning: &profile.Settings.ShowReasoning, TurnInstructions: turnInstructions, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
+		request.Prompt = ai.ManagedPromptReference(promptCtx)
+		request.PromptExposureID = responseID
 		if providerErr = budget.Check(request); providerErr != nil {
 			break
 		}
@@ -456,6 +475,8 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 						roundUsage[k] = v
 					}
 					emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
+				case "credit-settlement":
+					recordCredit(event.CreditSettlement)
 				case "tool-call-ready":
 					if event.ToolCall != nil {
 						call := *event.ToolCall
@@ -503,7 +524,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			tools = nil
 			// Discard the complete invalid provider candidate, including its tool history.
 			// Prior valid exchanges are kept; this candidate never becomes teaching text.
-			systemPrompt += "\n" + promptText("teaching/runtime/no-more-tools")
+			turnInstructions += "\n" + promptText("teaching/runtime/no-more-tools")
 			continue
 		}
 		assistant := ai.GatewayMessage{Role: "assistant", Content: text.String()[roundTextStart:], ThinkingBlocks: roundThinking, ToolCalls: pending, ProviderContent: roundProviderContent.String(), ReasoningContent: roundProviderReasoning.String()}
@@ -512,7 +533,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 		limited := toolRounds >= 6 || requestNumber >= 6
 		// Reserve a bounded result for every pending ID before any body is loaded.
-		resultRoom := budget.Available(ai.GatewayRequest{System: systemPrompt, Messages: roundMessages, Tools: tools}) - 256*len(pending) - 512
+		resultRoom := budget.Available(ai.GatewayRequest{TurnInstructions: turnInstructions, Messages: roundMessages, Tools: tools}) - 256*len(pending) - 512
 		forceFinal := limited
 		for _, call := range pending {
 			_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": call.CallID, "responseId": responseID, "toolName": call.ToolName, "arguments": call.Arguments})
@@ -560,7 +581,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 		if forceFinal || requestNumber >= 6 {
 			tools = nil
-			systemPrompt += "\n" + promptText("teaching/runtime/tools-finished")
+			turnInstructions += "\n" + promptText("teaching/runtime/tools-finished")
 		}
 	}
 	status := "completed"
@@ -578,8 +599,29 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	if text.Len() > 0 {
 		blocks = append(blocks, conversationstore.Block{ID: textBlockID, Type: "markdown", Source: text.String()})
 	}
-	message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: status, Blocks: blocks, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
+	message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: status, Blocks: blocks,
+		CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC(), CreditUsage: creditUsage}
+	if providerErr != nil {
+		message.FailureCode = providerFailureCode(providerErr)
+	}
 	if status == "completed" {
+		message.LessonEnded = lessonEndID != ""
+		message.LessonEndID = lessonEndID
+		if message.LessonEnded && ai.IsManagedProvider(effectiveProviderID) {
+			if history, err := conversation.AllMessages(); err == nil {
+				for i := len(history) - 1; i >= 0; i-- {
+					if prior := history[i]; prior.Role == "teacher" && prior.Status == "completed" {
+						message.LessonRatingExposureID = prior.TeachingExposureID
+						if prior.LessonEndID == lessonEndID {
+							message.LessonRatingExposureID = prior.LessonRatingExposureID
+						}
+						break
+					}
+				}
+			}
+		} else if !message.LessonEnded && ai.ManagedPromptIsExperimental(promptCtx) {
+			message.TeachingExposureID = responseID
+		}
 		answer, citations, coverage := reading.verifiedAnswer(ctx, text.String())
 		message.SourceCitations, message.ReadingCoverage = citations, coverage
 		if answer != text.String() {
@@ -605,14 +647,14 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 	}
 	if providerErr != nil {
-		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": providerFailureCode(providerErr), "partialPreserved": len(blocks) > 0}})
+		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": message.FailureCode, "partialPreserved": len(blocks) > 0, "creditUsage": creditUsage}})
 		return providerErr
 	}
 	latestSeq := finalEvent.Seq
 	if meta, e := conversation.Meta(); e == nil {
 		latestSeq = meta.LatestSeq
 	}
-	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": latestSeq, "sourceCitations": message.SourceCitations, "readingCoverage": message.ReadingCoverage}})
+	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": latestSeq, "sourceCitations": message.SourceCitations, "readingCoverage": message.ReadingCoverage, "creditUsage": creditUsage}})
 	if learner.Role == "learner" && ctx.Value(skipMemoryObservation{}) != true {
 		learningprofile.Observe(slug, learner.ID, learnerText, effectiveProviderID, s.Gateway)
 	}
@@ -648,6 +690,25 @@ func providerFailureCode(err error) string {
 	}
 	if errors.Is(err, context.Canceled) {
 		return "interrupted"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "teacher_request_timeout"
+	}
+	if errors.Is(err, ai.ErrChatGPTConnection) {
+		return "chatgpt_connection_failed"
+	}
+	var limited *ai.UpstreamRateLimit
+	if errors.As(err, &limited) {
+		return "teacher_provider_rate_limited"
+	}
+	var rejected *ai.ChatGPTHTTPError
+	if errors.As(err, &rejected) {
+		switch rejected.Status {
+		case 400, 413, 422:
+			return "chatgpt_request_rejected"
+		case 403, 404:
+			return "chatgpt_model_unavailable"
+		}
 	}
 	return "teacher_provider_unavailable"
 }

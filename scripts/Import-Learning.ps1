@@ -17,7 +17,7 @@ try {
     $handler.UseProxy = $false
     $client = [System.Net.Http.HttpClient]::new($handler)
     $client.Timeout = [System.Threading.Timeout]::InfiniteTimeSpan
-    $client.DefaultRequestHeaders.Add('X-LLL-Workspace','1')
+    $client.DefaultRequestHeaders.Add('X-LWA-Workspace','1')
     $stream = [IO.File]::OpenRead($zip.FullName)
     $body = [System.Net.Http.StreamContent]::new($stream)
     $body.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::new('application/zip')

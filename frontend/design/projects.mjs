@@ -4,6 +4,7 @@ function makeProject(slug, title, projectType, extra = {}) {
   return { id: slug, slug, title, projectType, status: 'active', layoutStatus: 'current', layoutVersion: 1,
     overviewAvailable: projectType === 'discipline-map', createdAt: stamp(), updatedAt: stamp(), ...extra };
 }
+export const seedMethodology = () => makeProject('learning-methodology', '学习的方法论', 'system-learning');
 function dateAt(offset) {
   const day = new Date();
   day.setDate(day.getDate() + offset);
@@ -24,7 +25,7 @@ export function seedProjects() {
     activity.push({id:'event-'+i, sourceId:'study-'+i, sourceType:'reading', title:titles[i % 3],
       createdAt:dateAt(-i)+'T10:30:00', projectSlug:p.slug, projectTitle:p.title, activityDelta:1+i%8, delta:i%4});
   }
-  return { projects, folders, activity, archivedProjects: [] };
+  return { projects: [seedMethodology(), ...projects], folders, activity, archivedProjects: [] };
 }
 function activitySummary(events, url) {
   const weeks = url.searchParams.get('weeks') === '52' ? 52 : 26;

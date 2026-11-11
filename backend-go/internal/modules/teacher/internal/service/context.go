@@ -72,7 +72,7 @@ func buildTeacherComposition(ctx context.Context, slug string, store *conversati
 		"preferences":      {Role: "context", Read: func(context.Context) (string, error) { return preferenceAppendix(), nil }},
 		"scope":            {Role: "context", Read: func(context.Context) (string, error) { return softScopeAppendix(slug), nil }},
 		"instructions":     {Role: "context", Read: func(context.Context) (string, error) { return store.SystemPrompt() }},
-		"guideline":        {Role: "context", Read: func(context.Context) (string, error) { return learningGuidelinePrompt(store) }},
+		"guideline":        {Role: "context", Read: func(ctx context.Context) (string, error) { return learningGuidelinePromptForContext(ctx, store) }},
 	}
 	composed, err := ai.ComposePrompt(ctx, "teacher/general", facts, sources)
 	if err != nil {

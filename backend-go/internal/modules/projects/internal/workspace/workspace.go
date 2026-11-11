@@ -157,7 +157,18 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	if err != nil {
 		return err
 	}
+	return writeProjectSkeleton(root, slug, title, in)
+}
 
+// StageLearningProject writes a normal learning project to an unpublished directory.
+func StageLearningProject(root, slug, title string) error {
+	if !filepath.IsAbs(root) || !ValidateSlug(slug) {
+		return errors.New("invalid staging directory or project slug")
+	}
+	return writeProjectSkeleton(root, slug, title, ProjectInput{ProjectType: ProjectTypeSystemLearning})
+}
+
+func writeProjectSkeleton(root, slug, title string, in ProjectInput) error {
 	// Check for collision.
 	if exists, err := os.Stat(filepath.Join(root, "state.json")); err == nil && !exists.IsDir() {
 		return &SlugConflictError{Slug: slug}
@@ -210,7 +221,7 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	}
 
 	// state.json (atomic)
-	if err := WriteProjectState(slug, state, ""); err != nil {
+	if err := writeProjectState(root, state); err != nil {
 		return err
 	}
 
@@ -275,6 +286,10 @@ func WriteProjectState(slug string, state *ProjectState, parentSlug string) erro
 	if err != nil {
 		return err
 	}
+	return writeProjectState(root, state)
+}
+
+func writeProjectState(root string, state *ProjectState) error {
 	state.UpdatedAt = time.Now().UTC()
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {

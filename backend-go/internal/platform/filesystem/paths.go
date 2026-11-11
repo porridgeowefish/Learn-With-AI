@@ -47,6 +47,10 @@ var (
 )
 
 func init() {
+	// The standalone cloud command receives its config and state paths directly.
+	if BuildMode == "cloud" {
+		return
+	}
 	// Resolve PROJECT_ROOT by walking up from the working directory until we find go.mod.
 	wd, err := os.Getwd()
 	if err != nil {

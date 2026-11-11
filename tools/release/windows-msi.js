@@ -7,7 +7,7 @@ const { repoRoot } = require("./package-layout");
 const WIX_VERSION = "6.0.2";
 const DOTNET_SDK_VERSION = "8.0.415";
 function toolchainPaths(environment = process.env) {
-  const root = environment.LLL_WINDOWS_TOOLCHAIN_DIR || path.join(
+  const root = environment.LWA_WINDOWS_TOOLCHAIN_DIR || environment.LLL_WINDOWS_TOOLCHAIN_DIR || path.join(
     environment.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
     "learn-with-ai-build-tools",
   );

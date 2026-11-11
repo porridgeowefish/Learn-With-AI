@@ -6,10 +6,27 @@ import (
 	"strings"
 
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
+	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
 )
+
+const ManagedKind = "lwa-cloud"
+const ManagedPrefix = ManagedKind + ":"
+const legacyManagedPrefix = "lll-cloud:"
+
+func IsManagedProvider(id string) bool {
+	return strings.HasPrefix(id, ManagedPrefix) || strings.HasPrefix(id, legacyManagedPrefix)
+}
+
+func canonicalProviderID(id string) string {
+	if model, ok := strings.CutPrefix(id, legacyManagedPrefix); ok {
+		return ManagedPrefix + model
+	}
+	return id
+}
 
 // Provider is one configured Ask-AI model source.
 type Provider struct {
+	ManagedMaxOutput    int    `json:"-"`
 	MaxConcurrency      int    `json:"maxConcurrency,omitempty"`
 	ID                  string `json:"id"`
 	Kind                string `json:"kind"` // "openai" | "anthropic"
@@ -25,6 +42,7 @@ type Provider struct {
 
 // Config is the askAiProviders section.
 type Config struct {
+	managed               *Provider
 	ForegroundConcurrency int                `json:"foregroundConcurrency,omitempty"`
 	BackgroundConcurrency int                `json:"backgroundConcurrency,omitempty"`
 	Default               string             `json:"default"`
@@ -43,6 +61,9 @@ func (c *Config) Enabled() bool {
 	if c == nil {
 		return false
 	}
+	if c.managed != nil {
+		return true
+	}
 	for _, p := range c.Providers {
 		if (p.Kind == "siwc" || (p.APIKey != "" && p.BaseURL != "")) && p.Model != "" {
 			return true
@@ -56,6 +77,9 @@ func (c *Config) FindExact(id string) *Provider {
 	if c == nil || id == "" {
 		return nil
 	}
+	if c.managed != nil && canonicalProviderID(id) == c.managed.ID {
+		return c.managed
+	}
 	for i := range c.Providers {
 		if c.Providers[i].ID == id {
 			return &c.Providers[i]
@@ -68,7 +92,13 @@ func (c *Config) Find(id string) *Provider {
 	if c == nil {
 		return nil
 	}
+	if c.managed != nil && canonicalProviderID(id) == c.managed.ID {
+		return c.managed
+	}
 	if id != "" {
+		if IsManagedProvider(id) {
+			return nil
+		}
 		for i := range c.Providers {
 			if c.Providers[i].ID == id {
 				return &c.Providers[i]
@@ -92,7 +122,21 @@ func (c *Config) Resolve(service string) *Provider {
 	if c == nil {
 		return nil
 	}
+	if managed := c.Managed(service); managed != nil {
+		return managed
+	}
+	return c.ResolveDirect(service)
+}
+
+// ResolveDirect selects only local or user-configured connections.
+func (c *Config) ResolveDirect(service string) *Provider {
+	if c == nil {
+		return nil
+	}
 	binding, ok := c.Bindings[service]
+	if IsManagedProvider(binding.ProviderID) {
+		return nil
+	}
 	provider := c.Find(binding.ProviderID)
 	if !ok {
 		provider = c.Find("")
@@ -105,6 +149,19 @@ func (c *Config) Resolve(service string) *Provider {
 		resolved.Model = strings.TrimSpace(binding.Model)
 	}
 	return &resolved
+}
+
+func (c *Config) Managed(service string) *Provider {
+	switch service {
+	case "teacher", "review", "practice", "disciplineMap", "section-summary", "notes":
+		return c.managed
+	default:
+		return nil
+	}
+}
+
+func (p Provider) HasConnection() bool {
+	return p.Kind == ManagedKind || p.Kind == "siwc" || (p.APIKey != "" && p.BaseURL != "")
 }
 
 // UseConfigPathForTest redirects the config file path and returns a restore
@@ -121,10 +178,18 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !ok {
+	var managed *Provider
+	if cloud, err := llmcloud.Default(); err == nil {
+		if model := cloud.Selected(); model.ID != "" {
+			managed = &Provider{ID: ManagedPrefix + model.ID, Kind: ManagedKind, Name: model.Name, Model: model.ID,
+				ContextWindowTokens: model.MaxInput + model.MaxOutput, ManagedMaxOutput: model.MaxOutput}
+		}
+	}
+	if !ok && managed == nil {
 		return nil, nil
 	}
 	cfg := Config{ForegroundConcurrency: settings.ForegroundConcurrency, BackgroundConcurrency: settings.BackgroundConcurrency, Default: settings.Default, SearchEngine: settings.SearchEngine, Bindings: make(map[string]Binding, len(settings.Bindings))}
+	cfg.managed = managed
 	for name, binding := range settings.Bindings {
 		cfg.Bindings[name] = Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}

@@ -8,7 +8,7 @@ on:
       version:
         description: Release version (numeric major.minor.patch)
         required: true
-        default: '0.10.3'
+        default: '0.10.4'
       publish:
         description: Publish GitHub Release v<version> from this commit after all smokes pass
         type: boolean
@@ -61,6 +61,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
           RELEASE_TARGETS: ${{ matrix.targets }}
+          LWA_CLOUD_PROMPT_PUBLIC_KEY: ${{ vars.LWA_CLOUD_PROMPT_PUBLIC_KEY || vars.LLL_CLOUD_PROMPT_PUBLIC_KEY }}
         run: |
           RELEASE_VERSION="${RELEASE_VERSION#v}"
           node tools/release/ci-run.js -- node tools/release/build-release.js --version "$RELEASE_VERSION" --targets "$RELEASE_TARGETS" --installers

@@ -1,5 +1,7 @@
 import { previewFigureAnswer, previewManufacturingAnswer } from '/__design/visuals.mjs';
 
+const starterDialogue = fetch('/__design/starter-dialogue.json').then(response => response.json());
+const previousStarter = '从一个具体问题开始。先说出你的理解，再用一个例子验证，最后试着用自己的话讲一遍。\n\n你最近想学会什么？我们可以从最小的一个问题开始。';
 const now = () => new Date().toISOString();
 const retriedSummaries = new Set();
 const confirmedBindings = new Set();
@@ -65,6 +67,12 @@ function message(role, source, extra = {}) {
     ...extra,
   };
 }
+function starterExchange(dialogue) {
+  return [
+    message('learner', dialogue.question, { operationId: 'starter-methodology-v1-question' }),
+    message('teacher', dialogue.answer, { operationId: 'starter-methodology-v1' }),
+  ];
+}
 function asset(key, content) {
   return {
     meta: {
@@ -125,7 +133,7 @@ function source(name, file, parsedText = '') {
     jobs: [],
   };
 }
-function initialize(project) {
+function initialize(project, dialogue) {
   const seeded = seedSlugs.has(project.slug);
   const physics = project.slug === 'physics';
   const lesson = physics ? physicsReview : review;
@@ -163,7 +171,9 @@ function initialize(project) {
           ),
           message('teacher', previewAnswer(physics)),
         ]
-      : [],
+      : project.slug === 'learning-methodology' && dialogue
+        ? starterExchange(dialogue)
+        : [],
     sources: seeded
       ? [
           source(
@@ -276,6 +286,15 @@ function conversation(ctx, s, parts, b) {
       queuePaused: !!s.queuePaused,
       latestResponseId: s.responseId,
     });
+  if (action === 'lesson-rating' && method === 'POST') {
+    const target = s.messages.find(item => item.id === b.messageId && item.lessonEnded);
+    if (!target) return json({ error: 'lesson_end_not_found' }, 404);
+    if (!Number.isInteger(b.stars) || b.stars < 0 || b.stars > 5) return json({ error: 'invalid_lesson_rating' }, 400);
+    if (target.lessonRating !== undefined && target.lessonRating !== b.stars) return json({ error: 'lesson_already_rated' }, 409);
+    target.lessonRating = b.stars;
+    ctx.dirty();
+    return new Response(null, { status: 204 });
+  }
   if (action === 'instructions') {
     if (method === 'PUT') s.systemPrompt = b.systemPrompt;
     return json({ systemPrompt: s.systemPrompt });
@@ -361,6 +380,18 @@ function conversation(ctx, s, parts, b) {
     if (op === 'regenerate' && s.messages.at(-1)?.role === 'teacher')
       s.messages.pop();
     const question = b.content || s.messages.findLast(m => m.role === 'learner')?.blocks[0]?.source || '';
+    if (question.trim() === '模拟 ChatGPT 请求失败') {
+      const failureCode = 'chatgpt_request_rejected';
+      const teacher = message('teacher', '', { status: 'failed', failureCode });
+      teacher.blocks = [];
+      s.messages.push(teacher);
+      const responseId = (s.responseId = id());
+      return stream([
+        ['turn-accepted', { learnerMessageId: learner.id, responseId, frameSeq: 1 }],
+        ['message-started', { teacherMessageId: teacher.id, responseId, frameSeq: 2 }],
+        ['message-failed', { messageId: teacher.id, code: failureCode, partialPreserved: false, responseId, frameSeq: 3 }],
+      ]);
+    }
     let answer = previewAnswer(s.physics, question);
     if (!question.includes('开放图示') && !/换.*(讲|方法)|直接|先讲/.test(question)) {
       if (s.learningMode === 'history') answer = '进度：Part 1/3 · 本 part：来龙去脉\n\n这是历史脉络的设计演示。我们可以从背景、关键转折与影响梳理一条时间线，再选择你感兴趣的阶段展开。实际教学会依据项目主题与资料。';
@@ -376,7 +407,17 @@ function conversation(ctx, s, parts, b) {
       const footer = answer.indexOf('\n\n```suggested-replies\n');
       answer = footer < 0 ? answer + searchText : answer.slice(0, footer) + searchText + answer.slice(footer);
     }
-    const teacher = message('teacher', answer);
+    const prior = s.messages.findLast(m => m.role === 'teacher')?.blocks[0]?.source || '';
+    const lessonEnded = /^(结束本次教学|没有其他问题|没有了)[。！!\s]*$/.test(question) && prior.includes('还有其他问题吗？');
+    if (question.trim() === '教学进度') answer = '我们已梳理阅读、练习和讲解三种学习形式。\n\n教学进度：已完成 3/3 项。\n\n还有其他问题吗？如果没有，可以结束本次教学。';
+    if (lessonEnded) answer = '本次教学到这里。你可以用弹出的星级控件为本次教学评分。';
+    const teacher = message('teacher', answer, lessonEnded ? { lessonEnded: true } : {});
+    const cloudAccount = ctx.state.cloud;
+    const managed = b.providerId ? b.providerId.startsWith('lwa-cloud:') || b.providerId.startsWith('lll-cloud:') : cloudAccount?.selectedModel;
+    if (cloudAccount?.signedIn && managed) {
+      teacher.creditUsage = {units: 1234, pending: false};
+      cloudAccount.spent = (cloudAccount.spent ?? 0) + teacher.creditUsage.units;
+    }
     const reasoning = controls?.showReasoning && b.options?.effort ? '设计预览：先确认概念与条件，再通过例子核对结论。实际摘要由所选模型提供。' : '';
     if (reasoning) teacher.blocks.push({id:id(),type:'reasoning-summary',source:reasoning});
     if (controls?.memoryEnabled && b.content && /我.*(学过|学习|希望|喜欢|目标)/.test(b.content) && !ctx.state.forgottenMemories?.includes(b.content)) {
@@ -402,7 +443,7 @@ function conversation(ctx, s, parts, b) {
         ]),
         [
           'message-completed',
-          { messageId: teacher.id, latestSeq: s.messages.length },
+          { messageId: teacher.id, latestSeq: s.messages.length, creditUsage: teacher.creditUsage },
         ],
       ].map(([event, data], i) => [
         event,
@@ -594,23 +635,31 @@ function finishGeneration(s, job) {
   }
 }
 
-function addLearningState(state, project) {
+function addLearningState(state, project, dialogue) {
   state.learning ??= Object.create(null);
   if (Object.hasOwn(state.learning, project.slug)) return false;
   Object.defineProperty(state.learning, project.slug, {
-    value: initialize(project),
+    value: initialize(project, dialogue),
     enumerable: true,
     configurable: true,
     writable: true,
   });
   return true;
 }
-export function initializeLearning(state) {
+export async function initializeLearning(state) {
+  const dialogue = await starterDialogue;
   let changed = false;
   for (const project of state.projects) {
-    if (!seedSlugs.has(project.slug)) continue;
-    if (addLearningState(state, project)) changed = true;
-
+    if (!seedSlugs.has(project.slug) && project.slug !== 'learning-methodology') continue;
+    if (addLearningState(state, project, dialogue)) changed = true;
+    if (project.slug === 'learning-methodology') {
+      const conversation = state.learning[project.slug];
+      const [opening] = conversation.messages;
+      if (opening?.role === 'teacher' && opening.blocks?.length === 1 && opening.blocks[0].source === previousStarter) {
+        conversation.messages = [...starterExchange(dialogue), ...conversation.messages.slice(1)];
+        changed = true;
+      }
+    }
   }
   return changed;
 }

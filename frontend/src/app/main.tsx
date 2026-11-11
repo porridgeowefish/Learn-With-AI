@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
 
 const container = document.getElementById('root');
 if (!container) {
-  throw new Error('LLL: #root element not found in index.html');
+  throw new Error('Learn-With-AI: #root element not found in index.html');
 }
 
 createRoot(container).render(

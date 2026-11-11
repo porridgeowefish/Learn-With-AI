@@ -25,7 +25,7 @@ if (action === 'build-desktop') {
   child.on('error', error => { console.error(error.message); process.exitCode = 1; });
   child.on('exit', code => { process.exitCode = code ?? 1; });
 } else if (action === 'stop') {
-  const port = process.env.LLL_SERVER_PORT || '8787';
+  const port = process.env.LWA_SERVER_PORT || process.env.LLL_SERVER_PORT || '8787';
   fetch(`http://127.0.0.1:${port}/api/system/shutdown`, { method: 'POST' }).then(response => {
     if (!response.ok) throw new Error(`Shutdown returned ${response.status}`);
     console.log('learn-with-ai stopped');

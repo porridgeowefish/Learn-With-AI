@@ -7,11 +7,11 @@ Source of truth: repository-maintenance entry and learning-runtime boundary.
 
 ## 0. Learning Runtime Boundary
 
-This file governs AI coding agents maintaining the LLL repository. It does not
-govern learner-facing Agents launched by LLL inside `projects/<slug>/`.
+This file governs AI coding agents maintaining the Learn-With-AI repository. It does not
+govern learner-facing Agents launched by Learn-With-AI inside `projects/<slug>/`.
 
 When the current directory is under `projects/<slug>/` and the initial prompt
-contains an LLL `Agent Identity`, `Charter`, and declared output path:
+contains a Learn-With-AI `Agent Identity`, `Charter`, and declared output path:
 
 ```text
 Treat the run as learner-artifact generation, not repository maintenance.

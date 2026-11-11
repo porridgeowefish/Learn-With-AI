@@ -11,7 +11,7 @@ func confirmedTeachingEnd(plan toolIntent, learner string, history []ai.GatewayM
 	if plan.EndDecision != "confirm_end" || strings.TrimSpace(plan.Evidence) == "" || !strings.Contains(learner, plan.Evidence) {
 		return false
 	}
-	if explicitTeachingEnd(learner) {
+	if explicitTeachingEnd(learner) || noMoreTeachingQuestions(learner, history) {
 		return true
 	}
 	text := strings.ToLower(strings.TrimSpace(learner))
@@ -36,13 +36,7 @@ func confirmedTeachingEnd(plan toolIntent, learner string, history []ai.GatewayM
 	}
 	// Short assent is only meaningful in response to an actual assistant ending
 	// question. Context messages and earlier unrelated questions cannot authorize.
-	last := ""
-	for i := len(history) - 1; i >= 0; i-- {
-		if history[i].Role == "assistant" {
-			last = history[i].Content
-			break
-		}
-	}
+	last := lastTeachingReply(history)
 	asks := (strings.Contains(last, "结束") && (strings.Contains(last, "？") || strings.Contains(last, "?")))
 	if !asks {
 		return false
@@ -51,6 +45,27 @@ func confirmedTeachingEnd(plan toolIntent, learner string, history []ai.GatewayM
 		if strings.Trim(text, " 。！!\n\r") == yes {
 			return true
 		}
+	}
+	return false
+}
+
+func lastTeachingReply(history []ai.GatewayMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == "assistant" {
+			return history[i].Content
+		}
+	}
+	return ""
+}
+
+func noMoreTeachingQuestions(learner string, history []ai.GatewayMessage) bool {
+	last := lastTeachingReply(history)
+	if !strings.Contains(last, "还有其他问题") || !strings.Contains(last, "结束本次教学") {
+		return false
+	}
+	switch strings.Trim(learner, " 。！!\n\r\t") {
+	case "没有", "没有了", "没有问题", "没有其他问题", "没有其他问题了", "没问题了", "没有别的问题了":
+		return true
 	}
 	return false
 }

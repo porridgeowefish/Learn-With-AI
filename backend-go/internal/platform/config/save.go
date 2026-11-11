@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/xmz14/lll/backend-go/internal/platform/envname"
 )
 
 // pathOverride lets tests redirect the file location.
@@ -141,7 +143,7 @@ func LoadWebSearch() (WebSearchSettings, bool, error) {
 		return out, false, err
 	}
 	if out.APIKey == "" && out.APIKeyEnv != "" {
-		out.APIKey = strings.TrimSpace(os.Getenv(out.APIKeyEnv))
+		out.APIKey = strings.TrimSpace(envname.Value(out.APIKeyEnv))
 	}
 	return out, true, nil
 }

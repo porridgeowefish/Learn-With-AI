@@ -4,28 +4,43 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
+	"time"
 )
+
+func messagesWithTurnInstructions(in Request) []Message {
+	if in.TurnInstructions == "" {
+		return in.Messages
+	}
+	i := 0
+	for i < len(in.Messages) && in.Messages[i].Role == "system" {
+		i++
+	}
+	return slices.Concat(in.Messages[:i], []Message{{Role: "system", Content: in.TurnInstructions}}, in.Messages[i:])
+}
 
 func openAIRequest(p askaiconfig.Provider, in Request, stream bool) map[string]any {
 	messages := make([]map[string]any, 0, len(in.Messages)+1)
 	if in.System != "" {
 		messages = append(messages, map[string]any{"role": "system", "content": in.System})
 	}
-	for _, message := range in.Messages {
+	for _, message := range messagesWithTurnInstructions(in) {
 		messages = append(messages, openAIMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "messages": messages, "stream": stream}
 	if in.ReasoningEffort != "" {
 		body["reasoning_effort"] = in.ReasoningEffort
 	}
-	body[openAIOutputLimitKey(p)] = platformconfig.ModelOutputTokens
+	body[openAIOutputLimitKey(p)] = outputLimit(in)
 	if len(in.Tools) > 0 {
 		var tools []map[string]any
 		for _, tool := range in.Tools {
@@ -65,11 +80,22 @@ func anthropicRequest(p askaiconfig.Provider, in Request, stream bool) map[strin
 		previousTool = message.ToolCallID != ""
 	}
 	system := strings.Join(systemParts, "\n\n")
-	body := map[string]any{"model": p.Model, "system": system, "messages": messages, "stream": stream, "max_tokens": platformconfig.ModelOutputTokens}
+	body := map[string]any{"model": p.Model, "system": system, "messages": messages, "stream": stream, "max_tokens": outputLimit(in)}
+	if in.TurnInstructions != "" {
+		if system == "" {
+			body["system"] = in.TurnInstructions
+		} else {
+			body["system"] = system + "\n\n" + in.TurnInstructions
+		}
+	}
 	// Explicit caching is a first-party Anthropic capability. Compatible
 	// providers (including Coding Plan endpoints) retain their accepted schema.
 	if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Scheme == "https" && strings.EqualFold(endpoint.Hostname(), "api.anthropic.com") && system != "" {
-		body["system"] = []map[string]any{{"type": "text", "text": system, "cache_control": map[string]any{"type": "ephemeral"}}}
+		blocks := []map[string]any{{"type": "text", "text": system, "cache_control": map[string]any{"type": "ephemeral"}}}
+		if in.TurnInstructions != "" {
+			blocks = append(blocks, map[string]any{"type": "text", "text": "\n\n" + in.TurnInstructions})
+		}
+		body["system"] = blocks
 	}
 	// Merely offering tools must not change the configured thinking channel.
 	// Older externally supplied tool history lacking signed blocks still uses
@@ -116,16 +142,53 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 	} else {
 		req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	client := http.DefaultClient
+	if inManagedStream(ctx) {
+		client = noRedirectClient(client)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, rateLimitError(resp)
+		}
+		if inManagedStream(ctx) && upstreamAuthRejected(resp) {
+			return nil, ErrUpstreamAuthRejected
+		}
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))
 	}
 	return resp, nil
+}
+
+// UpstreamRateLimit denotes an HTTP rejection before any response stream.
+type UpstreamRateLimit struct{ RetryAfter time.Duration }
+
+var ErrUpstreamAuthRejected = errors.New("upstream authentication rejected")
+
+func upstreamAuthRejected(response *http.Response) bool {
+	if response.StatusCode == http.StatusUnauthorized {
+		return true
+	}
+	// A bare 403 can describe a provider policy decision instead of a bad key.
+	return response.StatusCode == http.StatusForbidden &&
+		strings.Contains(strings.ToLower(response.Header.Get("WWW-Authenticate")), `error="invalid_token"`)
+}
+
+func (*UpstreamRateLimit) Error() string { return "provider status 429: rate limited" }
+
+func rateLimitError(resp *http.Response) *UpstreamRateLimit {
+	value := strings.TrimSpace(resp.Header.Get("Retry-After"))
+	var delay time.Duration
+	if seconds, err := strconv.ParseInt(value, 10, 32); err == nil && seconds > 0 {
+		delay = time.Duration(seconds) * time.Second
+	} else if until, err := http.ParseTime(value); err == nil {
+		delay = max(0, time.Until(until))
+	}
+	return &UpstreamRateLimit{RetryAfter: delay}
 }
 
 // StreamProvider uses the same protocol implementation for configured and explicit connections.
@@ -135,6 +198,37 @@ func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emi
 		return err
 	}
 	defer release()
+	return streamUpstream(ctx, p, in, emit)
+}
+
+// StreamUpstream sends an already admitted request using the provider protocol.
+func StreamUpstream(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+	in.upstreamOutputLimit = in.MaxOutputTokens
+	return streamUpstream(context.WithValue(ctx, managedStreamKey{}, true), p, in, emit)
+}
+
+type managedStreamKey struct{}
+
+func inManagedStream(ctx context.Context) bool {
+	value, _ := ctx.Value(managedStreamKey{}).(bool)
+	return value
+}
+
+func noRedirectClient(base *http.Client) *http.Client {
+	return &http.Client{
+		Transport: base.Transport, Timeout: base.Timeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+}
+
+func outputLimit(in Request) int {
+	if in.upstreamOutputLimit > 0 {
+		return in.upstreamOutputLimit
+	}
+	return platformconfig.ModelOutputTokens
+}
+
+func streamUpstream(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	if err := validateEffort(p, in); err != nil {
 		return err
 	}

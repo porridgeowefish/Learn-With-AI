@@ -31,15 +31,28 @@ type Block struct {
 }
 
 type Message struct {
-	ID              string                   `json:"id"`
-	Role            string                   `json:"role"`
-	Status          string                   `json:"status"`
-	Blocks          []Block                  `json:"blocks"`
-	OperationID     string                   `json:"operationId,omitempty"`
-	CreatedAt       time.Time                `json:"createdAt"`
-	CompletedAt     time.Time                `json:"completedAt,omitempty"`
-	SourceCitations []sources.SourceCitation `json:"sourceCitations,omitempty"`
-	ReadingCoverage []ReadingCoverage        `json:"readingCoverage,omitempty"`
+	ID                     string                   `json:"id"`
+	Role                   string                   `json:"role"`
+	Status                 string                   `json:"status"`
+	FailureCode            string                   `json:"failureCode,omitempty"`
+	Blocks                 []Block                  `json:"blocks"`
+	OperationID            string                   `json:"operationId,omitempty"`
+	CreatedAt              time.Time                `json:"createdAt"`
+	CompletedAt            time.Time                `json:"completedAt,omitempty"`
+	SourceCitations        []sources.SourceCitation `json:"sourceCitations,omitempty"`
+	ReadingCoverage        []ReadingCoverage        `json:"readingCoverage,omitempty"`
+	CreditUsage            *CreditUsage             `json:"creditUsage,omitempty"`
+	LessonEnded            bool                     `json:"lessonEnded,omitempty"`
+	LessonEndID            string                   `json:"lessonEndId,omitempty"`
+	TeachingExposureID     string                   `json:"teachingExposureId,omitempty"`
+	LessonRatingExposureID string                   `json:"lessonRatingExposureId,omitempty"`
+	LessonRating           *int                     `json:"lessonRating,omitempty"`
+}
+
+type CreditUsage struct {
+	Units           int64    `json:"units"`
+	Pending         bool     `json:"pending"`
+	PendingRequests []string `json:"pendingRequests,omitempty"`
 }
 
 type Event struct {
@@ -160,6 +173,23 @@ func New(slug string) (*Store, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// StageExampleExchange writes a sample learner question and teacher answer before publication.
+func StageExampleExchange(root, slug, operationID, question, answer string) error {
+	if !filepath.IsAbs(root) || !workspace.ValidateSlug(slug) || operationID == "" ||
+		strings.TrimSpace(question) == "" || strings.TrimSpace(answer) == "" {
+		return errors.New("invalid staged example conversation")
+	}
+	s := &Store{slug: slug, root: root, mu: &sync.Mutex{}}
+	if err := s.ensureLocked(); err != nil {
+		return err
+	}
+	if _, _, err := s.AppendMessage("learner", "completed", operationID+"-question", []Block{{Type: "markdown", Source: question}}); err != nil {
+		return err
+	}
+	_, _, err := s.AppendMessage("teacher", "completed", operationID, []Block{{Type: "markdown", Source: answer}})
+	return err
 }
 
 func (s *Store) ensureLocked() error {
@@ -370,6 +400,7 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		}
 		count++
 	}
+	applyLessonRatings(events, proj.Messages)
 	return proj, nil
 }
 
@@ -450,6 +481,7 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 	}
 	// hasMore is retained as a compatibility alias for older clients.
 	projection.HasMore = projection.HasPrevious
+	applyLessonRatings(events, projection.Messages)
 	return projection, nil
 }
 
@@ -509,6 +541,59 @@ func (s *Store) SequencedMessages() ([]SequencedMessage, error) {
 // cutoff. Later response supersession must not change a queued summary input.
 func (s *Store) SequencedMessagesThrough(throughSeq uint64) ([]SequencedMessage, error) {
 	return s.sequencedMessages(&throughSeq)
+}
+
+// MessagesUseProviderThrough verifies the source route at the snapshot boundary.
+// Old, incomplete, and unassociated messages have no usable provenance.
+func (s *Store) MessagesUseProviderThrough(ids []string, through uint64, matchesProvider func(string) bool) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	meta, events, err := s.loadLocked()
+	if err != nil {
+		return false, err
+	}
+	if through > meta.LatestSeq {
+		return false, errors.New("conversation cutoff exceeds latest sequence")
+	}
+	events = events[:sort.Search(len(events), func(i int) bool { return events[i].Seq > through })]
+	hidden := hiddenTeacherMessages(events)
+	type association struct{ TeacherMessageID, TriggeringLearnerMessageID string }
+	started := make(map[string]association)
+	classified := make(map[string]bool)
+	for _, event := range events {
+		switch event.Type {
+		case "teacher-response-started":
+			var data struct {
+				ResponseID string
+				association
+			}
+			if json.Unmarshal(event.Data, &data) == nil && data.ResponseID != "" {
+				started[data.ResponseID] = data.association
+			}
+		case "teacher-response-finished":
+			var data struct{ ResponseID, Status, ProviderID string }
+			if json.Unmarshal(event.Data, &data) != nil || data.Status != "completed" {
+				continue
+			}
+			route, ok := started[data.ResponseID]
+			if !ok || route.TeacherMessageID == "" || hidden[route.TeacherMessageID] {
+				continue
+			}
+			matches := data.ProviderID != "" && matchesProvider(data.ProviderID)
+			for _, id := range []string{route.TeacherMessageID, route.TriggeringLearnerMessageID} {
+				if id != "" {
+					previous, seen := classified[id]
+					classified[id] = matches && (!seen || previous)
+				}
+			}
+		}
+	}
+	for _, id := range ids {
+		if !classified[id] {
+			return false, nil
+		}
+	}
+	return len(ids) > 0, nil
 }
 
 func (s *Store) sequencedMessages(throughSeq *uint64) ([]SequencedMessage, error) {

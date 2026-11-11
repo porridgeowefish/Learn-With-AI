@@ -35,7 +35,7 @@
       <h1>Learn-With-AI<span>从“看过了”，<br>到“能讲清楚”。</span></h1>
       <p class="lead">一个带着你理解知识、检验理解的 AI 学习工作台。用自己的教材画出学科地图，看图解、做练习，再换你讲给 AI 教师听。</p>
       <div class="actions"><a class="button primary" href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest">下载安装 <span aria-hidden="true">↗</span></a><a class="button" href="https://github.com/porridgeowefish/Learn-With-AI">Learn-With-AI GitHub 仓库 <span aria-hidden="true">↗</span></a></div>
-      <p class="note">内置示例无需 API Key。生成自己的学习内容需连接自选模型服务，提供方可能收费。</p>
+      <p class="note">预置对话无需 API Key。继续学习时，可登录使用系统模型，也可以配置自己的 API。</p>
       <figure class="hero-image"><img src="assets/discipline-map.png" alt="Learn-With-AI 自动控制原理学科地图，展示主题关系、先修知识和学习操作" width="1440" height="900"><figcaption>界面来自自动控制原理演示项目。教材名称、对话和学习内容为人工编排的演示数据，不代表现场模型生成结果。</figcaption></figure>
     </section>
     <section class="section wrap" id="workflow">
@@ -49,12 +49,12 @@
       <div class="gallery"><figure><img src="assets/teacher.png" alt="AI 教师通过反馈关系图解释开环与闭环控制" loading="lazy" width="1440" height="900"><figcaption>带着问题理解概念</figcaption></figure><figure><img src="assets/feynman.png" alt="学习者讲述恒温空调，AI 教师追问传感器故障与稳定性" loading="lazy" width="1440" height="900"><figcaption>用自己的话检验理解</figcaption></figure></div>
       <p class="note">以上均为人工编排的产品演示。实际模型输出取决于模型和提问；重要概念、答案和 OCR 结果需对照原文核验。</p>
     </section>
-    <section class="section tint" id="start"><div class="wrap start-grid"><div><p class="eyebrow">第一次打开</p><h2>先体验，再带上<br>自己的学习材料。</h2><p>Learn-With-AI 是桌面学习软件，源码由 <a href="https://github.com/porridgeowefish">porridgeowefish</a> 在 GitHub 维护，以 MIT 许可开源。</p></div><ol class="start-list"><li><strong>下载对应系统的安装包</strong><p>前往 <a href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest">GitHub Releases</a>，选择 Windows、macOS 或 Linux，以及 x64 / ARM64 架构。</p></li><li><strong>打开「体验示例」</strong><p>不需要 Key，先体验预置讲解、笔记、复习和练习交互。示例关闭后重置。</p></li><li><strong>连接模型，创建自己的内容</strong><p>在设置中添加 OpenAI 或 Anthropic 兼容 API，然后从问题、学科或自己的资料开始。</p></li></ol></div></section>
+    <section class="section tint" id="start"><div class="wrap start-grid"><div><p class="eyebrow">第一次打开</p><h2>先体验，再带上<br>自己的学习材料。</h2><p>Learn-With-AI 是桌面学习软件，源码由 <a href="https://github.com/porridgeowefish">porridgeowefish</a> 在 GitHub 维护，以 MIT 许可开源。</p></div><ol class="start-list"><li><strong>下载对应系统的安装包</strong><p>前往 <a href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest">GitHub Releases</a>，选择 Windows、macOS 或 Linux，以及 x64 / ARM64 架构。</p></li><li><strong>打开「学习的方法论」</strong><p>首次启动即可查看一轮完整的示例问答。你可以继续提问，也可以删除这段对话。</p></li><li><strong>连接模型，创建自己的内容</strong><p>选择系统模型，或在设置中添加自己的 OpenAI 或 Anthropic 兼容 API，再从问题、学科或资料开始。</p></li></ol></div></section>
     <section class="section wrap faq"><p class="eyebrow">使用前想知道的事</p><h2>数据在哪里，模型由谁提供？</h2>
-      <details open><summary>本地优先，是否意味着 AI 可以完全离线？</summary><p>项目、对话、资料和笔记保存在本机。本地解析与本机 OCR 无需上传文档。教师对话、Ask AI、内容生成或可选云端识别，会将所需内容发送给你配置的服务。本地优先不等于模型离线运行。</p></details>
-      <details><summary>软件和模型使用是否免费？</summary><p>项目以 MIT 许可开源，内置示例无需 API。生成内容需要可用的模型连接，费用取决于你选择的服务商；项目不承诺免费模型额度。</p></details>
+      <details open><summary>本地优先，是否意味着 AI 可以完全离线？</summary><p>项目、对话、资料和笔记保存在本机。本地解析与本机 OCR 可离线完成。使用系统模型时，Learn-With-AI 转发当次推理所需的内容。自配 API 请求直接发送给你选择的提供方。</p></details>
+      <details><summary>软件和模型使用是否免费？</summary><p>软件以 MIT 许可开源。新账号获赠 500 积分，每天可领取 100 积分，用于系统模型。自配 API 的费用由对应提供方收取。</p></details>
       <details><summary>它与“学习 AI 的课程”有什么区别？</summary><p>Learn-With-AI 是帮助你学习不同学科的软件。你可以用它学习自动控制、数学或其他内容；本项目提供学习工作台，不是一个 AI 课程资源列表。</p></details>
-      <details><summary>在哪里查看安装细节、源码和更新？</summary><p><a href="https://github.com/porridgeowefish/Learn-With-AI">官方 GitHub 仓库</a>包含安装与开发说明，<a href="https://github.com/porridgeowefish/Learn-With-AI/releases">Releases</a>提供版本更新。遇到问题可提交 <a href="https://github.com/porridgeowefish/Learn-With-AI/issues">Issue</a>。原仓库名为 LLL_life_long_learn，旧仓库链接继续跳转到当前项目。</p></details>
+      <details><summary>在哪里查看安装细节、源码和更新？</summary><p><a href="https://github.com/porridgeowefish/Learn-With-AI">官方 GitHub 仓库</a>包含安装与开发说明，<a href="https://github.com/porridgeowefish/Learn-With-AI/releases">Releases</a>提供版本更新。遇到问题可提交 <a href="https://github.com/porridgeowefish/Learn-With-AI/issues">Issue</a>。</p></details>
     </section>
     <section class="closing wrap"><h2>选一个你想真正搞懂的概念。</h2><p>从一次追问、一张地图，或者一次讲述开始。</p><div class="actions"><a class="button primary" href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest">下载 Learn-With-AI</a><a class="button" href="https://github.com/porridgeowefish/Learn-With-AI">在 GitHub 查看源码 / Star</a></div></section>
   </main>

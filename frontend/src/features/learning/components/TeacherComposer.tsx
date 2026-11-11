@@ -1,22 +1,38 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import { managedProviderPrefix, normalizeManagedProviderId, type CloudStatus } from '@/features/cloud-account';
 import { useAskAiSettings, useLearningProfile, effortNames } from '@/features/settings';
 import { SendIcon, StopIcon } from '@/shared/primitive/Icons';
 import { ChatMediaInput, ChatMicrophone, useChatMedia } from './ChatMediaInput';
+import { TeacherModelPicker } from './TeacherModelPicker';
 import type { TeacherSession, TeacherSubmission } from '../teacher/useTeacherSession';
 import s from './TeacherView.module.css';
 
 export interface TeacherComposerHandle { sendText: (text: string) => void }
 
+
 export const TeacherComposer = forwardRef<TeacherComposerHandle, {
-  slug: string; title: string; session: TeacherSession; sourceCount: number;
-}>(function TeacherComposer({ slug, title, session, sourceCount }, ref) {
+  slug: string; title: string; session: TeacherSession; sourceCount: number; cloudStatus?: CloudStatus;
+}>(function TeacherComposer({ slug, title, session, sourceCount, cloudStatus }, ref) {
   const media = useChatMedia(slug);
   const settings = useAskAiSettings();
   const profile = useLearningProfile();
   const [chosenEffort, setChosenEffort] = useState(() => localStorage.getItem(`lll.teacher.effort.${slug}`) ?? '');
   const [webSearch, setWebSearch] = useState(false);
   const models = (settings.data?.providers ?? []).filter(provider => provider.id && provider.model && (provider.kind === 'siwc' || provider.baseURL));
-  const [providerId, setProviderId] = useState(() => localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
+  const managedModel = cloudStatus?.signedIn ? cloudStatus.selectedModel : undefined;
+  const managedId = managedModel ? managedProviderPrefix + managedModel : '';
+  const [preferredProvider, setPreferredProvider] = useState(() => normalizeManagedProviderId(
+    localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '',
+  ));
+  const selectProvider = (id: string) => {
+    setPreferredProvider(id);
+    localStorage.setItem(`lll.teacher.provider.${slug}`, id);
+  };
+  const needsLogin = cloudStatus?.signedIn === false && preferredProvider.startsWith(managedProviderPrefix);
+  const defaultLocal = settings.data?.bindings?.teacher?.providerId || settings.data?.default;
+  const localProvider = models.find(provider => provider.id === preferredProvider);
+  const providerId = needsLogin ? preferredProvider : localProvider?.id || managedId ||
+    models.find(provider => provider.id === defaultLocal)?.id || models[0]?.id || '';
   const capabilities = profile.data?.capabilities[providerId] ?? [];
   const preferredEffort = chosenEffort || profile.data?.settings.effort || 'medium';
   const effort = capabilities.includes(preferredEffort) ? preferredEffort : capabilities.includes('medium') ? 'medium' : '';
@@ -42,9 +58,6 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     voiceGeneration.current++; voiceBusy.current = false; setVoiceFinalizing(false);
     return () => { voiceGeneration.current++; };
   }, [slug]);
-  useEffect(() => {
-    if (!models.some(provider => provider.id === providerId) && models.length) setProviderId(settings.data?.bindings?.teacher?.providerId || settings.data?.default || models[0].id);
-  }, [providerId, settings.data, models]);
   useLayoutEffect(() => {
     const element = textarea.current;
     if (element) { element.style.height = 'auto'; element.style.height = `${Math.min(150, Math.max(28, element.scrollHeight))}px`; }
@@ -54,6 +67,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     if (!voiceDraft && ((submitting.current && submittingVersion.current === version.current) || media.pending || media.hasRecording || voiceBusy.current || composing.current)) return;
     const content = text.trim() || (media.attachments.some(a => a.kind === 'source') ? '请结合附件继续讲解。' : '');
     if (!content && !media.attachments.length && !retry?.attachments.length) return;
+    if (needsLogin) { session.reportError('使用系统模型，请先登录。'); return; }
     const snapshot = voiceDraft?.version ?? version.current;
     const selectedProviderId = providerId || undefined;
     const sameFailure = failed && failed.content === content && failed.attachments.map(a => a.attachmentId).join() === media.attachments.map(a => a.attachmentId).join();
@@ -101,7 +115,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     try {
       const text = await media.stopRecording();
       if (!mounted.current || token !== voiceGeneration.current || text === undefined) return;
-      if (direct) {
+      if (direct && !needsLogin) {
         item.content = [snapshot.input.trim(), text.trim()].filter(Boolean).join('\n');
         await send(item.content, item, snapshot);
       } else {
@@ -137,9 +151,8 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
         <input type="checkbox" role="switch" aria-label="联网搜索" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} />
         <span className={s.searchTrack} aria-hidden="true" />
       </label>}>
-        {!media.hasRecording && !media.voicePending && models.length > 0 && <select className={s.modelSelect} aria-label="选择教师模型" title="选择教师模型" value={providerId} onChange={event => {
-          setProviderId(event.target.value); localStorage.setItem(`lll.teacher.provider.${slug}`, event.target.value);
-        }}>{models.map(provider => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}</select>}
+        {!media.hasRecording && !media.voicePending && (<TeacherModelPicker status={cloudStatus} selected={providerId} onSelect={selectProvider}
+            localModels={models.map(provider => ({ id: provider.id, label: provider.name ? `${provider.name} · ${provider.model}` : provider.model }))} />)}
         {!media.hasRecording && !media.voicePending && <span className={s.reasoningControl}>
           <select className={s.modelSelect} aria-label="思考强度" title={capabilities.length ? '使用模型原生思考参数，从下次发送开始生效' : '当前模型不支持调节思考强度'} disabled={!capabilities.length || !profile.data} value={effort} onChange={event => {
             setChosenEffort(event.target.value); localStorage.setItem(`lll.teacher.effort.${slug}`, event.target.value);

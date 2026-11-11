@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// BuildMode is set to release by the portable archive builder.
+// BuildMode is set by the portable release and standalone cloud builders.
 var BuildMode = "development"
 
 func DiscoverResourceRoot(wd, executable, mode string) (string, error) {

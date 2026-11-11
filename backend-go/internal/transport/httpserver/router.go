@@ -34,6 +34,7 @@ type Server struct {
 	cache           *projects.Index
 
 	transferCancellations sync.Map
+	cloudLoginFlows       sync.Map
 	chatMediaMu           sync.Map
 	mu                    sync.RWMutex
 }
@@ -96,6 +97,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/settings/siwc/start", s.handleSIWCStart)
 	mux.HandleFunc("POST /api/settings/siwc/disconnect", s.handleSIWCDisconnect)
 	mux.HandleFunc("GET /api/settings/siwc/models", s.handleSIWCModels)
+	mux.HandleFunc("GET /api/cloud/account", s.handleCloudAccount)
+	mux.HandleFunc("GET /api/cloud/daily-history", s.handleCloudDailyHistory)
+	mux.HandleFunc("GET /api/cloud/models", s.handleCloudModels)
+	mux.HandleFunc("GET /api/cloud/models/guest", s.handleCloudGuestModels)
+	mux.HandleFunc("POST /api/cloud/{action}", s.handleCloudAction)
 	mux.HandleFunc("GET /api/settings/ai-services", s.handleGetAIServices)
 	mux.HandleFunc("PUT /api/settings/ai-services", s.handlePutAIServices)
 	mux.HandleFunc("POST /api/settings/ai-services/probe", s.handleProbeAIServices)
@@ -120,6 +126,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/projects/{id}/learning-plan", s.handlePutDisciplineLearningPlan)
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/lesson-rating", s.handleLessonRating)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/instructions", s.handleConversationInstructions)
 	mux.HandleFunc("GET /api/system/speech", s.handleSpeechCapability)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/transcribe", s.handleVoiceTranscription)
@@ -177,7 +184,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("GET /api/events", s.broadcaster.SSEHandler(map[string]any{}))
-	mux.Handle("/", spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX))
+	mux.Handle("/", withStarterLanding(spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX)))
 	return logging(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/events" && !strings.HasPrefix(r.URL.Path, "/api/workspace/") {
 			release, err := workspacegate.Enter()

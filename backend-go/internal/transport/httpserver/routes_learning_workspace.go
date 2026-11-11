@@ -45,6 +45,7 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 		learningWorkspaceError(w, err)
 		return
 	}
+	refreshConversationCredits(r.Context(), projection.Messages)
 	httpx.WriteJSON(w, http.StatusOK, projection)
 }
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.10.3",
+  "version": "0.10.4",
   "schemaVersion": 1,
   "resources": [
     {
@@ -132,7 +132,7 @@
     {
       "variables": [],
       "path": "learning-prompts/profiles/teacher/general.json",
-      "sha256": "d560645eee9f2ffb950c6c24e5f1a047b84461d4e8f663fe850ba31b0a29c9ae"
+      "sha256": "7b1f5e10d9853f8014038f52e27a45e082b186b372209d2d8faca9a3e48eab2f"
     },
     {
       "variables": [],
@@ -149,7 +149,7 @@
         "content"
       ],
       "path": "learning-prompts/teaching/context.json",
-      "sha256": "3f95443fc09d3fae62d13f1fb2b26ff490090339a212da6a2d9a9e15e174d132"
+      "sha256": "4946e48c88e9b55d033c4f58a13bc79818f59f6cec05f4b627300c41fb2c99c9"
     },
     {
       "variables": [],
@@ -178,7 +178,7 @@
     {
       "variables": [],
       "path": "learning-prompts/teaching/teacher.md",
-      "sha256": "ba543aca885ae718d6ab0519c7fec85890c4a7f85925b1214c9a9eebd56580de"
+      "sha256": "1b7f6fc1eb2c22d5c7d079d2d29cf7a172f87075c1a47be041702f576bf94000"
     },
     {
       "variables": [],

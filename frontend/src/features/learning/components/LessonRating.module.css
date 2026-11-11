@@ -1,0 +1,32 @@
+.stars {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.stars button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.stars button:hover,
+.stars button:focus-visible {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.stars button.selected {
+  color: var(--accent-ink);
+}
+
+.stars svg {
+  width: 26px;
+  height: 26px;
+}

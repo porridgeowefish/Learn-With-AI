@@ -62,18 +62,25 @@ func allowTransfer(w http.ResponseWriter, r *http.Request) bool {
 	if !allowSecretSettings(w, r) {
 		return false
 	}
-	if r.Header.Get("X-LLL-Workspace") != "1" {
+	if transferHeader(r, "Workspace") != "1" {
 		httpx.Error(w, 403, "缺少本地工作区请求标记")
 		return false
 	}
 	return true
 }
 
+func transferHeader(r *http.Request, name string) string {
+	if value := r.Header.Get("X-LWA-" + name); value != "" {
+		return value
+	}
+	return r.Header.Get("X-LLL-" + name)
+}
+
 func (s *Server) transferExport(w http.ResponseWriter, r *http.Request) {
 	if !allowTransfer(w, r) {
 		return
 	}
-	f, err := os.CreateTemp("", "lll-export-*.zip")
+	f, err := os.CreateTemp("", "lwa-export-*.zip")
 	if err != nil {
 		httpx.Error(w, 500, "无法创建导出文件")
 		return
@@ -95,9 +102,9 @@ func (s *Server) transferExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Disposition", "attachment; filename=lll-learning-records.zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=lwa-learning-records.zip")
 	w.Header().Set("Content-Type", "application/zip")
-	http.ServeContent(w, r, "lll-learning-records.zip", time.Time{}, f)
+	http.ServeContent(w, r, "lwa-learning-records.zip", time.Time{}, f)
 }
 
 func (s *Server) transferImport(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +113,7 @@ func (s *Server) transferImport(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	if id := r.Header.Get("X-LLL-Operation"); id != "" {
+	if id := transferHeader(r, "Operation"); id != "" {
 		if len(id) > 96 {
 			httpx.Error(w, 400, "导入编号过长")
 			return
@@ -223,7 +230,7 @@ func (s *Server) cancelTransferImport(w http.ResponseWriter, r *http.Request) {
 	if !allowTransfer(w, r) {
 		return
 	}
-	id := r.Header.Get("X-LLL-Operation")
+	id := transferHeader(r, "Operation")
 	v, ok := s.transferCancellations.Load(id)
 	if !ok {
 		httpx.Error(w, 404, "没有进行中的对应导入")

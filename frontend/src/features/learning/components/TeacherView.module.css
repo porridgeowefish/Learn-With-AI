@@ -48,6 +48,16 @@
 .composerMeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 0.6rem; }
 .composerMeta > :last-child { margin-left: auto; }
 .composer .modelSelect { min-width: 0; max-width: 240px; border: 0; color: var(--fg); background: transparent; font: inherit; font-size: 0.8rem; text-overflow: ellipsis; }
+.modelPicker { position: relative; min-width: 0; }
+.modelPickerTrigger { display: flex; gap: 4px; align-items: center; max-width: 180px; min-height: 32px; overflow: hidden; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--fg); font: inherit; font-size: .8rem; cursor: pointer; }
+.modelPickerTrigger svg { flex-shrink: 0; }
+.modelPickerPanel { position: absolute; z-index: 10; inset-inline-end: 0; bottom: calc(100% + 8px); width: min(264px, 66vw); max-height: min(340px, 55vh); overflow: auto; padding: 7px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: 0 8px 24px rgb(var(--shadow-color) / .12); font-size: .8rem; }
+.modelPickerPanel h3, .modelPickerPanel p { margin: 5px 8px; color: var(--muted); font-size: .74rem; }
+.modelPickerPanel > :is(button, a) { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; padding: 6px 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--fg); font: inherit; text-align: start; text-decoration: none; cursor: pointer; }
+.modelPickerPanel > :is(button, a):hover { background: var(--surface-tint); }
+.modelPickerPanel .lockedModel { color: var(--muted); }
+.lockedModel span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: .72rem; }
+.modelPickerPanel .modelPickerFooter { margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0; color: var(--accent-ink); }
 .materialStatus { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes pulse { 50% { opacity: .45; } }
 @media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 24px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composerDock { padding-bottom: 8px; margin-left: 58px; width: calc(100% - 68px); } }
@@ -196,3 +206,4 @@
 .voiceStatus span { min-width: 0; }
 .voiceStatus button { flex-shrink: 0; border: 0; background: transparent; color: var(--fg); font: inherit; cursor: pointer; padding: 6px 0 6px 6px; }
 .thinking { margin: 0 0 12px; color: var(--text-muted); font-size: 0.86667rem; }
+.creditUsage { margin: 6px 0 0; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }

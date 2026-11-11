@@ -2,10 +2,10 @@ package workspaceservice
 
 import (
 	"errors"
-	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"os"
 	"path/filepath"
 
+	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
@@ -27,6 +27,9 @@ func OpenRuntime(opts config.Options, defaultRoot string) (config.Config, *paths
 			err = projects.MigrateCourseBindings(filepath.Join(lease.Root, "projects"))
 		}
 		if err == nil {
+			err = initializeStarter(lease.Root)
+		}
+		if err == nil {
 			return cfg, lease, nil
 		}
 		lease.Close()
@@ -38,10 +41,18 @@ func OpenRuntime(opts config.Options, defaultRoot string) (config.Config, *paths
 
 // Initial adoption checks the workspace boundary. Individual projects are
 // discovered and checked by the project index, including older layouts.
-func validateLegacyProjectsRoot(root string) error {
+func validateLegacyProjectsRoot(root string, meta *paths.Metadata) error {
 	dir := filepath.Join(root, "projects")
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) {
+		for _, name := range []string{"preferences.md", "folders.json", "treasures"} {
+			if _, err := os.Lstat(filepath.Join(root, name)); err == nil {
+				return nil
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+		}
+		meta.StarterPending = true
 		return nil
 	}
 	if err != nil {

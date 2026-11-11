@@ -1,4 +1,11 @@
 api /api/activity?{}
+api /api/cloud/account
+api /api/cloud/daily-history
+api /api/cloud/models
+api /api/cloud/models/guest
+api /api/cloud/unbind-email
+api /api/cloud/unbind-github
+api /api/cloud/{}
 api /api/events
 api /api/folders
 api /api/health
@@ -24,6 +31,7 @@ api /api/projects/{}/conversation/attachments
 api /api/projects/{}/conversation/attachments/{}/file
 api /api/projects/{}/conversation/export.md
 api /api/projects/{}/conversation/instructions
+api /api/projects/{}/conversation/lesson-rating
 api /api/projects/{}/conversation/opening
 api /api/projects/{}/conversation/queue/resume
 api /api/projects/{}/conversation/queue/{}/discard
@@ -68,11 +76,10 @@ api /api/system/update{}
 api /api/treasures
 api /api/treasures/rewards/{}/seen
 api /api/treasures/rewards/{}/source
-api /api/usage/projects
-api /api/usage/teacher?page={}&pageSize=20
 api /api/workspace/
 page '*'
 page '/'
+page '/login'
 page 'collection'
 page 'collection/:itemId'
 page 'collection/faq'

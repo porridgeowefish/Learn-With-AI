@@ -5,7 +5,7 @@ Thanks for helping improve this local learning lab.
 ## Report a problem
 
 Use GitHub Issues for reproducible bugs and focused feature proposals. Include
-the LLL version or commit, operating system, reproduction steps, expected
+the Learn-With-AI version or commit, operating system, reproduction steps, expected
 behavior, actual behavior, and screenshots or logs with secrets removed.
 
 ## Submit a change

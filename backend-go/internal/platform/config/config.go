@@ -1,6 +1,6 @@
 // Package config owns the single typed application configuration loader.
 //
-// Precedence: compiled defaults < config.local.json < LLL_* environment
+// Precedence: compiled defaults < config.local.json < LWA_* environment
 // < explicit CLI flags. Loading normalizes the historical flat keys in
 // memory and never rewrites the user's file. Diagnostics redact secrets.
 package config
@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/xmz14/lll/backend-go/internal/platform/envname"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
@@ -134,7 +135,7 @@ func (c *Config) Validate() error {
 // the variable named by apiKeyEnv wins over an inline apiKey.
 func (p Provider) ResolveAPIKey() string {
 	if p.APIKeyEnv != "" {
-		if v := strings.TrimSpace(os.Getenv(p.APIKeyEnv)); v != "" {
+		if v := strings.TrimSpace(envname.Value(p.APIKeyEnv)); v != "" {
 			return v
 		}
 	}
@@ -175,7 +176,7 @@ func filePath(explicit string) string {
 }
 
 func workspaceBase() string {
-	if v := strings.TrimSpace(os.Getenv("LLL_WORKSPACE_ROOT")); v != "" {
+	if v := strings.TrimSpace(envname.Value("LWA_WORKSPACE_ROOT")); v != "" {
 		return v
 	}
 	if v := strings.TrimSpace(os.Getenv("WORKSPACE")); v != "" {
@@ -337,24 +338,24 @@ func mergeAI(cfg *Config, ai AI) {
 	}
 }
 
-// applyEnv applies LLL_* environment overrides.
+// applyEnv applies LWA_* environment overrides and reads legacy names.
 func applyEnv(cfg *Config, prov Provenance) {
-	mark := func(section, key string) { prov[section] = source{Section: section, From: "env"} }
+	mark := func(section string) { prov[section] = source{Section: section, From: "env"} }
 
-	if v := strings.TrimSpace(os.Getenv("LLL_SERVER_PORT")); v != "" {
+	if v := strings.TrimSpace(envname.Value("LWA_SERVER_PORT")); v != "" {
 		if port, err := strconv.Atoi(v); err == nil {
 			cfg.Server.Port = port
-			mark("server", "LLL_SERVER_PORT")
+			mark("server")
 		} else {
-			warnf(cfg, "config: LLL_SERVER_PORT=%q is not a number; ignored", v)
+			warnf(cfg, "config: LWA_SERVER_PORT=%q is not a number; ignored", v)
 		}
 	}
-	if v := strings.TrimSpace(os.Getenv("LLL_WORKSPACE_ROOT")); v != "" {
+	if v := strings.TrimSpace(envname.Value("LWA_WORKSPACE_ROOT")); v != "" {
 		cfg.Workspace.Root = v
-		mark("workspace", "LLL_WORKSPACE_ROOT")
+		mark("workspace")
 	} else if v := strings.TrimSpace(os.Getenv("WORKSPACE")); v != "" {
 		cfg.Workspace.Root = v
-		mark("workspace", "WORKSPACE")
+		mark("workspace")
 	}
 }
 
@@ -386,10 +387,10 @@ func (c *Config) WorkspaceRootResolved() string {
 }
 
 // OpenRuntime selects and locks the data root before reading authoritative configuration.
-func OpenRuntime(opts Options, defaultRoot string, validate func(string) error) (Config, *paths.Lease, error) {
-	override := opts.WorkspaceRoot != "" || os.Getenv("LLL_WORKSPACE_ROOT") != "" || os.Getenv("WORKSPACE") != ""
+func OpenRuntime(opts Options, defaultRoot string, validate func(string, *paths.Metadata) error) (Config, *paths.Lease, error) {
+	override := opts.WorkspaceRoot != "" || envname.Value("LWA_WORKSPACE_ROOT") != "" || os.Getenv("WORKSPACE") != ""
 	if opts.WorkspaceRoot == "" {
-		opts.WorkspaceRoot = os.Getenv("LLL_WORKSPACE_ROOT")
+		opts.WorkspaceRoot = envname.Value("LWA_WORKSPACE_ROOT")
 	}
 	if opts.WorkspaceRoot == "" {
 		opts.WorkspaceRoot = os.Getenv("WORKSPACE")

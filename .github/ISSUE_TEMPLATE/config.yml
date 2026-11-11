@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: LifeLongLearn source and contribution guide
-    url: https://github.com/porridgeowefish/LLL_life_long_learn/blob/main/CONTRIBUTING.md
+  - name: Learn-With-AI source and contribution guide
+    url: https://github.com/porridgeowefish/Learn-With-AI/blob/main/CONTRIBUTING.md
     about: Read the contribution guide before opening a Pull Request.

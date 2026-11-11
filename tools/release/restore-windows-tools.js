@@ -36,7 +36,7 @@ async function main() {
     const architecture = { x64: "x64", arm64: "arm64" }[process.arch];
     const archive = sdk?.files.find(file => file.rid === `win-${architecture}` && file.name.endsWith(".zip"));
     if (!architecture || !archive || !/^[a-f0-9]{128}$/i.test(archive.hash)) throw new Error("Official SDK archive metadata is missing");
-    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "lll-packaging-sdk-"));
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "lwa-packaging-sdk-"));
     const zip = path.join(temporary, "sdk.zip");
     try {
       console.log(`Downloading .NET SDK ${tools.dotnetSdkVersion} to the external toolchain`);
@@ -46,8 +46,8 @@ async function main() {
       const checksum = new Transform({ transform(chunk, encoding, callback) { hash.update(chunk); callback(null, chunk); } });
       await pipeline(Readable.fromWeb(response.body), checksum, fs.createWriteStream(zip));
       if (hash.digest("hex") !== archive.hash.toLowerCase()) throw new Error("SDK SHA-512 verification failed");
-      const extract = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Expand-Archive -LiteralPath $env:LLL_SDK_ARCHIVE -DestinationPath $env:LLL_SDK_DESTINATION -Force"], {
-        env: { ...environment, LLL_SDK_ARCHIVE: zip, LLL_SDK_DESTINATION: tools.dotnetDirectory },
+      const extract = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Expand-Archive -LiteralPath $env:LWA_SDK_ARCHIVE -DestinationPath $env:LWA_SDK_DESTINATION -Force"], {
+        env: { ...environment, LWA_SDK_ARCHIVE: zip, LWA_SDK_DESTINATION: tools.dotnetDirectory },
         stdio: "inherit", windowsHide: true,
       });
       if (extract.error || extract.status !== 0) throw extract.error || new Error("SDK extraction failed");

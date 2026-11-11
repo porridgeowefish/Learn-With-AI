@@ -6,11 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/xmz14/lll/backend-go/internal/platform/filesystem"
+	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
+	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+
+	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
 )
 
 type PromptSource struct {
@@ -190,11 +195,60 @@ func snapshotFile(snapshot map[string][]byte, name, extension string) ([]byte, e
 	return nil, fmt.Errorf("unregistered prompt resource %s", name)
 }
 func RenderPrompt(name string, variables map[string]string) (string, error) {
-	snapshot, err := promptSnapshot()
+	return RenderPromptContext(context.Background(), name, variables)
+}
+
+func RenderPromptContext(ctx context.Context, name string, variables map[string]string) (string, error) {
+	snapshot, err := promptSnapshotForContext(ctx)
 	if err != nil {
 		return "", err
 	}
 	return renderSnapshot(snapshot, name, variables)
+}
+
+type managedPromptKey struct{}
+
+func ManagedPromptReference(ctx context.Context) *promptpack.Reference {
+	content, _ := ctx.Value(managedPromptKey{}).(promptpack.Content)
+	return content.Reference()
+}
+
+func ManagedPromptIsExperimental(ctx context.Context) bool {
+	content, _ := ctx.Value(managedPromptKey{}).(promptpack.Content)
+	return content.Experiment != ""
+}
+
+// ManagedPromptContext captures the signed template snapshot for an explicitly
+// managed request. Custom provider connections never call the prompt service.
+func ManagedPromptContext(ctx context.Context, providerID, scene string) context.Context {
+	if !aiconfig.IsManagedProvider(providerID) {
+		return ctx
+	}
+	client, err := llmcloud.Default()
+	if err != nil {
+		return ctx
+	}
+	content, err := client.Prompts(ctx, scene)
+	if err != nil {
+		return ctx
+	}
+	return context.WithValue(ctx, managedPromptKey{}, content)
+}
+
+func promptSnapshotForContext(ctx context.Context) (map[string][]byte, error) {
+	snapshot, err := promptSnapshot()
+	content, ok := ctx.Value(managedPromptKey{}).(promptpack.Content)
+	if err != nil || !ok {
+		return snapshot, err
+	}
+	snapshot = maps.Clone(snapshot)
+	for name, value := range content.Resources {
+		if _, exists := snapshot[name+".md"]; exists {
+			snapshot[name+".md"] = []byte(value)
+		}
+	}
+	snapshot["_manifest_version"] = []byte("cloud:" + content.Version)
+	return snapshot, nil
 }
 func renderSnapshot(snapshot map[string][]byte, name string, variables map[string]string) (string, error) {
 	b, e := snapshotFile(snapshot, name, ".md")
@@ -293,7 +347,7 @@ func (c promptCondition) matchDepth(f map[string]string, depth int) (bool, error
 	return result, nil
 }
 func ComposePrompt(ctx context.Context, scene string, facts map[string]string, sources map[string]PromptSource) (ComposedPrompt, error) {
-	snapshot, err := promptSnapshot()
+	snapshot, err := promptSnapshotForContext(ctx)
 	if err != nil {
 		return ComposedPrompt{}, err
 	}

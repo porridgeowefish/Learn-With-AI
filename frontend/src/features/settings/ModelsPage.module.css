@@ -1,4 +1,14 @@
 .section { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.connectionTabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); }
+.connectionTabs button[aria-pressed='true'] { border-radius: 0; border-bottom: 2px solid var(--accent); color: var(--accent-ink); font-weight: 700; }
+.flat .apiSetup, .flat .apiSources { padding: 12px 0; border: 0; border-radius: 0; background: transparent; }
+.flat .apiSources { border-top: 1px solid var(--border); }
+.flat .list { gap: 0; }
+.flat .preview { padding: 11px 4px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.flat .preview:hover { background: var(--surface-tint); }
+.flat .connectionIcon { padding: 5px; background: transparent; }
+.flat .sourceLinks { gap: 4px 16px; margin-top: 8px; }
+.flat .sourceLinks a { padding: 3px 0; border: 0; background: transparent; text-decoration: underline; text-underline-offset: 3px; }
 .apiMode { display:flex; flex-direction:column; gap:12px; }
 .apiMode[hidden] { display:none; }
 .intro { color:var(--muted); font-size:.78rem; line-height:1.6; margin:4px 0 0; }

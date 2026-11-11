@@ -16,7 +16,7 @@
         "kind": "openai",
         "name": "Primary provider",
         "baseURL": "",
-        "apiKeyEnv": "LLL_PRIMARY_AI_API_KEY",
+        "apiKeyEnv": "LWA_PRIMARY_AI_API_KEY",
         "model": "",
         "contextWindowTokens": 0,
         "reasoning": false,
@@ -40,7 +40,7 @@
   },
   "webSearch": {
     "provider": "zhipu",
-    "apiKeyEnv": "LLL_WEB_SEARCH_API_KEY",
+    "apiKeyEnv": "LWA_WEB_SEARCH_API_KEY",
     "engine": "search_std"
   },
   "ui": {

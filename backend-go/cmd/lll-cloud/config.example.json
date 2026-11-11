@@ -1,0 +1,33 @@
+{
+  "models": [
+    { "id": "glm-5.3", "name": "GLM-5.3", "maxInput": 24000, "maxOutput": 4096, "rate": { "input": 2, "cached": 2, "write": 2, "output": 2 } },
+    { "id": "deepseek-flash", "name": "DeepSeek V4.1 Flash", "maxInput": 24000, "maxOutput": 4096, "rate": { "input": 2, "cached": 2, "write": 2, "output": 2 } }
+  ],
+  "connections": [
+    {
+      "id": "glm-primary",
+      "model": "glm-5.3",
+      "kind": "openai",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "upstreamModel": "glm-5.3",
+      "apiKeyEnv": "LWA_CLOUD_UPSTREAM_GLM",
+      "priority": 1,
+      "limits": { "concurrent": 2, "requestsPerMinute": 20, "tokensPerMinute": 120000 }
+    },
+    {
+      "id": "deepseek-primary",
+      "model": "deepseek-flash",
+      "kind": "openai",
+      "baseURL": "https://api.deepseek.com",
+      "upstreamModel": "deepseek-flash",
+      "apiKeyEnv": "LWA_CLOUD_UPSTREAM_DEEPSEEK",
+      "priority": 1,
+      "limits": { "concurrent": 2, "requestsPerMinute": 20, "tokensPerMinute": 120000 }
+    }
+  ],
+  "prompts": {
+    "root": "learning-prompts",
+    "version": "initial",
+    "keyEnv": "LWA_CLOUD_PROMPT_SIGNING_SEED"
+  }
+}

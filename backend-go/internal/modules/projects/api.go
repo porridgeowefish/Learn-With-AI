@@ -26,6 +26,7 @@ var ProjectExists = workspace.ProjectExists
 var DeleteProject = workspace.DeleteProject
 var CreateProjectSkeleton = workspace.CreateProjectSkeleton
 var CreateProjectSkeletonWithInput = workspace.CreateProjectSkeletonWithInput
+var StageLearningProject = workspace.StageLearningProject
 var ReadProjectState = workspace.ReadProjectState
 var WriteProjectState = workspace.WriteProjectState
 var IndexAll = workspace.IndexAll

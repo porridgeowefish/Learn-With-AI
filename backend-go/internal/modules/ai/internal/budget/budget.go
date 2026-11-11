@@ -53,7 +53,7 @@ func ForProvider(id string) Budget {
 	return b
 }
 func (b Budget) Input(req gateway.Request) int {
-	n := EstimateTextTokens(req.System) + 64
+	n := EstimateTextTokens(req.System) + EstimateTextTokens(req.TurnInstructions) + 64
 	for _, m := range req.Messages {
 		raw, _ := json.Marshal(m)
 		n += EstimateTextTokens(string(raw)) + 24
@@ -79,6 +79,7 @@ func (b Budget) Check(req gateway.Request) error {
 // teaching turns, without dropping any mandatory generation instructions.
 func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, error) {
 	b := generationBudget(p)
+	b.Output = GenerationOutputTokens(p)
 	if p.Kind == "anthropic" && p.Thinking && req.MaxThinkingTokens > 0 {
 		b.Thinking = req.MaxThinkingTokens
 	}
@@ -87,6 +88,9 @@ func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, erro
 
 // Every model uses the same learner-authorized single-request output ceiling.
 func GenerationOutputTokens(p aiconfig.Provider) int {
+	if p.Kind == aiconfig.ManagedKind && p.ManagedMaxOutput > 0 {
+		return p.ManagedMaxOutput
+	}
 	return platformconfig.ModelOutputTokens
 }
 

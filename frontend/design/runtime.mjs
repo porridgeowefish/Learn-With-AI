@@ -1,7 +1,8 @@
-import { projects, seedProjects } from '/__design/projects.mjs';
+import { projects, seedMethodology, seedProjects } from '/__design/projects.mjs';
 import { initializeLearning, learning } from '/__design/learning.mjs';
 import { settings } from '/__design/settings.mjs';
 import { visuals } from '/__design/visuals.mjs';
+import { cloud } from '/__design/cloud.mjs';
 
 
 
@@ -44,7 +45,12 @@ const state = database.then(db => new Promise((resolve, reject) => {
   read.onsuccess = () => resolve(Object.assign(seedProjects(), read.result));
   read.onerror = () => reject(read.error);
 })).then(async data => {
-  if (initializeLearning(data)) await save(data);
+  const newStarter = !data.starterInitialized;
+  if (newStarter) {
+    if (!data.projects.some(project => project.slug === 'learning-methodology')) data.projects.unshift(seedMethodology());
+    data.starterInitialized = true;
+  }
+  if (await initializeLearning(data) || newStarter) await save(data);
   return data;
 });
 async function save(data) {
@@ -62,7 +68,7 @@ export async function dispatch(request, url) {
   const data = await state;
   let changed = false;
   const ctx = {request, url, path:url.pathname, method:request.method, state:data, json, emit, dirty() { changed = true; }};
-  for (const handle of [projects, learning, settings, visuals]) {
+  for (const handle of [projects, learning, settings, visuals, cloud]) {
     const response = await handle(ctx);
     if (response) {
       if (changed || (!['GET','HEAD'].includes(request.method) && response.ok)) await save(data);

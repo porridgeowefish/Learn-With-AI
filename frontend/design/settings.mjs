@@ -47,7 +47,7 @@ function exportSnapshot(state) {
   return new Response(zipSync({[snapshotName]:strToU8(manifest)}), {headers:{'Content-Type':'application/zip'}});
 }
 async function importSnapshot({state, request, json}) {
-  const id = request.headers.get('X-LLL-Operation');
+  const id = request.headers.get('X-LWA-Operation');
   operations.set(id, true);
   try {
     const bytes = await request.arrayBuffer();
@@ -184,7 +184,7 @@ export async function settings(ctx) {
   if (path === '/api/workspace/export') return exportSnapshot(state);
   if (path === '/api/workspace/import') return importSnapshot(ctx);
   if (path === '/api/workspace/import/cancel') {
-    const id = request.headers.get('X-LLL-Operation');
+    const id = request.headers.get('X-LWA-Operation');
     if (operations.has(id)) operations.set(id,false);
     return json({ok:true});
   }

@@ -79,6 +79,9 @@ export function useTeacherSession(slug: string) {
         if (!accepted && (frame.type === 'turn-accepted' || frame.type === 'turn-queued')) {
           accepted = true; onAccepted?.();
         }
+        if ((frame.type === 'message-completed' || frame.type === 'message-failed') && frame.data.creditUsage) {
+          void client.invalidateQueries({ queryKey: ['cloud-account'] });
+        }
       });
       if (!owns()) return accepted;
       flush();
@@ -101,7 +104,7 @@ export function useTeacherSession(slug: string) {
         }
       }
     }
-  }, [commit, detach, flush, refresh]);
+  }, [client, commit, detach, flush, refresh]);
 
   useEffect(() => {
     checkedProjection.current = undefined;

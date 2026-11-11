@@ -318,6 +318,19 @@ func Observe(slug, message, text, providerID string, gateway ai.Gateway) {
 	if e != nil || !st.Settings.MemoryEnabled || st.Processed[slug+"/"+message] || strings.TrimSpace(text) == "" {
 		return
 	}
+	if providerID == "" || ai.IsManagedProvider(providerID) {
+		// Memory extraction includes saved private memory and must use a
+		// user-configured connection when the main turn uses a system model.
+		cfg, err := ai.LoadConfig()
+		if err != nil {
+			return
+		}
+		provider := cfg.ResolveDirect("teacher")
+		if provider == nil || !provider.HasConnection() {
+			return
+		}
+		providerID = provider.ID
+	}
 	if len([]rune(text)) > 6000 {
 		text = string([]rune(text)[:6000])
 	}

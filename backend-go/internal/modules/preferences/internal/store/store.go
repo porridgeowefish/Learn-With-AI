@@ -19,7 +19,7 @@ const MaxBytes = 256 << 10
 
 const defaultContent = `# 全局学习偏好
 
-这份文件由你维护，LLL 的教师与助教只读。
+这份文件由你维护，Learn-With-AI 的教师与助教只读。
 
 可以记录你长期稳定的偏好，例如：
 

@@ -20,7 +20,7 @@ import { Button } from '@/shared/primitive/Button';
 import { clearDeletedProjectClientData } from '@/features/projects/lib/projectDeletion';
 
 import s from './Sidebar.module.css';
-import { UpdateNotice } from './UpdateNotice';
+import { CloudAccount } from './CloudAccount';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: '主页', icon: 'zap' },
@@ -284,7 +284,9 @@ export function Sidebar() {
           />
         )}
       </div>
-      <div className={s.foot}><UpdateNotice/><div className={s.utilities}><a href="https://github.com/porridgeowefish/Learn-With-AI" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a></div></div>
+      <div className={s.foot}>
+        <CloudAccount />
+      </div>
       <Modal
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}

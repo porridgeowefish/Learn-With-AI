@@ -25,6 +25,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
@@ -90,6 +91,7 @@ type frozenInput struct {
 	System            string                   `json:"system"`
 	PromptHash        string                   `json:"promptHash"`
 	PromptVersion     string                   `json:"promptVersion"`
+	PromptReference   *promptpack.Reference    `json:"promptReference,omitempty"`
 	Messages          []ai.GatewayMessage      `json:"messages"`
 	Sources           []sources.SourceDocument `json:"sources"`
 	BaseAsset         assets.Asset             `json:"baseAsset"`
@@ -269,11 +271,16 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 		}
 	}
 	id := binding.ProviderID
+	if in.ProviderID == "" {
+		if managed := cfg.Managed(name); managed != nil {
+			return *managed, nil
+		}
+	}
 	if in.ProviderID != "" {
 		id = in.ProviderID
 	}
 	p := cfg.FindExact(id)
-	if p == nil || (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || (p.Kind != "openai" && p.Kind != "anthropic" && p.Kind != "siwc") {
+	if p == nil || !p.HasConnection() || (p.Kind != "openai" && p.Kind != "anthropic" && p.Kind != "siwc" && p.Kind != ai.ManagedKind) {
 		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	chosen := *p
@@ -287,12 +294,16 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 	}
 	return chosen, nil
 }
-func prompt(kind string) (string, string, error) {
-	composed, err := ai.ComposePrompt(context.Background(), "generation/"+kind, nil, nil)
-	if err != nil {
-		return "", "", problem("prompt-resource-unavailable", 503)
+func prompt(ctx context.Context, kind, providerID string) (ai.ComposedPrompt, *promptpack.Reference, error) {
+	scene := "generation/" + kind
+	if kind == "practice" {
+		ctx = ai.ManagedPromptContext(ctx, providerID, scene)
 	}
-	return composed.Text, composed.ResourceVersion, nil
+	composed, err := ai.ComposePrompt(ctx, scene, nil, nil)
+	if err != nil {
+		return ai.ComposedPrompt{}, nil, problem("prompt-resource-unavailable", 503)
+	}
+	return composed, ai.ManagedPromptReference(ctx), nil
 }
 func hash(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
 
@@ -367,11 +378,12 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	if e != nil {
 		return Job{}, e
 	}
-	system, version, e := prompt(in.Kind)
+	composed, reference, e := prompt(ctx, in.Kind, p.ID)
 	if e != nil {
 		return Job{}, e
 	}
-	f := frozenInput{System: system, PromptHash: hash(system), PromptVersion: version, Sources: []sources.SourceDocument{}}
+	system := composed.Text
+	f := frozenInput{System: system, PromptHash: hash(system), PromptVersion: composed.ResourceVersion, PromptReference: reference, Sources: []sources.SourceDocument{}}
 	if !(in.Kind == "discipline-map" && in.MapMode == "general") {
 		store, e := sources.New(slug)
 		if e != nil {

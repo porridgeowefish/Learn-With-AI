@@ -9,6 +9,18 @@ import { ChatMediaBlock } from './ChatMediaInput';
 import { teacherMarkdown } from './LearningProgress';
 import s from './TeacherView.module.css';
 
+
+const credits = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 3 });
+const teacherFailureMessages: Record<string, string> = {
+  context_preparation_failed: '无法读取本轮教学设置，请确认偏好和附加信息已保存后重试。',
+  context_budget_exhausted: '这轮内容超过了模型的输入上限。可以缩短附加信息，或在新对话中继续。',
+  teacher_request_timeout: '这轮请求超时，请重新生成。',
+  teacher_provider_rate_limited: '模型服务当前限流，请稍后重试。',
+  chatgpt_connection_failed: 'ChatGPT 授权连接失败。请到设置的「模型连接」检查 ChatGPT 连接后重试。',
+  chatgpt_request_rejected: 'ChatGPT 拒绝了这轮请求。请重新生成，或换一个可用模型继续。',
+  chatgpt_model_unavailable: '当前 ChatGPT 模型不可用，请在模型设置里重新选择。',
+};
+
 // MessageActions stays primitive-valued (or stable callbacks) so the memo
 // comparator can keep history messages frozen while live text streams.
 interface MessageActions {
@@ -50,8 +62,16 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
         {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
+        {teacher && !streaming && message.creditUsage && <p className={s.creditUsage}>
+          {message.creditUsage.pending
+            ? (message.creditUsage.units ? `已扣 ${credits.format(message.creditUsage.units / 1000)} 积分 · 部分待结算` : '积分待结算')
+            : `消耗 ${credits.format(message.creditUsage.units / 1000)} 积分`}
+        </p>}
         {notice && <div className={s.notice}>{notice}</div>}
-        {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}        {actions && !streaming && (
+        {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">
+          {teacherFailureMessages[message.failureCode ?? ''] ?? '这条回复未完成，请重新生成或继续提问。'}
+        </div>}
+        {actions && !streaming && (
           <div className={s.messageActions}>
             <button type="button" className={s.iconButton} title={actions.copied ? '已复制' : '复制原文'} aria-label={actions.copied ? '已复制' : '复制原文'} onClick={() => void actions.onCopy(message)}><CopyIcon />{actions.copied && <span className={s.copiedMark}>已复制</span>}</button>
             <button type="button" className={s.iconButton} title="下载本条文本" aria-label="下载本条文本" onClick={() => actions.onDownload(message)}><DownloadIcon /></button>

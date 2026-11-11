@@ -24,7 +24,7 @@ type toolIntent struct {
 	Forbidden []string `json:"forbidden"`
 }
 
-func (s *Service) inferToolIntent(ctx context.Context, providerID, model, learnerText string, history []ai.GatewayMessage) (toolIntent, map[string]int, error) {
+func (s *Service) inferToolIntent(ctx context.Context, providerID, model, learnerText string, history []ai.GatewayMessage, recordCredit func(*ai.CreditSettlement)) (toolIntent, map[string]int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	intentPrompt, promptErr := ai.RenderPrompt("auxiliary/tool-intent", nil)
@@ -32,9 +32,14 @@ func (s *Service) inferToolIntent(ctx context.Context, providerID, model, learne
 		return toolIntent{}, nil, promptErr
 	}
 	var recent []ai.GatewayMessage
+	// Prompt references follow the transcript in the teacher request.
+	// Only actual conversation turns should resolve the learner's intent.
+	for len(history) > 0 && history[len(history)-1].Pinned {
+		history = history[:len(history)-1]
+	}
 	for i := max(0, len(history)-4); i < len(history); i++ {
 		m := history[i]
-		if (m.Role == "user" || m.Role == "assistant") && m.Content != "" {
+		if !m.Pinned && (m.Role == "user" || m.Role == "assistant") && m.Content != "" {
 			content := m.Content
 			if m.Role == "assistant" {
 				runes := []rune(content)
@@ -63,6 +68,9 @@ func (s *Service) inferToolIntent(ctx context.Context, providerID, model, learne
 			for k, v := range event.Usage {
 				usage[k] = v
 			}
+		}
+		if event.Type == "credit-settlement" && recordCredit != nil {
+			recordCredit(event.CreditSettlement)
 		}
 	})
 	if err != nil {

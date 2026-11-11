@@ -1,20 +1,24 @@
 async function registerWorker() {
   if (!navigator.serviceWorker) throw new Error('请通过本机预览地址或 HTTPS 打开。');
-  const registration = await navigator.serviceWorker.register('/design-worker.mjs', { type: 'module', updateViaCache:'none' });
-  const installing = registration.installing;
-  if (!navigator.serviceWorker.controller && installing && installing.state !== 'activated') await new Promise((resolve, reject) => {
-    installing.addEventListener('statechange', () => {
-      if (installing.state === 'activated') resolve();
-      if (installing.state === 'redundant') reject(new Error('设计数据加载失败'));
-    });
+  const revision = document.querySelector('meta[name="lll-design-revision"]')?.content;
+  const worker = new URL('/design-worker.mjs', location.origin);
+  if (revision) worker.searchParams.set('revision', revision);
+  await navigator.serviceWorker.register(worker, { type: 'module', updateViaCache:'none' });
+  if (navigator.serviceWorker.controller?.scriptURL === worker.href) return;
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      navigator.serviceWorker.removeEventListener('controllerchange', changed);
+      reject(new Error('设计数据更新超时'));
+    }, 5000);
+    function changed() {
+      if (navigator.serviceWorker.controller?.scriptURL !== worker.href) return;
+      clearTimeout(timeout);
+      navigator.serviceWorker.removeEventListener('controllerchange', changed);
+      resolve();
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', changed);
+    changed();
   });
-  await navigator.serviceWorker.ready;
-  if (!navigator.serviceWorker.controller) await new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once:true }));
-  if (import.meta.hot) import.meta.hot.on('design-data-changed', () => {
-    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once:true });
-    void registration.update().catch(error => console.warn('设计数据更新失败', error));
-  });
-
 }
 async function start() {
   try {
@@ -24,12 +28,12 @@ async function start() {
     const adapter = '/__design/page-adapter.mjs';
     const {installPageAdapter} = await import(/* @vite-ignore */ adapter);
     installPageAdapter();
-    if (import.meta.hot) import.meta.hot.on('design-data-changed', () => location.reload());
   }
+  if (import.meta.hot) import.meta.hot.on('design-data-changed', () => location.reload());
   // The product requests a native absolute path. A browser preview only needs a display name.
   const originalFetch = window.fetch.bind(window);
   window.lllOpenExternal = async url => {
-    if (url !== 'https://auth.openai.com/design-preview') throw new Error('设计预览不会打开外部授权页面');
+    if (url !== 'https://auth.openai.com/design-preview' && url !== 'https://github.com/login/oauth/authorize?client_id=lll-design-preview') throw new Error('设计预览不会打开外部授权页面');
   };
   window.fetch = async (input, init) => {
     if (typeof input === 'string' && input === '/api/workspace/directories' && init?.body && JSON.parse(init.body).pick) {
@@ -55,6 +59,10 @@ async function start() {
     ctx.font = '16px sans-serif'; ctx.fillText('设计预览 · 截图示例', 12, 28);
     window.dispatchEvent(new CustomEvent('lll-region-capture-result', {detail:{id,width,height,dataUrl:canvas.toDataURL()}}));
   };
+  if (location.pathname === '/' && !location.search && !localStorage.getItem('lll.design.starter-opened')) {
+    localStorage.setItem('lll.design.starter-opened', '1');
+    history.replaceState(null, '', '/project/learning-methodology');
+  }
   await import('../src/app/main.tsx');
   const anchor = location.hash.slice(1);
   if (anchor) {

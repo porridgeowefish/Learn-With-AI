@@ -134,13 +134,13 @@ npm run build
 npm run start
 ```
 
-The source server opens `http://127.0.0.1:8787/`. Development data defaults to the ignored `workspace/` directory; set `--workspace` or `LLL_WORKSPACE_ROOT` to choose another location. The backend uses Go; the frontend uses React 18, TypeScript and Vite. See the [Chinese guide](./README.md#从源码构建) for development commands.
+The source server opens `http://127.0.0.1:8787/`. Development data defaults to the ignored `workspace/` directory. Set `--workspace` or `LWA_WORKSPACE_ROOT` to choose another location. The backend uses Go. The frontend uses React 18, TypeScript and Vite. See the [Chinese guide](./README.md#从源码构建) for development commands.
 
 You can also clone `https://gitee.com/szu-andrew/learn-with-ai.git` and run the same build steps from the `learn-with-ai` directory.
 
 ## Feedback and contributions
 
-The repository was formerly named LLL_life_long_learn. Existing repository links redirect to Learn-With-AI; the username and current repository URL remain unchanged.
+Previous repository links redirect to the current Learn-With-AI repository.
 
 [Report a bug or suggest an improvement](https://github.com/porridgeowefish/Learn-With-AI/issues). Include the app version, operating system and steps to reproduce the problem; remove keys and private learning content. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution workflow.
 

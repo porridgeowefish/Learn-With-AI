@@ -1,5 +1,5 @@
 // Gitee ordinary repositories limit each attachment to 100 MB. Publish these
-// parts and copy the generated marker into the Gitee Release body.
+// parts and copy both generated markers into the Gitee Release body.
 const fs = require('node:fs');
 const path = require('node:path');
 function splitMsi(input, output, partBytes = 90 * 1024 * 1024) {
@@ -26,7 +26,8 @@ function splitMsi(input, output, partBytes = 90 * 1024 * 1024) {
       position += size;
     }
   } finally { fs.closeSync(fd); }
-  const marker = `<!-- LLL-UPDATE-PARTS: ${name} ${count} ${stat.size} -->`;
+  // Installed versions look for the legacy marker when downloading an upgrade.
+  const marker = ['LWA', 'LLL'].map(prefix => `<!-- ${prefix}-UPDATE-PARTS: ${name} ${count} ${stat.size} -->`).join('\n');
   fs.writeFileSync(markerFile, marker + '\n', { flag: 'wx' });
   return { parts: outputs, marker, bytes: stat.size };
 }

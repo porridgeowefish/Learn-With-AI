@@ -51,6 +51,7 @@ type (
 // ErrQueueItemNotFound marks queue operations against an item that already
 // left the queue (promoted or discarded).
 var ErrQueueItemNotFound = conversation.ErrQueueItemNotFound
+var ErrLessonAlreadyRated = conversation.ErrLessonAlreadyRated
 
 func New(gateway ai.Gateway) *Service { return service.New(gateway) }
 
@@ -72,6 +73,10 @@ var SearchFromSettings = websearch.FromSettings
 func NewActiveResponses() *ActiveResponses { return service.NewActiveResponses() }
 
 func NewConversation(slug string) (*ConversationStore, error) { return conversation.New(slug) }
+
+func StageExampleExchange(root, slug, operationID, question, answer string) error {
+	return conversation.StageExampleExchange(root, slug, operationID, question, answer)
+}
 
 type ChatAttachment = conversation.Attachment
 type SpeechCapability = speech.Capability

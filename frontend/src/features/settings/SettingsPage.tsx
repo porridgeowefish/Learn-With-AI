@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAppearance, useUpdateAppearance } from './appearance';
 import { ModelsPage } from './ModelsPage';
+import { AccountSettings } from './AccountSettings';
 import { WorkspaceSettings } from './WorkspaceSettings';
 import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { LearningSettings } from './LearningSettings';
@@ -14,16 +15,20 @@ import s from './SettingsPage.module.css';
 import { FONT_SIZES, useFontSize, type FontSize } from '@/shared/lib/fontSize';
 
 const categories = [ ['general', '常规'], ['appearance', '外观'], ['models', '模型连接'], ['learning', '回复、搜索与记忆'], ['notes', '教师笔记'], ['storage', '存储与数据'], ['usage', 'Token 用量'], ['about', '更新与关于'] ] as const;
+
+const visibleCategories = ([['account', '个人信息'], ...categories.filter(([id]) => id !== 'usage')] as const);
 export function SettingsPage() {
   const startGuide = useOnboardingStore(state => state.start);
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState('');
-  const section = categories.some(([id]) => id === params.get('section')) ? params.get('section')! : 'general';
+  const requested = params.get('section');
+  const section = visibleCategories.some(([id]) => id === requested) ? requested : requested === 'usage' ? 'account' : 'general';
   return <div className={s.host}>
-    <aside className={s.navigation}><h1>设置</h1><input aria-label="搜索设置" placeholder="搜索设置" value={filter} onChange={e => setFilter(e.target.value)} /><nav aria-label="设置分类">{categories.filter(([,name]) => name.includes(filter)).map(([id,name]) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => setParams({section:id})}>{name}</button>)}</nav></aside>
+    <aside className={s.navigation}><h1>设置</h1><input aria-label="搜索设置" placeholder="搜索设置" value={filter} onChange={e => setFilter(e.target.value)} /><nav aria-label="设置分类">{visibleCategories.filter(([,name]) => name.includes(filter)).map(([id,name]) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => setParams({section:id})}>{name}</button>)}</nav></aside>
     <div className={s.scroll} data-testid="settings-scroll" key={section}>
-      <header className={s.header}><h2 className={s.title}>{categories.find(([id]) => id === section)?.[1]}</h2></header>
-      {section === 'general' && <section className={s.appearance}><h2>学习工作台</h2><p>在左侧管理外观、模型、搜索与学习数据。</p><Link to="/settings?section=usage">查看 Token 用量</Link><Link to="/settings?section=learning">管理回复与联网搜索</Link><div><Button onClick={startGuide}>开始屏幕向导</Button></div></section>}
+      <header className={s.header}><h2 className={s.title}>{visibleCategories.find(([id]) => id === section)?.[1]}</h2></header>
+      {section === 'account' && <AccountSettings />}
+      {section === 'general' && <section className={s.appearance}><h2>学习工作台</h2><p>在左侧管理外观、模型、搜索与学习数据。</p>{false}<Link to="/settings?section=learning">管理回复与联网搜索</Link><div><Button onClick={startGuide}>开始屏幕向导</Button></div></section>}
       {section === 'appearance' && <AppearanceSection />}
       {section === 'models' && <ModelsPage />}
       {section === 'learning' && <LearningSettings />}
@@ -84,7 +89,7 @@ function AppearanceSection() {
 }
 
 function OpenSourceSection() {
-  const repo = 'https://github.com/porridgeowefish/LLL_life_long_learn';
+  const repo = 'https://github.com/porridgeowefish/Learn-With-AI';
   return (
     <section className={s.openSource} aria-labelledby="open-source-title">
       <div>

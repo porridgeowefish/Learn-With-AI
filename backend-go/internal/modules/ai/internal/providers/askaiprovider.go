@@ -37,7 +37,8 @@ func Stream(ctx context.Context, p Provider, system string, msgs []Message, onFr
 	provider := connection(p)
 	// Preserve the text API's explicit thinking-display option.
 	provider.Reasoning = p.Reasoning || p.Thinking
-	return gateway.StreamProvider(ctx, provider, request(system, msgs), func(event gateway.Event) {
+	req := request(system, msgs)
+	emit := func(event gateway.Event) {
 		switch event.Type {
 		case "text-delta":
 			onFrame(Frame{Type: "text", Content: event.Delta})
@@ -48,7 +49,13 @@ func Stream(ctx context.Context, p Provider, system string, msgs []Message, onFr
 		case "response-completed":
 			onFrame(Frame{Type: "done"})
 		}
-	})
+	}
+	if p.Kind == config.ManagedKind {
+		req.ProviderID = p.ID
+		req.ShowReasoning = &provider.Reasoning
+		return (gateway.Configured{}).Stream(ctx, req, emit)
+	}
+	return gateway.StreamProvider(ctx, provider, req, emit)
 }
 
 func Complete(ctx context.Context, p Provider, system string, msgs []Message) (string, error) {

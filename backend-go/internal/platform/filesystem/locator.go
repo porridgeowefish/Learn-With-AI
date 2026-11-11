@@ -15,8 +15,10 @@ import (
 )
 
 type Metadata struct {
-	ID      string `json:"workspaceId"`
-	Version int    `json:"workspaceFormatVersion"`
+	ID             string `json:"workspaceId"`
+	Version        int    `json:"workspaceFormatVersion"`
+	StarterPending bool   `json:"starterPending,omitempty"`
+	StarterLanding bool   `json:"starterLanding,omitempty"`
 }
 type Locator struct {
 	Version     int       `json:"locatorVersion"`
@@ -114,7 +116,7 @@ func (l *Lease) Close() {
 }
 
 // OpenWorkspace invokes legacy selection only for an initial claim or an explicit override.
-func OpenWorkspace(override bool, legacy func() (string, error), validate func(string) error) (*Lease, error) {
+func OpenWorkspace(override bool, legacy func() (string, error), validate func(string, *Metadata) error) (*Lease, error) {
 	dir, e := ControlDir()
 	if e != nil {
 		return nil, e
@@ -168,7 +170,7 @@ func OpenWorkspace(override bool, legacy func() (string, error), validate func(s
 	}
 	lease := &Lease{identity, lock, root}
 	if claim && validate != nil {
-		e = validate(root)
+		e = validate(root, &m)
 	}
 	if claim && e == nil {
 		e = StoreJSON(filepath.Join(root, "workspace.json"), m)

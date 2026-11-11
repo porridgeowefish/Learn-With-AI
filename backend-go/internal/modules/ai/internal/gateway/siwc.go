@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,6 +21,14 @@ import (
 var siwcAccessToken = siwc.AccessToken
 var siwcHTTPClient = &http.Client{Transport: netproxy.Transport()}
 
+var ErrChatGPTConnection = errors.New("ChatGPT connection failed")
+
+type ChatGPTHTTPError struct{ Status int }
+
+func (e *ChatGPTHTTPError) Error() string {
+	return fmt.Sprintf("ChatGPT request status %d", e.Status)
+}
+
 func streamSIWC(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	p.Kind = "siwc"
 	return streamResponses(ctx, p, in, emit)
@@ -33,12 +40,12 @@ func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, em
 		var err error
 		token, err = siwcAccessToken(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrChatGPTConnection, err)
 		}
 		endpoint = "https://api.openai.com/v1/responses"
 	}
 	input := make([]map[string]any, 0, len(in.Messages)*2)
-	for _, m := range in.Messages {
+	for _, m := range messagesWithTurnInstructions(in) {
 		if m.ToolCallID != "" {
 			input = append(input, map[string]any{"type": "function_call_output", "call_id": m.ToolCallID, "output": m.Content})
 			continue
@@ -61,7 +68,7 @@ func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, em
 	}
 	body := map[string]any{"model": p.Model, "input": input, "store": false, "stream": true}
 	if p.Kind != "siwc" {
-		body["max_output_tokens"] = platformconfig.ModelOutputTokens
+		body["max_output_tokens"] = outputLimit(in)
 	}
 	if supportsSIWCReasoningSummary(p.Model) {
 		reasoning := map[string]any{}
@@ -99,12 +106,28 @@ func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, em
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	res, err := siwcHTTPClient.Do(req)
+	client := siwcHTTPClient
+	if inManagedStream(ctx) {
+		client = noRedirectClient(client)
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		if res.StatusCode == http.StatusTooManyRequests {
+			return rateLimitError(res)
+		}
+		if inManagedStream(ctx) && upstreamAuthRejected(res) {
+			return ErrUpstreamAuthRejected
+		}
+		if p.Kind == "siwc" {
+			if upstreamAuthRejected(res) {
+				return ErrChatGPTConnection
+			}
+			return &ChatGPTHTTPError{Status: res.StatusCode}
+		}
 		detail, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
 		return fmt.Errorf("OpenAI request status %d: %s", res.StatusCode, strings.TrimSpace(string(detail)))
 	}

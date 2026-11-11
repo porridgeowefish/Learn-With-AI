@@ -28,20 +28,28 @@ func Generate(ctx context.Context, provider, model string, turns []notestore.Not
 	if model == "" {
 		model = p.Model
 	}
-	if (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || model == "" {
+	if !p.HasConnection() || model == "" {
+		return "", notestore.NoteUsage{}, ErrProviderNotConfigured
+	}
+	if p.Kind == ai.ManagedKind && !notestore.AllManagedTurns(turns) {
 		return "", notestore.NoteUsage{}, ErrProviderNotConfigured
 	}
 	data, err := json.Marshal(turns)
 	if err != nil {
 		return "", notestore.NoteUsage{}, err
 	}
-	notePrompt, err := ai.RenderPrompt("auxiliary/notes", nil)
+	promptCtx := ai.ManagedPromptContext(ctx, provider, "auxiliary/notes")
+	notePrompt, err := ai.RenderPromptContext(promptCtx, "auxiliary/notes", nil)
 	if err != nil {
 		return "", notestore.NoteUsage{}, err
 	}
 	var content strings.Builder
 	reported := notestore.NoteUsage{}
-	err = (ai.Configured{}).Stream(ctx, ai.GatewayRequest{BindingName: "notes", ProviderID: provider, Model: model, System: notePrompt, Messages: []ai.GatewayMessage{{Role: "user", Content: string(data)}}}, func(e ai.GatewayEvent) {
+	request := ai.GatewayRequest{BindingName: "notes", ProviderID: provider, Model: model, System: notePrompt, Messages: []ai.GatewayMessage{{Role: "user", Content: string(data)}}}
+	if request.Prompt = ai.ManagedPromptReference(promptCtx); request.Prompt != nil {
+		request.PromptExposureID = notestore.BatchID(turns)
+	}
+	err = (ai.Configured{}).Stream(ctx, request, func(e ai.GatewayEvent) {
 		if e.Type == "text-delta" {
 			content.WriteString(e.Delta)
 		}

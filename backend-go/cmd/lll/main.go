@@ -1,4 +1,4 @@
-// Command lll is the Local Learning Lab HTTP server entry point.
+// Command lll starts the Learn-With-AI HTTP server.
 package main
 
 import (
@@ -27,8 +27,8 @@ func main() {
 	var (
 		versionOnly = flag.Bool("version", false, "print version")
 		noBrowser   = flag.Bool("no-browser", false, "do not open the browser")
-		port        = flag.Int("port", 0, "server port (overrides config and LLL_SERVER_PORT)")
-		workspace   = flag.String("workspace", "", "workspace root (overrides config and LLL_WORKSPACE_ROOT)")
+		port        = flag.Int("port", 0, "server port (overrides config and LWA_SERVER_PORT)")
+		workspace   = flag.String("workspace", "", "workspace root (overrides config and LWA_WORKSPACE_ROOT)")
 		configPath  = flag.String("config", "", "config file path (default: <workspace>/config.local.json)")
 	)
 	flag.Parse()

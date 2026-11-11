@@ -12,7 +12,7 @@ const initialConflictLimit = 5;
 function post(action: string, body?: BodyInit, signal?: AbortSignal, operation?: string) {
   return fetch('/api/workspace/' + action, {
     method: 'POST', body, signal,
-    headers: { 'X-LLL-Workspace': '1', ...(operation ? { 'X-LLL-Operation': operation } : {}), 'Content-Type': body instanceof Blob ? 'application/zip' : 'application/json' },
+    headers: { 'X-LWA-Workspace': '1', ...(operation ? { 'X-LWA-Operation': operation } : {}), 'Content-Type': body instanceof Blob ? 'application/zip' : 'application/json' },
   });
 }
 

@@ -1,0 +1,70 @@
+.trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.trigger:hover { background: var(--surface-tint); }
+.trigger:focus-visible { outline: 2px solid var(--accent); }
+.avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.accountName { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.account { display: grid; gap: 14px; min-width: 0; }
+.field { display: grid; gap: 5px; min-width: 0; font-size: .88rem; }
+.field select, .field input {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+}
+.field select:focus-visible, .field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.caption { margin: 0; color: var(--muted); font-size: .84rem; }
+.wallet {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-tint);
+}
+.wallet strong { display: block; font-size: 2rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.signOut { justify-self: start; }
+.identities { min-width: 0; border-top: 1px solid var(--border); }
+.identities h3 { margin: 10px 0 3px; color: var(--muted); font-size: .84rem; font-weight: 600; }
+.identityRow { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; font-size: .88rem; }
+.identityRow + .identityRow { border-top: 1px solid var(--border); }
+.identityRow p { overflow-wrap: anywhere; }
+.checkIns { display: grid; gap: 5px; }
+.claimHistory { list-style: none; margin: 4px 0 0; padding: 0; max-height: 140px; overflow: auto; }
+.claimHistory li { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.binding {
+  display: grid;
+  gap: 10px;
+}
+.code { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.bindingActions { display: flex; justify-content: flex-end; gap: 8px; }

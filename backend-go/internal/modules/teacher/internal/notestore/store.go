@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
@@ -149,16 +150,22 @@ func (s *Store) Observe(cfg AutoNotesSettings, latestSeq uint64, turns []NoteTur
 	var jobs []NoteJob
 	for cfg.Enabled && len(st.Pending) >= cfg.EveryTurns {
 		batch := append([]NoteTurn(nil), st.Pending[:cfg.EveryTurns]...)
-		ids := []string{}
-		for _, t := range batch {
-			ids = append(ids, t.LearnerMessageID)
-		}
-		job := NoteJob{ID: stableID("notejob", strings.Join(ids, "\x00")), Status: "queued", FromTurn: st.Count + 1, ThroughTurn: st.Count + len(batch), Turns: batch, ProviderID: cfg.ProviderID, Model: cfg.Model, Retryable: true}
+		job := NoteJob{ID: BatchID(batch), Status: "queued", FromTurn: st.Count + 1, ThroughTurn: st.Count + len(batch), Turns: batch, ProviderID: cfg.ProviderID, Model: cfg.Model, Retryable: true}
 		if job.ProviderID == "" {
 			job.ProviderID = batch[len(batch)-1].ProviderID
 		}
 		if job.Model == "" {
 			job.Model = batch[len(batch)-1].Model
+		}
+		if ai.IsManagedProvider(job.ProviderID) && !AllManagedTurns(batch) {
+			job.ProviderID, job.Model = "", ""
+			for i := len(batch) - 1; i >= 0; i-- {
+				turn := batch[i]
+				if turn.ProviderID != "" && !ai.IsManagedProvider(turn.ProviderID) {
+					job.ProviderID, job.Model = turn.ProviderID, turn.Model
+					break
+				}
+			}
 		}
 		if err := write(filepath.Join(s.root, "jobs", job.ID+".json"), job); err != nil {
 			return nil, err
@@ -172,6 +179,26 @@ func (s *Store) Observe(cfg AutoNotesSettings, latestSeq uint64, turns []NoteTur
 	}
 	return jobs, write(filepath.Join(s.root, "state.json"), st)
 }
+
+// AllManagedTurns requires explicit provenance before a note batch may use
+// the cloud. Old turns with no provider and mixed batches remain local.
+func AllManagedTurns(turns []NoteTurn) bool {
+	for _, turn := range turns {
+		if !ai.IsManagedProvider(turn.ProviderID) {
+			return false
+		}
+	}
+	return len(turns) > 0
+}
+
+func BatchID(turns []NoteTurn) string {
+	ids := make([]string, 0, len(turns))
+	for _, turn := range turns {
+		ids = append(ids, turn.LearnerMessageID)
+	}
+	return stableID("notejob", strings.Join(ids, "\x00"))
+}
+
 func stableID(prefix, value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return prefix + "_" + hex.EncodeToString(sum[:16])

@@ -16,10 +16,18 @@ export interface ConversationMessage {
   id: string;
   role: 'learner' | 'teacher' | 'system';
   status: 'completed' | 'failed' | 'interrupted';
+  failureCode?: string;
   blocks: MessageBlock[];
   createdAt: string;
   sourceCitations?: SourceCitation[];
   readingCoverage?: Array<{ sourceId: string; revisionId: string; contentHash: string; scope: string; completeWithinScope: boolean }>;
+  creditUsage?: { units: number; pending: boolean };
+  lessonEnded?: boolean;
+  lessonRating?: number;
+}
+
+export function rateLesson(slug: string, messageId: string, stars: number) {
+  return http.post<void>(`/api/projects/${encodeURIComponent(slug)}/conversation/lesson-rating`, { messageId, stars });
 }
 
 export interface SourceCitation {
@@ -144,8 +152,8 @@ export type TeacherStreamFrame = (
   | { type: 'search-started'; data: { query: string } }
   | { type: 'search-completed'; data: { query: string; count: number } }
   | { type: 'search-failed'; data: { query: string; code: string } }
-  | { type: 'message-completed'; data: { messageId: string; latestSeq: number } }
-  | { type: 'message-failed'; data: { messageId?: string; code: string; partialPreserved: boolean } }
+  | { type: 'message-completed'; data: { messageId: string; latestSeq: number; creditUsage?: ConversationMessage['creditUsage'] } }
+  | { type: 'message-failed'; data: { messageId?: string; code: string; partialPreserved: boolean; creditUsage?: ConversationMessage['creditUsage'] } }
   | { type: string; data: Record<string, unknown> }) & { responseId?: string; frameSeq?: number };
 
 export const learningWorkspaceKeys = {

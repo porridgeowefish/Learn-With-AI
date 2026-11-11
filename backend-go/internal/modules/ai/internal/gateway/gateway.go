@@ -18,6 +18,8 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
+	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
+	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
 // Message is one provider-facing conversation turn. ToolCalls is set on
@@ -55,27 +57,35 @@ type ToolCall struct {
 }
 
 type Event struct {
-	Type          string
-	Delta         string
-	ToolCall      *ToolCall
-	Usage         map[string]int
-	ThinkingBlock json.RawMessage
+	Type             string
+	Delta            string
+	ToolCall         *ToolCall
+	Usage            map[string]int
+	ThinkingBlock    json.RawMessage
+	CreditSettlement *llmcloud.CreditSettlement `json:"creditSettlement,omitempty"`
 }
 
+type CreditSettlement = llmcloud.CreditSettlement
+
 type Request struct {
-	ReasoningEffort string
-	ShowReasoning   *bool
-	WebSearch       bool
-	System          string
-	Messages        []Message
-	Tools           []Tool
-	ProviderID      string
-	BindingName     string
-	Model           string
+	Prompt           *promptpack.Reference
+	PromptExposureID string
+	ReasoningEffort  string
+	ShowReasoning    *bool
+	WebSearch        bool
+	System           string
+	// TurnInstructions are trusted, per-turn directives sent after fixed system rules.
+	TurnInstructions string
+	Messages         []Message
+	Tools            []Tool
+	ProviderID       string
+	BindingName      string
+	Model            string
 	// MaxOutputTokens is a legacy budget annotation, not a provider override.
 	// The user-selected platform ModelOutputTokens owns the wire ceiling.
-	MaxOutputTokens   int
-	MaxThinkingTokens int
+	MaxOutputTokens     int
+	MaxThinkingTokens   int
+	upstreamOutputLimit int
 }
 
 type Gateway interface {
@@ -96,6 +106,12 @@ func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) erro
 	p := cfg.Resolve(binding)
 	if strings.TrimSpace(in.ProviderID) != "" {
 		p = cfg.FindExact(strings.TrimSpace(in.ProviderID))
+	}
+	if p != nil && p.Kind == askaiconfig.ManagedKind {
+		return streamManaged(ctx, *p, in, emit)
+	}
+	if p == nil && askaiconfig.IsManagedProvider(in.ProviderID) {
+		return llmcloud.ErrLoginRequired
 	}
 	if p != nil && in.Model != "" {
 		p.Model = in.Model

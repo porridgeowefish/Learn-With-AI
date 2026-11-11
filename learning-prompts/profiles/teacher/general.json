@@ -10,24 +10,6 @@
       "resource": "teaching/interactive"
     },
     {
-      "contextBinding": "course_framework"
-    },
-    {
-      "contextBinding": "prior_knowledge"
-    },
-    {
-      "contextBinding": "preferences"
-    },
-    {
-      "contextBinding": "scope"
-    },
-    {
-      "contextBinding": "instructions"
-    },
-    {
-      "contextBinding": "guideline"
-    },
-    {
       "resource": "teaching/response-length/short",
       "when": {
         "equals": "short",
@@ -66,7 +48,28 @@
       "resource": "tools/visual/instructions"
     },
     {
+      "resource": "teaching/context/preference-policy"
+    },
+    {
       "history": true
+    },
+    {
+      "contextBinding": "course_framework"
+    },
+    {
+      "contextBinding": "prior_knowledge"
+    },
+    {
+      "contextBinding": "scope"
+    },
+    {
+      "contextBinding": "guideline"
+    },
+    {
+      "contextBinding": "preferences"
+    },
+    {
+      "contextBinding": "instructions"
     }
   ],
   "tools": [
@@ -84,7 +87,7 @@
       "role": "context",
       "required": true,
       "sourceID": "instructions",
-      "template": "teaching/context/context"
+      "template": "teaching/context/conversation-instructions"
     },
     "guideline": {
       "role": "context",

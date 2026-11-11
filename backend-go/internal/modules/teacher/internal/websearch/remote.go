@@ -128,7 +128,7 @@ func (s remoteSearch) plan(ctx context.Context, query string) ([]Result, error) 
 	rpc := func(id int, method string, params any) map[string]any {
 		return map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}
 	}
-	raw, session, err := s.post(ctx, endpoint, rpc(1, "initialize", map[string]any{"protocolVersion": "2024-11-05", "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "LLL", "version": "1.0"}}), "")
+	raw, session, err := s.post(ctx, endpoint, rpc(1, "initialize", map[string]any{"protocolVersion": "2024-11-05", "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "Learn-With-AI", "version": "1.0"}}), "")
 	if err != nil {
 		return nil, err
 	}

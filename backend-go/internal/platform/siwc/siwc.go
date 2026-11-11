@@ -218,14 +218,14 @@ func Start() (string, error) {
 		if a.clientID == "" {
 			if err := retainIssuedClientID(a, issued); err != nil {
 				finish(a, err.Error())
-				http.Error(w, "Sign-in failed. Return to LLL and retry.", 400)
+				http.Error(w, "Sign-in failed. Return to Learn-With-AI and retry.", 400)
 				go srv.Close()
 				return
 			}
 		}
 		if err := complete(req.Context(), a, issued, code); err != nil {
 			finish(a, err.Error())
-			http.Error(w, "Sign-in failed. Return to LLL and retry.", 400)
+			http.Error(w, "Sign-in failed. Return to Learn-With-AI and retry.", 400)
 		} else {
 			finish(a, "")
 			fmt.Fprint(w, "ChatGPT is connected to Learn-With-AI. You may close this tab.")

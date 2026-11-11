@@ -23,6 +23,7 @@ const API_SOURCES = [
 ] as const;
 const SIMPLE_PRESET_IDS = API_SOURCES.map(source => source.id);
 interface Editor { token: number; provider: AskProvider; original: string; isNew: boolean; presetId: string }
+
 function ModelSelect({ value, models, label, disabled, onChange }: { value: string; models: string[]; label: string; disabled?: boolean; onChange: (model: string) => void }) {
   const [custom, setCustom] = useState(false);
   const ids = [...new Set([...models, ...(value ? [value] : [])])];
@@ -49,7 +50,7 @@ export function ModelsPage() {
   const [discovered, setDiscovered] = useState<string[]>([]);
   const [catalogBusy, setCatalogBusy] = useState(false);
   const [catalogMessage, setCatalogMessage] = useState('');
-  const [mode, setMode] = useState<'login' | 'api'>('login');
+  const [mode, setMode] = useState<'login' | 'api'>('api');
   editorRef.current = editor;
   useEffect(() => { if (settings.data && !dirtyRef.current) setDraft(copyConfig(settings.data)); }, [settings.data]);
   const editConfig = (change: (current: AskConfig) => AskConfig) => {
@@ -123,15 +124,18 @@ export function ModelsPage() {
   const preset = editor ? PROVIDER_PRESETS.find(p => p.id === editor.presetId) : undefined;
   const modelIds = [...new Set([...(preset?.models.map(m => m.id) ?? []), ...discovered, ...(editor?.provider.model ? [editor.provider.model] : [])])];
   const options = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
-  return <section className={s.section} aria-labelledby="api-connections-title">
-    <header className={s.header} data-tour="model-connections"><div><h2 id="api-connections-title">AI 连接</h2><p className={s.intro}>选择服务商，粘贴 API Key，再检测连接。</p></div><div className={s.actions}>
+  return <section className={`${s.section}${` ${s.flat}`}`} aria-labelledby="api-connections-title">
+    <header className={s.header} data-tour="model-connections"><div><h2 id="api-connections-title">{'自配模型连接'}</h2><p className={s.intro}>{'使用自己的 API Key，或连接现有的 ChatGPT 账号。'}</p></div><div className={s.actions}>
       <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>
-    <div className={s.actions} role="group" aria-label="连接方式"><Button size="sm" variant={mode === 'login' ? 'primary' : 'outline'} onClick={() => setMode('login')}>登录连接</Button><Button size="sm" variant={mode === 'api' ? 'primary' : 'outline'} onClick={() => setMode('api')}>API 连接</Button></div>
+    {<div className={s.connectionTabs} role="group" aria-label="连接方式">
+      <Button variant="ghost" size="sm" aria-pressed={mode === 'api'} onClick={() => setMode('api')}>自配 API</Button>
+      <Button variant="ghost" size="sm" aria-pressed={mode === 'login'} onClick={() => setMode('login')}>ChatGPT 登录</Button>
+    </div>}
     {mode === 'login' && <SIWCConnection config={draft} save={next => persist(next)} />}
     <div className={s.bindings}><label>当前学习模型<select value={draft.bindings?.teacher?.providerId || draft.default} onChange={event => setBinding('teacher', event.target.value)}><option value="">选择连接</option>{options}</select></label><p className={s.saveStatus}>教师、Ask AI、复习稿与练习默认使用此连接。</p></div>
     <div className={s.apiMode} hidden={mode !== 'api'}>
-    <div className={s.apiSetup}><div><h3>配置 API</h3><p>选择服务商、模型并填写 Key。地址和协议会自动配置；第一个连接会自动用于学习。</p></div><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button></div>
+    <div className={s.apiSetup}><div><h3>{'已保存的 API 连接'}</h3><p>{'选择服务商后填写 API Key，即可检测并保存连接。'}</p></div><Button size="sm" variant={'primary'} disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button></div>
     {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
     {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">

@@ -18,7 +18,7 @@ if ! printf '%s\n' "$url" | LC_ALL=C grep -Eq '^http://127\.0\.0\.1:[0-9]{1,5}/?
   echo 'Expected a local Learn-With-AI server URL.' >&2; exit 1
 fi
 reply=$(curl -q --noproxy '*' --silent --show-error --write-out '\n%{http_code}' \
-  -H 'X-LLL-Workspace: 1' -H 'Content-Type: application/zip' \
+  -H 'X-LWA-Workspace: 1' -H 'Content-Type: application/zip' \
   --data-binary @- "${url%/}/api/workspace/import" < "$archive")
 code=$(printf '%s\n' "$reply" | tail -n 1)
 case "$code" in

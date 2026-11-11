@@ -17,6 +17,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/app/bootstrap"
 	"github.com/xmz14/lll/backend-go/internal/app/workspaceservice"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
+	"github.com/xmz14/lll/backend-go/internal/platform/envname"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"github.com/xmz14/lll/backend-go/internal/transport/httpserver"
 )
@@ -134,7 +135,7 @@ func DefaultWorkspace() string {
 	if paths.BuildMode != "release" {
 		return paths.DefaultWorkspaceRoot(paths.PROJECT_ROOT)
 	}
-	if root := os.Getenv("LLL_WORKSPACE_ROOT"); root != "" {
+	if root := envname.Value("LWA_WORKSPACE_ROOT"); root != "" {
 		return root
 	}
 	home, _ := os.UserHomeDir()

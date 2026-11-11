@@ -191,19 +191,6 @@ func (s *Service) process(slug string) error {
 		mu.Unlock()
 		return e
 	}
-	if job.Prompt == "" {
-		var composed ai.ComposedPrompt
-		composed, e = ai.ComposePrompt(s.ctx, "auxiliary/section-summary", nil, nil)
-		job.Prompt = composed.Text
-		job.PromptHash = hash(job.Prompt)
-	}
-	if e != nil {
-		job.Status = "failed"
-		job.Error = e.Error()
-		_ = save(slug, st)
-		mu.Unlock()
-		return e
-	}
 	job.Status = "running"
 	frozen := *job
 	e = save(slug, st)
@@ -224,25 +211,15 @@ func (s *Service) process(slug string) error {
 	data, e := json.Marshal(frozen.Input)
 	var output strings.Builder
 	reported := map[string]int{}
-	provider, model := "", ""
-	cfg, configErr := ai.LoadConfig()
-	if configErr != nil {
-		e = configErr
-	}
-	if cfg != nil {
-		binding := "teacher"
-		if _, ok := cfg.Bindings["notes"]; ok {
-			binding = "notes"
-		}
-		if _, ok := cfg.Bindings["section-summary"]; ok {
-			binding = "section-summary"
-		}
-		if p := cfg.Resolve(binding); p != nil {
-			provider, model = p.ID, p.Model
-		}
+	if e == nil {
+		e = prepareSummary(ctx, slug, &frozen)
 	}
 	if e == nil {
-		e = s.Gateway.Stream(ctx, ai.GatewayRequest{BindingName: "section-summary", ProviderID: provider, Model: model, System: frozen.Prompt, Messages: []ai.GatewayMessage{{Role: "user", Content: string(data)}}}, func(ev ai.GatewayEvent) {
+		e = s.Gateway.Stream(ctx, ai.GatewayRequest{
+			BindingName: "section-summary", ProviderID: frozen.ProviderID, Model: frozen.Model, System: frozen.Prompt,
+			Prompt: frozen.PromptReference, PromptExposureID: frozen.ID,
+			Messages: []ai.GatewayMessage{{Role: "user", Content: string(data)}},
+		}, func(ev ai.GatewayEvent) {
 			if ev.Type == "text-delta" {
 				if output.Len()+len(ev.Delta) > 64<<10 {
 					cancel()
@@ -304,7 +281,7 @@ func (s *Service) process(slug string) error {
 	}
 	if c, err := conversation.New(slug); err == nil {
 		if meta, err := c.Meta(); err == nil {
-			err = usage.AppendNote(slug, usage.Record{ConversationID: meta.ID, UnitID: meta.UnitID, ResponseID: frozen.ID, ProviderID: provider, InputTokens: reported["inputTokens"], OutputTokens: reported["outputTokens"], UsageReported: len(reported) > 0})
+			err = usage.AppendNote(slug, usage.Record{ConversationID: meta.ID, UnitID: meta.UnitID, ResponseID: frozen.ID, ProviderID: frozen.ProviderID, InputTokens: reported["inputTokens"], OutputTokens: reported["outputTokens"], UsageReported: len(reported) > 0})
 			if err != nil {
 				s.report(slug, err)
 			}
@@ -312,6 +289,86 @@ func (s *Service) process(slug string) error {
 	}
 	s.Notify(slug)
 	return e
+}
+
+func prepareSummary(ctx context.Context, slug string, job *Summary) error {
+	cfg, err := ai.LoadConfig()
+	if err != nil {
+		return err
+	}
+	requested := job.ProviderID
+	if requested == "" {
+		requested = job.SourceProviderID
+	}
+	managedSource := ai.IsManagedProvider(requested)
+	allManaged := false
+	if managedSource {
+		c, err := conversation.New(slug)
+		if err != nil {
+			return err
+		}
+		ids := make([]string, 0, len(job.Input))
+		for _, message := range job.Input {
+			ids = append(ids, message.ID)
+		}
+		allManaged, err = c.MessagesUseProviderThrough(ids, job.ThroughSeq, ai.IsManagedProvider)
+		if err != nil {
+			return err
+		}
+	}
+	provider := summaryProvider(cfg, job.ProviderID, requested, allManaged)
+	if provider == nil {
+		return errors.New("section summary provider is unavailable")
+	}
+	if job.ProviderID == "" {
+		job.ProviderID, job.Model = provider.ID, provider.Model
+	}
+	if job.Prompt == "" {
+		const scene = "auxiliary/section-summary"
+		promptCtx := ai.ManagedPromptContext(ctx, job.ProviderID, scene)
+		composed, err := ai.ComposePrompt(promptCtx, scene, nil, nil)
+		if err != nil {
+			return err
+		}
+		if len(composed.Tools) != 0 {
+			return errors.New("summary generation cannot enable tools")
+		}
+		job.Prompt, job.PromptHash = composed.Text, hash(composed.Text)
+		job.PromptReference = ai.ManagedPromptReference(promptCtx)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return update(slug, job.ID, func(current *Summary) error {
+		if current.Status != "running" || !valid(slug, *current) {
+			return errors.New("summary source changed before inference")
+		}
+		current.ProviderID, current.Model = job.ProviderID, job.Model
+		current.Prompt, current.PromptHash = job.Prompt, job.PromptHash
+		current.PromptReference = job.PromptReference
+		return nil
+	})
+}
+
+func summaryProvider(cfg *ai.Config, frozen, requested string, allManaged bool) *ai.ProviderConfig {
+	if cfg == nil {
+		return nil
+	}
+	if frozen != "" {
+		if ai.IsManagedProvider(frozen) && !allManaged {
+			return nil
+		}
+		return cfg.FindExact(frozen)
+	}
+	for _, name := range []string{"section-summary", "notes"} {
+		if binding := cfg.Bindings[name]; binding.ProviderID != "" {
+			return cfg.ResolveDirect(name)
+		}
+	}
+	if requested != "" && (!ai.IsManagedProvider(requested) || allManaged) {
+		return cfg.FindExact(requested)
+	}
+	return cfg.ResolveDirect("teacher")
 }
 
 type summaryOutput struct {
@@ -351,21 +408,14 @@ func parseSummary(raw string) (summaryOutput, error) {
 
 // EnqueueConfirmed executes the registered tool against a trusted bound scope.
 // Model arguments cannot choose a project, message, or summary range.
-func (s *Service) EnqueueConfirmed(ctx context.Context, slug, learnerID, ackID string, seq uint64) (Summary, error) {
-	summaryPrompt, e := ai.ComposePrompt(ctx, "auxiliary/section-summary", nil, nil)
-	if e != nil {
-		return Summary{}, e
-	}
-	if len(summaryPrompt.Tools) != 0 {
-		return Summary{}, errors.New("summary generation cannot enable tools")
-	}
+func (s *Service) EnqueueConfirmed(ctx context.Context, slug, learnerID, ackID string, seq uint64, sourceProviderID ...string) (Summary, error) {
 	description, e := ai.RenderPrompt("tools/summarize-taught-concepts", nil)
 	if e != nil {
 		return Summary{}, e
 	}
 	var registry ai.ToolRegistry
 	e = registry.Register(ai.ToolSpec{Definition: ai.Tool{Name: "summarize_taught_concepts", Description: description, Schema: map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{}}}, Handle: func(ctx context.Context, _ map[string]any) (any, error) {
-		v, e := Confirm(slug, learnerID, ackID, seq, summaryPrompt.Text)
+		v, e := Confirm(slug, learnerID, ackID, seq, sourceProviderID...)
 		if e == nil {
 			s.Notify(slug)
 		}
