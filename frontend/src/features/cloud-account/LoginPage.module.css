@@ -19,7 +19,7 @@
   background: var(--card);
   box-shadow: var(--shadow-lg);
 }
-.header { display: grid; justify-items: center; gap: 12px; padding-bottom: 5px; }
+.header { display: grid; justify-items: start; gap: 12px; padding-bottom: 5px; }
 .header h1 { margin: 0; font-size: 1.9rem; line-height: 1.2; }
 .brand { display: inline-flex; align-items: center; gap: 8px; color: var(--accent-ink); font-size: .94rem; font-weight: 700; }
 .brand img { display: block; width: 27px; height: 27px; }
@@ -38,10 +38,10 @@
   font-weight: 400;
 }
 .form input:focus-visible, .card button:focus-visible, .back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.form .submit, .form .codeButton, .providers .provider { min-height: var(--control-height); justify-content: center; font-size: .92rem; }
+.form .submit, .form .codeButton { min-height: var(--control-height); font-size: .92rem; }
 .form .submit {
-  justify-self: center;
-  min-width: 128px;
+  justify-content: flex-start;
+  padding-inline: 12px;
   margin-top: 6px;
   border-color: var(--accent);
   background: var(--surface-tint);
@@ -49,13 +49,22 @@
   font-weight: 700;
 }
 .form .submit:hover:not(:disabled) { background: var(--accent-medium); }
-.registration { display: flex; justify-content: center; align-items: baseline; gap: 4px; color: var(--muted); font-size: .9rem; }
+.registration { display: flex; align-items: baseline; gap: 4px; color: var(--muted); font-size: .9rem; }
 .textLink { background: transparent; border: 0; padding: 2px; color: var(--accent-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .recoveryLink { justify-self: end; font-size: .9rem; }
-.hint { margin: 0; color: var(--muted); font-size: .9rem; text-align: center; }
+.hint { margin: 0; color: var(--muted); font-size: .9rem; }
 .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .82rem; }
 .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
-.providers { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 10px; }
-.providers svg { width: 16px; height: 16px; }
+.providers { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
+.providers .provider {
+  min-height: var(--control-height);
+  justify-content: center;
+  padding-inline: 0;
+}
+.provider img, .provider svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
 .code { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .notice { margin: 0; color: var(--accent-ink); font-size: .88rem; text-align: center; }

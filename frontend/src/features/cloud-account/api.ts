@@ -32,6 +32,7 @@ const errors: Record<string, string> = {
   github_flow_expired: '本次 GitHub 授权已过期，请重新发起。',
   google_flow_expired: '本次 Google 授权已过期，请重新发起。',
   google_authorization_failed: 'Google 授权未完成。',
+  google_unavailable: 'Google 登录暂时不可用，请稍后重试。',
   google_verified_email_required: '请使用已验证的 Gmail 或 Google Workspace 邮箱，或使用邮箱验证码。',
   google_local_callback_unavailable: '当前无法接收 Google 登录回调。请从桌面应用发起登录。',
   login_required: '请先登录。',
@@ -57,7 +58,6 @@ export const readCloudStatus = () => read<CloudStatus>('/api/cloud/account');
 export const readCloudModels = () => read<{ models: Model[] }>('/api/cloud/models');
 export const readCloudGuestModels = () => read<{ models: Model[] }>('/api/cloud/models/guest');
 export const readCloudDailyHistory = () => read<DailyHistory>('/api/cloud/daily-history');
-export const readGoogleAvailability = () => read<{ available: boolean }>('/api/cloud/google-config');
 export const cloudAction = <T>(name: string, body: object = {}) => read<T>(`/api/cloud/${name}`, body);
 
 const authorizationEndpoints = {

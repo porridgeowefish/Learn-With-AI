@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { GitHubLogoIcon, EnvelopeClosedIcon, ArrowLeftIcon } from '@radix-ui/react-icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/primitive/Button';
-import { cloudAction, GitHubEmailConfirmation, githubLogin, googleLogin, readGoogleAvailability, type Account, type CloudStatus } from './api';
+import { cloudAction, GitHubEmailConfirmation, githubLogin, googleLogin, type Account, type CloudStatus } from './api';
+import googleLogo from './google-g.png';
 import s from './LoginPage.module.css';
 
 export function LoginPage() {
@@ -18,7 +19,6 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const google = useQuery({ queryKey: ['cloud-google-availability'], queryFn: readGoogleAvailability, retry: false, staleTime: 60_000 });
   const register = mode === 'register';
   const reset = mode === 'reset';
   const usesEmail = mode === 'email' || reset;
@@ -96,6 +96,7 @@ export function LoginPage() {
   function oauth(provider: 'github' | 'google') {
     const waiting = () => setMessage('请在浏览器完成授权。');
     void perform(async () => {
+      if (provider === 'google') setMessage('正在打开 Google 授权…');
       try { accept(await (provider === 'github' ? githubLogin(false, waiting) : googleLogin(waiting))); }
       catch (error) {
         if (!(error instanceof GitHubEmailConfirmation)) throw error;
@@ -111,7 +112,7 @@ export function LoginPage() {
       <section className={s.card}>
         <header className={s.header}>
           <div className={s.brand}><img src="/app-icon.png" alt="" /> Learn-With-AI</div>
-          <h1>{register ? '注册' : reset ? '找回密码' : confirmsGitHub ? '验证邮箱' : usesEmail ? '邮箱登录' : '登录'}</h1>
+          <h1>{register ? '注册' : reset ? '找回密码' : confirmsGitHub ? '验证邮箱' : usesEmail ? '邮箱验证码登录' : '登录'}</h1>
           {reset && <p className={s.hint}>请输入已绑定到账号的邮箱。</p>}
           {confirmsGitHub && <p className={s.hint}>该邮箱已有 Learn-With-AI 账号。验证后可继续使用原账号和积分。</p>}
         </header>
@@ -120,8 +121,6 @@ export function LoginPage() {
             <label>账号<input name="username" autoComplete="username" required /></label>
             <label>密码<input type="password" name="password" autoComplete={register ? 'new-password' : 'current-password'} minLength={register ? 6 : undefined} required /></label>
           </>}
-          {mode === 'password' && <button type="button" className={`${s.textLink} ${s.recoveryLink}`} disabled={busy}
-            onClick={() => showMode('reset')}>忘记密码？</button>}
           {usesEmail && <label>邮箱<input type="email" name="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="QQ 邮箱或 Gmail" /></label>}
           {(usesEmail || confirmsGitHub) &&
             <div className={s.code}>
@@ -132,6 +131,8 @@ export function LoginPage() {
           {reset && <label>新密码<input type="password" name="password" autoComplete="new-password" minLength={6} required /></label>}
           {(register || reset) && <label>确认密码<input type="password" name="confirmPassword" autoComplete="new-password" required /></label>}
           <Button type="submit" className={s.submit} variant="outline" loading={busy}>{register ? '注册并登录' : reset ? '重设密码并登录' : '登录'}</Button>
+          {mode === 'password' && <button type="button" className={`${s.textLink} ${s.recoveryLink}`} disabled={busy}
+            onClick={() => showMode('reset')}>忘记密码？</button>}
         </form>
         <div className={s.registration}>
           {mode === 'password' && <span>没有账号？</span>}
@@ -140,13 +141,20 @@ export function LoginPage() {
           </button>
         </div>
         {mode === 'password' && <>
-          <div className={s.divider}><span>其他登录方式</span></div>
-          <div className={s.providers}>
-            <Button type="button" className={s.provider} iconLeft={<EnvelopeClosedIcon />} aria-label="邮箱验证码登录" disabled={busy}
-              onClick={() => showMode('email')}>邮箱</Button>
-            {google.data?.available && <Button type="button" className={s.provider} aria-label="Google 授权登录" disabled={busy}
-              onClick={() => oauth('google')}>Google</Button>}
-            <Button type="button" className={s.provider} iconLeft={<GitHubLogoIcon />} aria-label="GitHub 授权登录" disabled={busy} onClick={() => oauth('github')}>GitHub</Button>
+          <div className={s.divider}><span id="other-login-methods">其他登录方式</span></div>
+          <div className={s.providers} role="group" aria-labelledby="other-login-methods">
+            <Button type="button" className={s.provider} title="Google 授权登录"
+              aria-label="Google 授权登录" disabled={busy} onClick={() => oauth('google')}>
+              <img src={googleLogo} alt="" />
+            </Button>
+            <Button type="button" className={s.provider} title="GitHub 授权登录"
+              aria-label="GitHub 授权登录" disabled={busy} onClick={() => oauth('github')}>
+              <GitHubLogoIcon aria-hidden="true" />
+            </Button>
+            <Button type="button" className={s.provider} title="邮箱验证码登录"
+              aria-label="邮箱验证码登录" disabled={busy} onClick={() => showMode('email')}>
+              <EnvelopeClosedIcon aria-hidden="true" />
+            </Button>
           </div>
         </>}
         {message && <p className={s.notice} role="status">{message}</p>}

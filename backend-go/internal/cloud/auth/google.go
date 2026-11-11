@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
@@ -22,23 +23,63 @@ var (
 	ErrGoogleEmail = errors.New("google did not verify an authoritative email")
 )
 
+const googleUserInfoURL = "https://openidconnect.googleapis.com/v1/userinfo"
+
 type Google struct {
 	id, secret string
 	db         *store.Store
 	client     *http.Client
+	proxied    bool
+	readyMu    sync.Mutex
+	readyUntil time.Time
+	ready      bool
 }
 
-func NewGoogle(db *store.Store, id, secret string) (*Google, error) {
+func NewGoogle(db *store.Store, id, secret, proxyURL string) (*Google, error) {
 	if db == nil || !strings.HasSuffix(id, ".apps.googleusercontent.com") || secret == "" {
 		return nil, errors.New("invalid Google desktop OAuth configuration")
 	}
-	return &Google{id: id, secret: secret, db: db, client: &http.Client{
+	client := &http.Client{
 		Timeout:       15 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
-	}}, nil
+	}
+	if proxyURL != "" {
+		transport, err := oauthLoopbackProxyTransport(proxyURL)
+		if err != nil {
+			return nil, err
+		}
+		client.Transport = transport
+	}
+	return &Google{id: id, secret: secret, db: db, client: client, proxied: proxyURL != ""}, nil
 }
 
 func (g *Google) ClientID() string { return g.id }
+
+// Available hides the optional login while its configured proxy cannot reach Google.
+func (g *Google) Available(ctx context.Context) bool {
+	if !g.proxied {
+		return true
+	}
+	g.readyMu.Lock()
+	defer g.readyMu.Unlock()
+	if time.Now().Before(g.readyUntil) {
+		return g.ready
+	}
+	probe, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(probe, http.MethodGet, googleUserInfoURL, nil)
+	if err != nil {
+		return false
+	}
+	response, err := g.client.Do(request)
+	g.ready = false
+	if err == nil {
+		response.Body.Close()
+		g.ready = response.StatusCode == http.StatusUnauthorized
+	}
+	g.readyUntil = time.Now().Add(15 * time.Second)
+	return g.ready
+}
 
 func validGoogleRedirect(value string) bool {
 	u, err := url.Parse(value)
@@ -71,7 +112,7 @@ func (g *Google) Finish(ctx context.Context, code, verifier, redirect string) (S
 	if err := g.decode(req, &token); err != nil || token.Access == "" {
 		return Session{}, ErrGoogle
 	}
-	req, err = http.NewRequestWithContext(ctx, http.MethodGet, "https://openidconnect.googleapis.com/v1/userinfo", nil)
+	req, err = http.NewRequestWithContext(ctx, http.MethodGet, googleUserInfoURL, nil)
 	if err != nil {
 		return Session{}, err
 	}

@@ -8,7 +8,12 @@ import (
 )
 
 func (s *Server) EnableGoogle(g *auth.Google) {
-	s.mux.HandleFunc("GET /v1/auth/google/config", func(w http.ResponseWriter, _ *http.Request) {
+	s.mux.HandleFunc("GET /v1/auth/google/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if !g.Available(r.Context()) {
+			fail(w, http.StatusServiceUnavailable, "google_unavailable")
+			return
+		}
 		respond(w, http.StatusOK, map[string]string{"clientId": g.ClientID()})
 	})
 	s.mux.HandleFunc("POST /v1/auth/google/finish", func(w http.ResponseWriter, r *http.Request) {

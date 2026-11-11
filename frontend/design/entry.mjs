@@ -33,7 +33,11 @@ async function start() {
   // The product requests a native absolute path. A browser preview only needs a display name.
   const originalFetch = window.fetch.bind(window);
   window.lllOpenExternal = async url => {
-    if (url !== 'https://auth.openai.com/design-preview' && url !== 'https://github.com/login/oauth/authorize?client_id=lll-design-preview') throw new Error('设计预览不会打开外部授权页面');
+    if (![
+      'https://auth.openai.com/design-preview',
+      'https://github.com/login/oauth/authorize?client_id=lll-design-preview',
+      'https://accounts.google.com/o/oauth2/v2/auth?client_id=preview.apps.googleusercontent.com',
+    ].includes(url)) throw new Error('设计预览不会打开外部授权页面');
   };
   window.fetch = async (input, init) => {
     if (typeof input === 'string' && input === '/api/workspace/directories' && init?.body && JSON.parse(init.body).pick) {

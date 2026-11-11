@@ -74,6 +74,9 @@ export async function cloud({path, request, method, state, json}) {
       return json({flowId: input.link ? 'preview-link' : new URL(request.referrer || 'http://preview.invalid').searchParams.has('github-email')
         ? 'preview-email' : 'preview', authorizationUrl:'https://github.com/login/oauth/authorize?client_id=lll-design-preview'});
     case 'google-start':
+      if (new URL(request.referrer || 'http://preview.invalid').searchParams.has('google-unavailable')) {
+        return json({error:'google_unavailable'}, 503);
+      }
       return json({flowId:'preview-google', authorizationUrl:'https://accounts.google.com/o/oauth2/v2/auth?client_id=preview.apps.googleusercontent.com'});
     case 'google-finish':
       return signIn('google-learner@example.com');

@@ -33,8 +33,8 @@ type config struct {
 	UpstreamHosts     []string
 	TrustedProxyCIDRs []string
 	Operators         map[string]struct{ Role, TOTPEnv string }
-	GitHub            struct{ ClientID, SecretEnv, Callback string }
-	Google            struct{ ClientID, SecretEnv string }
+	GitHub            struct{ ClientID, SecretEnv, Callback, TokenProxyURL string }
+	Google            struct{ ClientID, SecretEnv, ProxyURL string }
 	Prompts           struct {
 		Root, Version, KeyEnv string
 		Experiments           []promptcatalog.Experiment
@@ -175,15 +175,20 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	if err := handler.TrustProxies(cfg.TrustedProxyCIDRs); err != nil {
 		return err
 	}
-	if cfg.GitHub.ClientID != "" || cfg.GitHub.SecretEnv != "" || cfg.GitHub.Callback != "" {
+	if cfg.GitHub.ClientID != "" || cfg.GitHub.SecretEnv != "" || cfg.GitHub.Callback != "" || cfg.GitHub.TokenProxyURL != "" {
 		github, err := auth.NewGitHub(db, cfg.GitHub.ClientID, envname.Value(cfg.GitHub.SecretEnv), cfg.GitHub.Callback)
 		if err != nil {
 			return err
 		}
+		if cfg.GitHub.TokenProxyURL != "" {
+			if err := github.SetTokenProxy(cfg.GitHub.TokenProxyURL); err != nil {
+				return err
+			}
+		}
 		handler.EnableGitHub(github)
 	}
-	if cfg.Google.ClientID != "" || cfg.Google.SecretEnv != "" {
-		google, err := auth.NewGoogle(db, cfg.Google.ClientID, envname.Value(cfg.Google.SecretEnv))
+	if cfg.Google.ClientID != "" || cfg.Google.SecretEnv != "" || cfg.Google.ProxyURL != "" {
+		google, err := auth.NewGoogle(db, cfg.Google.ClientID, envname.Value(cfg.Google.SecretEnv), cfg.Google.ProxyURL)
 		if err != nil {
 			return err
 		}
