@@ -24,9 +24,19 @@ export async function cloud({path, request, method, state, json}) {
     return json(demo.account);
   };
   switch (path.slice('/api/cloud/'.length)) {
-    case 'send-code': return json({exampleCode:'123456'});
+    case 'send-code':
+      if (input.purpose === 'reset') demo.resetEmail = input.email;
+      return json({exampleCode:'123456'});
     case 'verify-email':
       if (input.code !== '123456') return json({error:'invalid_credentials'}, 401);
+      if (input.purpose === 'reset') {
+        const account = demo.account ?? {email:'learner@example.com', name:'learner'};
+        if (!account.name || input.email !== demo.resetEmail || account.email !== input.email || input.password?.length < 6 || !input.password) {
+          return json({error:'invalid_credentials'}, 401);
+        }
+        delete demo.resetEmail;
+        return signIn(account.email, account.name, account.githubLinked);
+      }
       return demo.account?.email === input.email
         ? signIn(input.email, demo.account.name, demo.account.githubLinked)
         : signIn(input.email, input.username);
