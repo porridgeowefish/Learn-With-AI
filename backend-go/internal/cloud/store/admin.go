@@ -84,6 +84,8 @@ CREATE TABLE admin_adjustment (
 PRAGMA user_version = 5;
 `
 
+// PutAdminSession records the one-time factor counter when the operator uses a factor.
+// A zero counter means the operator authenticated with the base session alone.
 func (s *Store) PutAdminSession(ctx context.Context, account string, counter int64, baseDigest, digest []byte, now, expires time.Time) error {
 	return s.transaction(ctx, func(tx *sql.Tx) error {
 		user, err := sessionAccount(ctx, tx, baseDigest, now)
@@ -93,17 +95,19 @@ func (s *Store) PutAdminSession(ctx context.Context, account string, counter int
 		if user.ID != account {
 			return ErrNotFound
 		}
-		result, err := tx.ExecContext(ctx, `INSERT INTO admin_factor VALUES(?,?)
-			ON CONFLICT(account_id) DO UPDATE SET last_counter=excluded.last_counter WHERE excluded.last_counter > admin_factor.last_counter`, account, counter)
-		if err != nil {
-			return err
-		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n != 1 {
-			return ErrCode
+		if counter != 0 {
+			result, err := tx.ExecContext(ctx, `INSERT INTO admin_factor VALUES(?,?)
+				ON CONFLICT(account_id) DO UPDATE SET last_counter=excluded.last_counter WHERE excluded.last_counter > admin_factor.last_counter`, account, counter)
+			if err != nil {
+				return err
+			}
+			n, err := result.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if n != 1 {
+				return ErrCode
+			}
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM admin_session WHERE expires_at <= ?", now.Unix()); err != nil {
 			return err

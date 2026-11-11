@@ -34,6 +34,7 @@ type config struct {
 	TrustedProxyCIDRs []string
 	Operators         map[string]struct{ Role, TOTPEnv string }
 	GitHub            struct{ ClientID, SecretEnv, Callback string }
+	Google            struct{ ClientID, SecretEnv string }
 	Prompts           struct {
 		Root, Version, KeyEnv string
 		Experiments           []promptcatalog.Experiment
@@ -181,6 +182,13 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 		}
 		handler.EnableGitHub(github)
 	}
+	if cfg.Google.ClientID != "" || cfg.Google.SecretEnv != "" {
+		google, err := auth.NewGoogle(db, cfg.Google.ClientID, envname.Value(cfg.Google.SecretEnv))
+		if err != nil {
+			return err
+		}
+		handler.EnableGoogle(google)
+	}
 	var promptKey ed25519.PrivateKey
 	if cfg.Prompts.Root != "" {
 		promptKey, err = promptSigningKey(cfg)
@@ -219,11 +227,15 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	if len(cfg.Operators) > 0 {
 		operators := make(map[string]httpapi.Operator, len(cfg.Operators))
 		for principal, operator := range cfg.Operators {
-			secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(envname.Value(operator.TOTPEnv))
-			if err != nil {
-				return errors.New("invalid operator authentication configuration")
+			entry := httpapi.Operator{Role: operator.Role}
+			if operator.TOTPEnv != "" {
+				secret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(envname.Value(operator.TOTPEnv))
+				if err != nil || len(secret) < 20 {
+					return errors.New("invalid operator authentication configuration")
+				}
+				entry.TOTPKey = secret
 			}
-			operators[principal] = httpapi.Operator{Role: operator.Role, TOTPKey: secret}
+			operators[principal] = entry
 		}
 		if err := handler.EnableAdmin(operators); err != nil {
 			return err

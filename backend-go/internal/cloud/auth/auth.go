@@ -81,12 +81,16 @@ func (s *Service) SendCode(ctx context.Context, email, purpose string) error {
 }
 
 func (s *Service) sendCode(ctx context.Context, email, purpose string) error {
+	return s.sendScopedCode(ctx, email, purpose, purpose)
+}
+
+func (s *Service) sendScopedCode(ctx context.Context, email, purpose, scope string) error {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
 		return err
 	}
 	code := fmt.Sprintf("%06d", n.Int64())
-	digest := s.codeDigest(email, purpose, code)
+	digest := s.codeDigest(email, scope, code)
 	now := s.now()
 	if err := s.store.PutCode(ctx, email, purpose, digest, now, now.Add(10*time.Minute)); err != nil {
 		return err

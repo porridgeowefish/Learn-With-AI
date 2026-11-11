@@ -20,9 +20,10 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
-// Rate is measured in thousandths of a credit per token.
+// Rate uses legacy thousandths per token unless TokensPerPoint sets the input exchange rate.
 type Rate struct {
 	Input, Cached, Write, Output int64
+	TokensPerPoint               int64 `json:",omitempty"`
 }
 
 type Model struct {
@@ -41,11 +42,22 @@ func (m Model) valid() bool {
 	r := m.Rate
 	return identifier.MatchString(m.ID) && m.Name != "" && m.MaxInput > 0 && m.MaxInput <= maxTokens &&
 		m.MaxOutput > 0 && m.MaxOutput <= maxTokens && r.Input > 0 && r.Input <= maxRate &&
-		r.Cached >= 0 && r.Cached <= maxRate && r.Write >= 0 && r.Write <= maxRate && r.Output > 0 && r.Output <= maxRate
+		r.Cached >= 0 && r.Cached <= maxRate && r.Write >= 0 && r.Write <= maxRate && r.Output > 0 && r.Output <= maxRate &&
+		r.TokensPerPoint >= 0 && r.TokensPerPoint <= maxTokens
 }
 
 func (rate Rate) charge(usage map[string]int) (int64, bool) {
-	return inference.ChargeTokens(usage, rate.Input, rate.Cached, rate.Write, rate.Output)
+	weighted, known := inference.ChargeTokens(usage, rate.Input, rate.Cached, rate.Write, rate.Output)
+	return rate.creditUnits(weighted), known
+}
+
+func (rate Rate) creditUnits(weighted int64) int64 {
+	if rate.TokensPerPoint == 0 {
+		return weighted
+	}
+	// The input weight defines the baseline. Round up to a thousandth of a point.
+	denominator := rate.Input * rate.TokensPerPoint
+	return (weighted*1000 + denominator - 1) / denominator
 }
 
 type inferenceInput struct {
@@ -98,7 +110,8 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	digest := sha256.Sum256(encoded)
-	units := int64(estimated)*max(model.Rate.Input, model.Rate.Cached, model.Rate.Write) + int64(in.MaxOutputTokens)*model.Rate.Output
+	weighted := int64(estimated)*max(model.Rate.Input, model.Rate.Cached, model.Rate.Write) + int64(in.MaxOutputTokens)*model.Rate.Output
+	units := model.Rate.creditUnits(weighted)
 	budget := store.BudgetHold{Currency: s.budget.Currency, Limit: s.budget.MonthlyNanos}
 	if budget.Limit > 0 {
 		estimator, ok := s.gateway.(interface {

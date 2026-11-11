@@ -35,6 +35,7 @@ type Server struct {
 
 	transferCancellations sync.Map
 	cloudLoginFlows       sync.Map
+	googleLoginFlows      sync.Map
 	chatMediaMu           sync.Map
 	mu                    sync.RWMutex
 }
@@ -102,6 +103,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/cloud/models", s.handleCloudModels)
 	mux.HandleFunc("GET /api/cloud/models/guest", s.handleCloudGuestModels)
 	mux.HandleFunc("POST /api/cloud/{action}", s.handleCloudAction)
+	mux.HandleFunc("GET /api/cloud/google-config", s.handleGoogleConfig)
+	mux.HandleFunc("GET /api/cloud/google/callback", s.handleGoogleCallback)
 	mux.HandleFunc("GET /api/settings/ai-services", s.handleGetAIServices)
 	mux.HandleFunc("PUT /api/settings/ai-services", s.handlePutAIServices)
 	mux.HandleFunc("POST /api/settings/ai-services/probe", s.handleProbeAIServices)

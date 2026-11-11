@@ -46,17 +46,40 @@ func (s *Server) EnableGitHub(g *auth.GitHub) {
 		}
 		_, _ = io.WriteString(w, "GitHub 授权已完成。请回到 Learn-With-AI。")
 	})
-	s.mux.HandleFunc("POST /v1/auth/github/finish", func(w http.ResponseWriter, r *http.Request) {
+	s.mux.HandleFunc("POST /v1/auth/github/email/send", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ FlowID, Verifier string }
+		if !decode(w, r, &in, 4096) || !s.allowAuth(w, r, "github-email", in.FlowID, 5) {
+			return
+		}
+		if err := s.accounts.SendGitHubConfirmation(r.Context(), in.FlowID, in.Verifier); err != nil {
+			authError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	s.mux.HandleFunc("POST /v1/auth/github/finish", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ FlowID, Verifier, Code string }
 		if !decode(w, r, &in, 4096) {
 			return
 		}
 		session, err := g.Finish(r.Context(), in.FlowID, in.Verifier, bearer(r))
+		if errors.Is(err, store.ErrGitHubConfirmation) && in.Code != "" {
+			if !s.allowAuth(w, r, "github-confirm", in.FlowID, 10) {
+				return
+			}
+			if err := s.accounts.ConfirmGitHubEmail(r.Context(), in.FlowID, in.Verifier, in.Code); err != nil {
+				authError(w, err)
+				return
+			}
+			session, err = g.Finish(r.Context(), in.FlowID, in.Verifier, bearer(r))
+		}
 		switch {
 		case errors.Is(err, store.ErrWaiting):
 			w.WriteHeader(http.StatusAccepted)
 		case errors.Is(err, store.ErrConflict):
 			fail(w, http.StatusConflict, "github_link_required")
+		case errors.Is(err, store.ErrGitHubConfirmation):
+			fail(w, http.StatusConflict, "github_email_confirmation_required")
 		case errors.Is(err, store.ErrCode):
 			fail(w, http.StatusBadRequest, "github_verified_email_required")
 		case errors.Is(err, store.ErrGitHub):

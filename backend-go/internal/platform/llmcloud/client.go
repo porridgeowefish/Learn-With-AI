@@ -94,6 +94,8 @@ type Client struct {
 	session        session
 	sessionVersion uint64
 	selected       Model
+	catalog        []Model
+	catalogExpires time.Time
 	vault          *sessionVault
 }
 
@@ -159,6 +161,8 @@ func (c *Client) setSession(next session) {
 func (c *Client) setSessionLocked(next session) {
 	if next.Account.ID != c.session.Account.ID || next.Token == "" {
 		c.selected = Model{}
+		c.catalog = nil
+		c.catalogExpires = time.Time{}
 		if c.prompts != nil {
 			c.prompts.Clear()
 		}
@@ -319,7 +323,18 @@ func (c *Client) StartGitHub(ctx context.Context, link bool) (GitHubFlow, error)
 	return GitHubFlow{ID: result.FlowID, AuthorizationURL: result.AuthorizationURL, Verifier: verifier, link: link, sessionVersion: version}, nil
 }
 
-func (c *Client) FinishGitHub(ctx context.Context, f GitHubFlow) (Account, bool, error) {
+func (c *Client) SendGitHubConfirmation(ctx context.Context, f GitHubFlow) error {
+	c.mu.RLock()
+	version := c.sessionVersion
+	c.mu.RUnlock()
+	if f.link || version != f.sessionVersion {
+		return ErrLoginRequired
+	}
+	_, err := c.json(ctx, http.MethodPost, "v1/auth/github/email/send", "", map[string]string{"flowId": f.ID, "verifier": f.Verifier}, nil)
+	return err
+}
+
+func (c *Client) FinishGitHub(ctx context.Context, f GitHubFlow, emailCode ...string) (Account, bool, error) {
 	c.mu.RLock()
 	current, version := c.session, c.sessionVersion
 	c.mu.RUnlock()
@@ -331,7 +346,11 @@ func (c *Client) FinishGitHub(ctx context.Context, f GitHubFlow) (Account, bool,
 		token = current.Token
 	}
 	var next session
-	status, err := c.json(ctx, http.MethodPost, "v1/auth/github/finish", token, map[string]string{"flowId": f.ID, "verifier": f.Verifier}, &next)
+	input := map[string]string{"flowId": f.ID, "verifier": f.Verifier}
+	if len(emailCode) > 0 && emailCode[0] != "" {
+		input["code"] = emailCode[0]
+	}
+	status, err := c.json(ctx, http.MethodPost, "v1/auth/github/finish", token, input, &next)
 	if err != nil || status == http.StatusAccepted {
 		return Account{}, false, err
 	}
@@ -402,9 +421,52 @@ func (c *Client) RateTeaching(ctx context.Context, exposureID string, stars int)
 }
 
 func (c *Client) Models(ctx context.Context) ([]Model, error) {
+	c.mu.RLock()
+	version := c.sessionVersion
+	c.mu.RUnlock()
 	var models []Model
 	_, err := c.json(ctx, http.MethodGet, "v1/models", "", nil, &models)
+	if err == nil {
+		c.mu.Lock()
+		if c.sessionVersion == version && c.session.Token != "" && time.Now().Before(c.session.ExpiresAt) {
+			c.catalog = append([]Model(nil), models...)
+			c.catalogExpires = time.Now().Add(time.Minute)
+		}
+		c.mu.Unlock()
+	}
 	return models, err
+}
+
+// ModelForConversation resolves an explicit cloud model without changing the selected default.
+func (c *Client) ModelForConversation(ctx context.Context, id string) Model {
+	c.mu.RLock()
+	version := c.sessionVersion
+	active := c.session.Token != "" && time.Now().Before(c.session.ExpiresAt)
+	fresh := time.Now().Before(c.catalogExpires)
+	models := c.catalog
+	c.mu.RUnlock()
+	if !active {
+		return Model{}
+	}
+	if !fresh {
+		if _, err := c.Models(ctx); err != nil {
+			return Model{}
+		}
+		c.mu.RLock()
+		models = c.catalog
+		c.mu.RUnlock()
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.sessionVersion != version || !time.Now().Before(c.session.ExpiresAt) {
+		return Model{}
+	}
+	for _, model := range models {
+		if model.ID == id {
+			return model
+		}
+	}
+	return Model{}
 }
 
 func (c *Client) GuestModels(ctx context.Context) ([]GuestModel, error) {

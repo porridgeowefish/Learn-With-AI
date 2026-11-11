@@ -19,8 +19,12 @@ export interface TeacherSubmission {
 
 export function useTeacherSession(slug: string) {
   const client = useQueryClient();
-  const controls = useRef<{ providerId?: string; options?: { effort: string; webSearch: boolean } }>({});
-  const configure = useCallback((value: typeof controls.current) => { controls.current = value; }, []);
+  const controls = useRef<{ providerId?: string; options?: { effort: string; webSearch: boolean }; allowOpening?: boolean }>({});
+  const [openingProvider, setOpeningProvider] = useState('');
+  const configure = useCallback((value: typeof controls.current) => {
+    controls.current = value;
+    setOpeningProvider(value.allowOpening ? value.providerId ?? '' : '');
+  }, []);
   const conversation = useConversation(slug);
   const projection = useRef(conversation.data);
   projection.current = conversation.data;
@@ -114,10 +118,13 @@ export function useTeacherSession(slug: string) {
 
   useEffect(() => {
     if (!conversation.data || controller.current || current.current.live || current.current.phase === 'failed' || checkedProjection.current === conversation.data) return;
-    checkedProjection.current = conversation.data;
     const opening = conversation.data.messages.every(message => message.operationId === 'teacher-welcome-v1');
-    void run((signal, emit) => (opening ? startTeacherOpening : resumeTeacherTurn)(slug, signal, emit), undefined, true);
-  }, [conversation.data, probe, run, slug]);
+    if (opening && !openingProvider) return;
+    checkedProjection.current = conversation.data;
+    void run((signal, emit) => opening
+      ? startTeacherOpening(slug, signal, emit, openingProvider)
+      : resumeTeacherTurn(slug, signal, emit), undefined, true);
+  }, [conversation.data, openingProvider, probe, run, slug]);
 
   const send = async (input: TeacherSubmission, onAccepted: () => void) => {
     let accepted = false;

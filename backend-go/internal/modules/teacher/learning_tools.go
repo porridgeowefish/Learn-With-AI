@@ -82,7 +82,7 @@ func (s *LearningTools) streamContext(parent context.Context) (context.Context, 
 }
 func resolveToolProvider(id, purpose string) (*ai.ProviderConfig, error) {
 	cfg, err := ai.LoadConfig()
-	if err != nil || cfg == nil || !cfg.Enabled() {
+	if err != nil || cfg == nil || (!cfg.Enabled() && !ai.IsManagedProvider(id)) {
 		return nil, ErrAIUnavailable
 	}
 	pc := cfg.Find(id)

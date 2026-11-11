@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { CheckIcon, ChevronDownIcon, LockClosedIcon } from '@radix-ui/react-icons';
-import { cloudAction, managedProviderPrefix, readCloudGuestModels, readCloudModels, type CloudStatus } from '@/features/cloud-account';
+import { managedProviderPrefix, readCloudGuestModels, readCloudModels, type CloudStatus } from '@/features/cloud-account';
 import s from './TeacherView.module.css';
 
 export function TeacherModelPicker({ status, selected, localModels, onSelect }: {
@@ -11,41 +11,24 @@ export function TeacherModelPicker({ status, selected, localModels, onSelect }: 
   localModels: { id: string; label: string }[];
   onSelect: (id: string) => void;
 }) {
-  const qc = useQueryClient();
   const { pathname } = useLocation();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const signedIn = !!status?.signedIn;
   const models = useQuery({
     queryKey: [signedIn ? 'cloud-models' : 'cloud-guest-models'],
-    queryFn: signedIn ? readCloudModels : readCloudGuestModels, enabled: open, retry: false,
+    queryFn: signedIn ? readCloudModels : readCloudGuestModels,
+    enabled: open || (signedIn && selected.startsWith(managedProviderPrefix)), retry: false,
   });
   const cloudModels = models.data?.models ?? [];
   const selectedName = localModels.find(model => model.id === selected)?.label ||
     cloudModels.find(model => managedProviderPrefix + model.id === selected)?.name ||
-    (status?.signedIn && selected.startsWith(managedProviderPrefix) ? status.selectedModel : undefined);
+    (selected.startsWith(managedProviderPrefix) ? selected.slice(managedProviderPrefix.length) : undefined);
 
   function select(id: string) {
     onSelect(id);
     setOpen(false);
     trigger.current?.focus();
-  }
-
-  async function selectCloud(id: string) {
-    setBusy(true);
-    setError('');
-    try {
-      await cloudAction('select-model', { model: id });
-      qc.setQueryData<CloudStatus>(['cloud-account'], current => current?.signedIn
-        ? { ...current, selectedModel: id } : current);
-      select(managedProviderPrefix + id);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
   }
 
   return <div className={s.modelPicker} onBlur={event => {
@@ -54,14 +37,14 @@ export function TeacherModelPicker({ status, selected, localModels, onSelect }: 
     if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); trigger.current?.focus(); }
   }}>
     <button ref={trigger} className={s.modelPickerTrigger} type="button" aria-label="选择教师模型" aria-expanded={open}
-      onClick={() => { setOpen(!open); setError(''); }}>{selectedName || '选择模型'}<ChevronDownIcon /></button>
+      onClick={() => setOpen(!open)}>{selectedName || '选择模型'}<ChevronDownIcon /></button>
     {open && <div className={s.modelPickerPanel} aria-label="可选模型">
       <h3>云端模型</h3>
       {models.isPending && <p role="status">正在读取模型…</p>}
       {models.isError && <p role="status">暂时无法读取云端模型。</p>}
       {models.data && !cloudModels.length && <p>暂无已发布的云端模型。</p>}
       {cloudModels.map(model => status?.signedIn
-        ? <button key={model.id} type="button" disabled={busy} onClick={() => void selectCloud(model.id)}>
+        ? <button key={model.id} type="button" onClick={() => select(managedProviderPrefix + model.id)}>
           {model.name}{selected === managedProviderPrefix + model.id && <CheckIcon />}
         </button>
         : <Link key={model.id} className={s.lockedModel} to="/login" state={{ next: pathname }} title="请先登录">
@@ -73,7 +56,6 @@ export function TeacherModelPicker({ status, selected, localModels, onSelect }: 
           {model.label}{model.id === selected && <CheckIcon />}
         </button>)}
       </>}
-      {error && <p role="alert">{error}</p>}
       <Link className={s.modelPickerFooter} to="/settings?section=models">配置自己的 API</Link>
     </div>}
   </div>;

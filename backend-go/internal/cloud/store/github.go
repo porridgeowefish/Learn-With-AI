@@ -9,10 +9,13 @@ import (
 )
 
 var (
-	ErrWaiting       = errors.New("authorization is pending")
-	ErrGitHub        = errors.New("github authorization failed")
-	ErrGitHubSession = errors.New("github binding requires the original session")
+	ErrWaiting            = errors.New("authorization is pending")
+	ErrGitHub             = errors.New("github authorization failed")
+	ErrGitHubSession      = errors.New("github binding requires the original session")
+	ErrGitHubConfirmation = errors.New("github sign-in needs email confirmation")
 )
+
+const GitHubEmailPurpose = "github-confirm"
 
 const githubSchema = `
 CREATE TABLE github_identity (
@@ -108,12 +111,14 @@ func (s *Store) CompleteGitHub(ctx context.Context, flowID, githubID, email stri
 			if email == "" {
 				return ErrCode
 			}
-			var exists bool
-			if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM account WHERE email = ?)", email).Scan(&exists); err != nil {
+			err = tx.QueryRowContext(ctx, "SELECT id FROM account WHERE email=?", email).Scan(&accountID)
+			if err == nil {
+				_, err = tx.ExecContext(ctx, `UPDATE github_flow SET state='email_conflict', account_id=?, link_provider_id=?, verifier=''
+					WHERE id=?`, accountID, githubID, flowID)
 				return err
 			}
-			if exists {
-				return ErrConflict
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
 			}
 			account, err := accountForEmail(ctx, tx, email, now)
 			if err != nil {
@@ -127,6 +132,49 @@ func (s *Store) CompleteGitHub(ctx context.Context, flowID, githubID, email stri
 		_, err = tx.ExecContext(ctx, "UPDATE github_flow SET state = 'ready', account_id = ?, verifier = '' WHERE id = ?", accountID, flowID)
 		return err
 	})
+}
+
+func (s *Store) GitHubConfirmationEmail(ctx context.Context, flowID string, proof []byte, now time.Time) (string, error) {
+	var email string
+	err := s.db.QueryRowContext(ctx, `SELECT a.email FROM github_flow f JOIN account a ON a.id=f.account_id
+		WHERE f.id=? AND f.desktop_challenge=? AND f.expires_at>? AND f.owner='' AND f.state='email_conflict'
+		AND f.link_provider_id<>'' AND a.email IS NOT NULL`, flowID, proof, now.Unix()).Scan(&email)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return email, err
+}
+
+func (s *Store) ConfirmGitHubEmail(ctx context.Context, flowID string, proof []byte, email string, digest []byte, now time.Time) error {
+	var invalid bool
+	err := s.transaction(ctx, func(tx *sql.Tx) error {
+		var accountID, providerID string
+		err := tx.QueryRowContext(ctx, `SELECT f.account_id,f.link_provider_id FROM github_flow f JOIN account a ON a.id=f.account_id
+			WHERE f.id=? AND f.desktop_challenge=? AND f.expires_at>? AND f.owner='' AND f.state='email_conflict'
+			AND f.link_provider_id<>'' AND a.email=?`, flowID, proof, now.Unix(), email).Scan(&accountID, &providerID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		match, err := checkEmailCode(ctx, tx, email, GitHubEmailPurpose, digest, now)
+		if invalid = !match; err != nil || invalid {
+			return err
+		}
+		if err := linkGitHubIdentity(ctx, tx, providerID, accountID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "UPDATE email_challenge SET used=1 WHERE email=? AND purpose=?", email, GitHubEmailPurpose); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "UPDATE github_flow SET state='ready' WHERE id=?", flowID)
+		return err
+	})
+	if err == nil && invalid {
+		err = ErrCode
+	}
+	return err
 }
 
 func linkGitHubIdentity(ctx context.Context, tx *sql.Tx, providerID, accountID string) error {
@@ -183,6 +231,9 @@ func (s *Store) RedeemGitHub(ctx context.Context, flowID string, proof, ownerSes
 		case "waiting", "exchanging":
 			return ErrWaiting
 		case "email_conflict":
+			if accountID != "" && linkProvider != "" {
+				return ErrGitHubConfirmation
+			}
 			return ErrConflict
 		case "email_required":
 			return ErrCode

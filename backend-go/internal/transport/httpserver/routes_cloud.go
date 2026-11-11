@@ -145,6 +145,12 @@ func (s *Server) handleCloudAction(w http.ResponseWriter, r *http.Request) {
 		err = client.SelectModel(r.Context(), in.Model)
 	case "logout":
 		err = client.Logout(r.Context())
+	case "google-start":
+		s.startGoogleLogin(w, r, client)
+		return
+	case "google-finish":
+		s.finishGoogleLogin(w, r, client, in.FlowID)
+		return
 	case "github-start":
 		flow, startErr := client.StartGitHub(r.Context(), in.Link)
 		err = startErr
@@ -159,13 +165,18 @@ func (s *Server) handleCloudAction(w http.ResponseWriter, r *http.Request) {
 			s.cloudLoginFlows.Store(flow.ID, cloudFlow{flow: flow, expires: now.Add(10 * time.Minute)})
 			out = map[string]string{"flowId": flow.ID, "authorizationUrl": flow.AuthorizationURL}
 		}
-	case "github-finish":
+	case "github-finish", "github-send-code":
 		raw, exists := s.cloudLoginFlows.Load(in.FlowID)
 		if !exists || !time.Now().Before(raw.(cloudFlow).expires) {
 			httpx.Error(w, http.StatusBadRequest, "github_flow_expired")
 			return
 		}
-		account, complete, finishErr := client.FinishGitHub(r.Context(), raw.(cloudFlow).flow)
+		flow := raw.(cloudFlow).flow
+		if r.PathValue("action") == "github-send-code" {
+			err = client.SendGitHubConfirmation(r.Context(), flow)
+			break
+		}
+		account, complete, finishErr := client.FinishGitHub(r.Context(), flow, in.Code)
 		err = finishErr
 		if err == nil && !complete {
 			httpx.WriteJSON(w, http.StatusAccepted, map[string]bool{"pending": true})

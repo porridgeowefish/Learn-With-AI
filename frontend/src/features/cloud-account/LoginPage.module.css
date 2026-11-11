@@ -55,7 +55,7 @@
 .hint { margin: 0; color: var(--muted); font-size: .9rem; text-align: center; }
 .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .82rem; }
 .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
-.providers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.providers { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 10px; }
 .providers svg { width: 16px; height: 16px; }
 .code { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .notice { margin: 0; color: var(--accent-ink); font-size: .88rem; text-align: center; }

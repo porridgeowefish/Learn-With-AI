@@ -6,6 +6,7 @@ import { describeGenerationError } from '../api/generationError';
 import { useSources } from '../api/learningWorkspace';
 import { isGenerationActive, useGenerationAction, useGenerationCandidate, useGenerationJobs, type GenerationKind } from '../api/generation';
 import { SourceImportControl } from './SourceImportControl';
+import { readConversationModel } from '../teacher/modelSelection';
 import s from './GenerationControl.module.css';
 
 const names = {review: '复习稿', practice: '练习题', 'discipline-map': '地图'};
@@ -30,7 +31,8 @@ export function GenerationControl({slug, kind, disabled = false}: {slug:string;k
  useEffect(()=>{if(open){operation.current=undefined;action.reset();}},[open]);
  const submit=()=>{
   const mapSources=readySources.slice(0,32).map(item=>item.sourceId);
-  const request={kind,...(kind==='practice'?{questionCount:count}:{}),...(kind==='discipline-map'?{mapMode:mapSources.length?'sources' as const:'general' as const,sourceIds:mapSources}:{})};
+  const providerId = kind === 'discipline-map' ? '' : readConversationModel(slug);
+  const request={kind,...(providerId?{providerId}:{}),...(kind==='practice'?{questionCount:count}:{}),...(kind==='discipline-map'?{mapMode:mapSources.length?'sources' as const:'general' as const,sourceIds:mapSources}:{})};
   const intent=JSON.stringify(request);
   if(operation.current?.intent!==intent)operation.current={intent,id:crypto.randomUUID()};
   action.mutate({request:{...request,operationId:operation.current.id}},{onSuccess:()=>setOpen(false)});

@@ -2,8 +2,10 @@
 package askaiconfig
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
@@ -43,6 +45,7 @@ type Provider struct {
 // Config is the askAiProviders section.
 type Config struct {
 	managed               *Provider
+	cloud                 *llmcloud.Client
 	ForegroundConcurrency int                `json:"foregroundConcurrency,omitempty"`
 	BackgroundConcurrency int                `json:"backgroundConcurrency,omitempty"`
 	Default               string             `json:"default"`
@@ -80,6 +83,14 @@ func (c *Config) FindExact(id string) *Provider {
 	if c.managed != nil && canonicalProviderID(id) == c.managed.ID {
 		return c.managed
 	}
+	if IsManagedProvider(id) {
+		if c.cloud == nil {
+			return nil
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancel()
+		return managedProvider(c.cloud.ModelForConversation(ctx, strings.TrimPrefix(canonicalProviderID(id), ManagedPrefix)))
+	}
 	for i := range c.Providers {
 		if c.Providers[i].ID == id {
 			return &c.Providers[i]
@@ -92,13 +103,10 @@ func (c *Config) Find(id string) *Provider {
 	if c == nil {
 		return nil
 	}
-	if c.managed != nil && canonicalProviderID(id) == c.managed.ID {
-		return c.managed
+	if IsManagedProvider(id) {
+		return c.FindExact(id)
 	}
 	if id != "" {
-		if IsManagedProvider(id) {
-			return nil
-		}
 		for i := range c.Providers {
 			if c.Providers[i].ID == id {
 				return &c.Providers[i]
@@ -171,25 +179,34 @@ func UseConfigPathForTest(path string) (restore func()) {
 	return platformconfig.UsePathForTest(path)
 }
 
-// Load reads the askAiProviders section. Returns (nil, nil) when the file or
-// section is absent (feature disabled). Returns an error only on parse failure.
+func managedProvider(model llmcloud.Model) *Provider {
+	if model.ID == "" {
+		return nil
+	}
+	return &Provider{ID: ManagedPrefix + model.ID, Kind: ManagedKind, Name: model.Name, Model: model.ID,
+		ContextWindowTokens: model.MaxInput + model.MaxOutput, ManagedMaxOutput: model.MaxOutput}
+}
+
+// Load reads local provider settings and the current cloud session without making cloud requests.
 func Load() (*Config, error) {
 	settings, ok, err := platformconfig.LoadAI()
 	if err != nil {
 		return nil, err
 	}
 	var managed *Provider
-	if cloud, err := llmcloud.Default(); err == nil {
-		if model := cloud.Selected(); model.ID != "" {
-			managed = &Provider{ID: ManagedPrefix + model.ID, Kind: ManagedKind, Name: model.Name, Model: model.ID,
-				ContextWindowTokens: model.MaxInput + model.MaxOutput, ManagedMaxOutput: model.MaxOutput}
+	var cloudSession *llmcloud.Client
+	if client, err := llmcloud.Default(); err == nil {
+		if _, active := client.Current(); active {
+			cloudSession = client
+			managed = managedProvider(client.Selected())
 		}
 	}
-	if !ok && managed == nil {
+	if !ok && cloudSession == nil {
 		return nil, nil
 	}
 	cfg := Config{ForegroundConcurrency: settings.ForegroundConcurrency, BackgroundConcurrency: settings.BackgroundConcurrency, Default: settings.Default, SearchEngine: settings.SearchEngine, Bindings: make(map[string]Binding, len(settings.Bindings))}
 	cfg.managed = managed
+	cfg.cloud = cloudSession
 	for name, binding := range settings.Bindings {
 		cfg.Bindings[name] = Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}

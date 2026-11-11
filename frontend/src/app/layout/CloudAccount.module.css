@@ -29,7 +29,7 @@
 .accountName { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .account { display: grid; gap: 14px; min-width: 0; }
 .field { display: grid; gap: 5px; min-width: 0; font-size: .88rem; }
-.field select, .field input {
+.field input {
   min-width: 0;
   width: 100%;
   padding: 9px 10px;
@@ -39,7 +39,7 @@
   color: inherit;
   font: inherit;
 }
-.field select:focus-visible, .field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .caption { margin: 0; color: var(--muted); font-size: .84rem; }
 .wallet {
   display: flex;

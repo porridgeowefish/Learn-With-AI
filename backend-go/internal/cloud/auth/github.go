@@ -174,3 +174,28 @@ func (g *GitHub) Finish(ctx context.Context, flowID, verifier, ownerToken string
 	}
 	return Session{Account: account, Token: token, ExpiresAt: expires}, nil
 }
+
+func (s *Service) SendGitHubConfirmation(ctx context.Context, flowID, verifier string) error {
+	if len(flowID) > 100 || len(verifier) < 43 || len(verifier) > 128 {
+		return ErrInvalid
+	}
+	email, err := s.store.GitHubConfirmationEmail(ctx, flowID, sessionDigest(verifier), s.now())
+	if err != nil {
+		return err
+	}
+	return s.sendScopedCode(ctx, email, store.GitHubEmailPurpose, store.GitHubEmailPurpose+":"+flowID)
+}
+
+func (s *Service) ConfirmGitHubEmail(ctx context.Context, flowID, verifier, code string) error {
+	if len(flowID) > 100 || len(verifier) < 43 || len(verifier) > 128 || !validCode(code) {
+		return ErrInvalid
+	}
+	now := s.now()
+	proof := sessionDigest(verifier)
+	email, err := s.store.GitHubConfirmationEmail(ctx, flowID, proof, now)
+	if err != nil {
+		return err
+	}
+	digest := s.codeDigest(email, store.GitHubEmailPurpose+":"+flowID, code)
+	return s.store.ConfirmGitHubEmail(ctx, flowID, proof, email, digest, now)
+}

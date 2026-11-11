@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
@@ -23,12 +24,12 @@ type Operator struct {
 	TOTPKey []byte
 }
 
-// EnableAdmin installs step-up-authenticated operations before serving traffic.
+// EnableAdmin installs operator-only operations before serving traffic.
 func (s *Server) EnableAdmin(operators map[string]Operator) error {
 	config := make(map[string]Operator, len(operators))
 	for principal, operator := range operators {
 		principal = strings.ToLower(strings.TrimSpace(principal))
-		if principal == "" || len(operator.TOTPKey) < 20 || (operator.Role != "admin" && operator.Role != "operator") {
+		if principal == "" || (len(operator.TOTPKey) > 0 && len(operator.TOTPKey) < 20) || (operator.Role != "admin" && operator.Role != "operator") {
 			return errors.New("invalid operator configuration")
 		}
 		if id, byAccount := strings.CutPrefix(principal, "account:"); byAccount {
@@ -50,13 +51,46 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 		operator, ok := config[user.Email]
 		return operator, ok
 	}
+	issueSession := func(w http.ResponseWriter, r *http.Request, user store.Account, operator Operator, baseToken string, counter int64, now time.Time) {
+		token := rand.Text()
+		digest := sha256.Sum256([]byte(token))
+		baseDigest := sha256.Sum256([]byte(baseToken))
+		expires := now.Add(15 * time.Minute)
+		if err := s.db.PutAdminSession(r.Context(), user.ID, counter, baseDigest[:], digest[:], now, expires); err != nil {
+			authError(w, err)
+			return
+		}
+		respond(w, http.StatusOK, map[string]any{"token": token, "expiresAt": expires, "role": operator.Role})
+	}
+	s.mux.HandleFunc("POST /v1/admin/login", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ Username, Password string }
+		if !decode(w, r, &in, 8192) || !s.allowAuth(w, r, "admin-password", in.Username, 10) {
+			return
+		}
+		session, err := s.accounts.LoginPassword(r.Context(), in.Username, in.Password)
+		if err != nil {
+			authError(w, err)
+			return
+		}
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 3*time.Second)
+			defer cancel()
+			_ = s.accounts.Logout(ctx, session.Token)
+		}()
+		operator, found := lookup(session.Account)
+		if !found || len(operator.TOTPKey) != 0 {
+			fail(w, http.StatusForbidden, "operator_required")
+			return
+		}
+		issueSession(w, r, session.Account, operator, session.Token, 0, time.Now())
+	})
 	s.mux.HandleFunc("POST /v1/admin/session", func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.authenticated(w, r)
 		if !ok {
 			return
 		}
 		operator, found := lookup(user)
-		if !found {
+		if !found || len(operator.TOTPKey) == 0 {
 			fail(w, http.StatusForbidden, "operator_required")
 			return
 		}
@@ -65,20 +99,12 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 			return
 		}
 		now := time.Now()
-		counter, ok := verifyTOTP(operator.TOTPKey, in.Code, now)
-		if !ok {
+		counter, valid := verifyTOTP(operator.TOTPKey, in.Code, now)
+		if !valid {
 			fail(w, http.StatusUnauthorized, "invalid_operator_code")
 			return
 		}
-		token := rand.Text()
-		digest := sha256.Sum256([]byte(token))
-		baseDigest := sha256.Sum256([]byte(bearer(r)))
-		expires := now.Add(15 * time.Minute)
-		if err := s.db.PutAdminSession(r.Context(), user.ID, counter, baseDigest[:], digest[:], now, expires); err != nil {
-			authError(w, err)
-			return
-		}
-		respond(w, http.StatusOK, map[string]any{"token": token, "expiresAt": expires, "role": operator.Role})
+		issueSession(w, r, user, operator, bearer(r), counter, now)
 	})
 	allow := func(w http.ResponseWriter, r *http.Request, write bool) (store.Account, bool) {
 		token := bearer(r)

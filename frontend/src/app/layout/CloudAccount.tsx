@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { EnvelopeClosedIcon, GitHubLogoIcon, PersonIcon } from '@radix-ui/react-icons';
-import { cloudAction as action, githubLogin, readCloudDailyHistory, readCloudModels, readCloudStatus, type Account, type CloudStatus as Status, type Wallet } from '@/features/cloud-account/api';
+import { cloudAction as action, githubLogin, readCloudDailyHistory, readCloudStatus, type Account, type CloudStatus as Status, type Wallet } from '@/features/cloud-account/api';
 import { Button } from '@/shared/primitive/Button';
 import { Modal } from '@/shared/primitive/Modal';
 import s from './CloudAccount.module.css';
@@ -19,10 +19,6 @@ export function CloudAccount() {
   const [identityView, setIdentityView] = useState<IdentityView>();
   const [showHistory, setShowHistory] = useState(false);
   const status = useQuery({ queryKey: ['cloud-account'], queryFn: readCloudStatus, retry: false });
-  const models = useQuery({
-    queryKey: ['cloud-models'], queryFn: readCloudModels,
-    retry: false, enabled: open && !!status.data?.signedIn,
-  });
   const account = status.data?.account;
   const history = useQuery({
     queryKey: ['cloud-daily-history', account?.id || account?.email || account?.name], queryFn: readCloudDailyHistory,
@@ -121,18 +117,6 @@ export function CloudAccount() {
                 </ul> : <p className={s.caption}>最近 30 天没有签到记录。</p>)}
               </section>}
             </div>}
-            <label className={s.field}>
-              系统模型
-              <select value={status.data?.selectedModel ?? ''} disabled={models.isLoading || !!busy}
-                onChange={event => { const id = event.target.value; void perform('model', async () => {
-                  await action('select-model', { model: id });
-                  qc.setQueryData<Status>(['cloud-account'], current => current && { ...current, selectedModel: id });
-                }); }}>
-                <option value="">使用本机模型连接</option>
-                {models.data?.models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
-              </select>
-            </label>
-            {models.isError && <p className={s.caption}>暂时无法读取系统模型目录。</p>}
             {<section className={s.identities} aria-labelledby="account-identities-title">
               <h3 id="account-identities-title">登录方式</h3>
               <div className={s.identityRow}>

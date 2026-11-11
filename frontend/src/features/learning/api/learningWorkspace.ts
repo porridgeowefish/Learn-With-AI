@@ -335,8 +335,10 @@ export async function resumeTeacherTurn(slug: string, signal: AbortSignal, onFra
   return true;
 }
 
-export async function startTeacherOpening(slug: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/opening`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal });
+export async function startTeacherOpening(slug: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void, providerId: string) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/opening`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId }), signal,
+  });
   if (response.status === 204) return false;
   if (!response.ok || !response.body) throw new ApiError(response.status, '教师开场无法开始', await response.text());
   await consumeSSE(response, onFrame);

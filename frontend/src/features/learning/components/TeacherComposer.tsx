@@ -1,9 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
-import { managedProviderPrefix, normalizeManagedProviderId, type CloudStatus } from '@/features/cloud-account';
+import { managedProviderPrefix, type CloudStatus } from '@/features/cloud-account';
 import { useAskAiSettings, useLearningProfile, effortNames } from '@/features/settings';
 import { SendIcon, StopIcon } from '@/shared/primitive/Icons';
 import { ChatMediaInput, ChatMicrophone, useChatMedia } from './ChatMediaInput';
 import { TeacherModelPicker } from './TeacherModelPicker';
+import { conversationModelKey, readConversationModel } from '../teacher/modelSelection';
 import type { TeacherSession, TeacherSubmission } from '../teacher/useTeacherSession';
 import s from './TeacherView.module.css';
 
@@ -21,24 +22,26 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   const models = (settings.data?.providers ?? []).filter(provider => provider.id && provider.model && (provider.kind === 'siwc' || provider.baseURL));
   const managedModel = cloudStatus?.signedIn ? cloudStatus.selectedModel : undefined;
   const managedId = managedModel ? managedProviderPrefix + managedModel : '';
-  const [preferredProvider, setPreferredProvider] = useState(() => normalizeManagedProviderId(
-    localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '',
-  ));
+  const [preferredProvider, setPreferredProvider] = useState(() => readConversationModel(slug));
   const selectProvider = (id: string) => {
     setPreferredProvider(id);
-    localStorage.setItem(`lll.teacher.provider.${slug}`, id);
+    localStorage.setItem(conversationModelKey(slug), id);
   };
-  const needsLogin = cloudStatus?.signedIn === false && preferredProvider.startsWith(managedProviderPrefix);
+  const preferredManaged = preferredProvider.startsWith(managedProviderPrefix) ? preferredProvider : '';
+  const needsLogin = cloudStatus?.signedIn === false && !!preferredManaged;
   const defaultLocal = settings.data?.bindings?.teacher?.providerId || settings.data?.default;
   const localProvider = models.find(provider => provider.id === preferredProvider);
-  const providerId = needsLogin ? preferredProvider : localProvider?.id || managedId ||
+  const providerId = preferredManaged || localProvider?.id || managedId ||
     models.find(provider => provider.id === defaultLocal)?.id || models[0]?.id || '';
   const capabilities = profile.data?.capabilities[providerId] ?? [];
   const preferredEffort = chosenEffort || profile.data?.settings.effort || 'medium';
   const effort = capabilities.includes(preferredEffort) ? preferredEffort : capabilities.includes('medium') ? 'medium' : '';
   const searchEnabled = !!profile.data?.settings.search.enabled;
   useEffect(() => { if (!searchEnabled) setWebSearch(false); }, [searchEnabled]);
-  useEffect(() => { session.configure({ providerId, options: { effort, webSearch: searchEnabled && webSearch } }); }, [session.configure, providerId, effort, webSearch, searchEnabled]);
+  const allowOpening = !!providerId && (!providerId.startsWith(managedProviderPrefix) || !!cloudStatus?.signedIn);
+  useEffect(() => {
+    session.configure({ providerId, allowOpening, options: { effort, webSearch: searchEnabled && webSearch } });
+  }, [session.configure, providerId, allowOpening, effort, webSearch, searchEnabled]);
   const [input, setInput] = useState('');
   const inputValue = useRef('');
   const [voiceFinalizing, setVoiceFinalizing] = useState(false);
