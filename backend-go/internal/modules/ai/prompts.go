@@ -26,6 +26,8 @@ type PromptSource struct {
 }
 type ComposedPrompt struct {
 	Messages        []GatewayMessage
+	HistoryStart    int
+	HistoryEnd      int
 	Text            string
 	Tools           []string
 	Budgets         map[string]int
@@ -388,6 +390,7 @@ func ComposePrompt(ctx context.Context, scene string, facts map[string]string, s
 	}
 	var parts []string
 	var messages []GatewayMessage
+	var historyStart, historyEnd int
 	var skipped []string
 	var fragments []PromptFragment
 	for _, s := range p.Slots {
@@ -427,7 +430,9 @@ func ComposePrompt(ctx context.Context, scene string, facts map[string]string, s
 			if err != nil {
 				return ComposedPrompt{}, err
 			}
+			historyStart = len(messages)
 			messages = append(messages, group...)
+			historyEnd = len(messages)
 			continue
 		}
 		if s.Binding != "" {
@@ -542,7 +547,7 @@ func ComposePrompt(ctx context.Context, scene string, facts map[string]string, s
 			return ComposedPrompt{}, fmt.Errorf("prompt input capacity exceeded")
 		}
 	}
-	return ComposedPrompt{Text: strings.Join(parts, "\n\n"), Tools: p.Tools, Messages: messages, Budgets: p.Budgets, Skipped: skipped, Fragments: fragments, ResourceVersion: string(snapshot["_manifest_version"])}, nil
+	return ComposedPrompt{Text: strings.Join(parts, "\n\n"), Tools: p.Tools, Messages: messages, HistoryStart: historyStart, HistoryEnd: historyEnd, Budgets: p.Budgets, Skipped: skipped, Fragments: fragments, ResourceVersion: string(snapshot["_manifest_version"])}, nil
 }
 
 // PromptSceneTools resolves the declared tool names without reading context data.

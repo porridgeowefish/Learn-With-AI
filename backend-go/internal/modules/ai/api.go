@@ -30,6 +30,7 @@ type Provider = providers.Provider
 type AIMessage = providers.Message
 type AIFrame = providers.Frame
 type Budget = budget.Budget
+type TeacherBudget = budget.TeacherBudget
 
 const ManagedKind = aiconfig.ManagedKind
 const ManagedProviderPrefix = aiconfig.ManagedPrefix
@@ -59,5 +60,6 @@ func Complete(ctx context.Context, p Provider, system string, messages []AIMessa
 }
 
 var ErrContextBudgetExhausted = budget.ErrContextBudgetExhausted
+var IsContextOverflow = gateway.IsContextOverflow
 
 func WithBackgroundRequest(ctx context.Context) context.Context { return gateway.WithBackground(ctx) }

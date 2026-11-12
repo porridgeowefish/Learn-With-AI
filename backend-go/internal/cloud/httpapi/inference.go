@@ -210,7 +210,13 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		emit(map[string]string{"type": "done"})
 	} else if started {
 		emit(ai.GatewayEvent{Type: "credit-settlement", CreditSettlement: &receipt})
-		emit(map[string]string{"type": "error", "code": "inference_interrupted"})
+		code := "inference_interrupted"
+		if ai.IsContextOverflow(streamErr) {
+			code = "model_input_limit"
+		}
+		emit(map[string]string{"type": "error", "code": code})
+	} else if ai.IsContextOverflow(streamErr) {
+		failWithSettlement(w, http.StatusRequestEntityTooLarge, "model_input_limit", receipt)
 	} else if errors.Is(streamErr, routing.ErrCapacity) {
 		w.Header().Set("Retry-After", "5")
 		failWithSettlement(w, http.StatusTooManyRequests, "model_busy", receipt)

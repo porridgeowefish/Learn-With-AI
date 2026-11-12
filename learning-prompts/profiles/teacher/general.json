@@ -51,7 +51,7 @@
       "resource": "teaching/context/preference-policy"
     },
     {
-      "history": true
+      "contextBinding": "guideline"
     },
     {
       "contextBinding": "course_framework"
@@ -63,7 +63,7 @@
       "contextBinding": "scope"
     },
     {
-      "contextBinding": "guideline"
+      "history": true
     },
     {
       "contextBinding": "preferences"

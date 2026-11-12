@@ -30,11 +30,16 @@ func buildTeacherContextWithFacts(ctx context.Context, slug string, store *conve
 	return "", composed.Messages, nil
 }
 func buildTeacherComposition(ctx context.Context, slug string, store *conversationstore.Store, turnFacts map[string]string, providerID ...string) (ai.ComposedPrompt, error) {
-	guideline, err := store.LearningGuideline()
+	sequenced, checkpoint, err := store.ContextHistory(0)
 	if err != nil {
 		return ai.ComposedPrompt{}, err
 	}
-	sequenced, err := store.SequencedMessages()
+	history := teacherHistory{messages: sequenced, checkpoint: checkpoint}
+	return composeTeacherHistory(ctx, slug, store, turnFacts, history)
+}
+
+func composeTeacherHistory(ctx context.Context, slug string, store *conversationstore.Store, turnFacts map[string]string, history teacherHistory) (ai.ComposedPrompt, error) {
+	guideline, err := store.LearningGuideline()
 	if err != nil {
 		return ai.ComposedPrompt{}, err
 	}
@@ -49,7 +54,7 @@ func buildTeacherComposition(ctx context.Context, slug string, store *conversati
 		}
 		facts[key] = value
 	}
-	if len(sequenced) == 0 {
+	if len(history.messages) == 0 {
 		facts["isOpening"] = "true"
 	}
 	if root, e := projects.ProjectRootForSlug(slug); e == nil {
@@ -65,7 +70,7 @@ func buildTeacherComposition(ctx context.Context, slug string, store *conversati
 	}
 	sources := map[string]ai.PromptSource{
 		"history": {Messages: func(context.Context) ([]ai.GatewayMessage, error) {
-			return toProviderMessages(slug, sequenced), nil
+			return history.providerMessages(slug), nil
 		}},
 		"course_framework": {Role: "context", Read: func(context.Context) (string, error) { return continuity.CourseFramework(slug) }},
 		"prior_knowledge":  {Role: "context", Read: func(context.Context) (string, error) { return continuity.PriorKnowledge(slug) }},

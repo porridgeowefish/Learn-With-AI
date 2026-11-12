@@ -233,7 +233,12 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	emit(StreamFrame{Type: "message-started", Data: map[string]any{"teacherMessageId": teacherMessageID}})
 
 	promptCtx := ai.ManagedPromptContext(ctx, effectiveProviderID, "teacher/general")
-	composition, err := buildTeacherComposition(promptCtx, slug, conversation, map[string]string{"webSearchEnabled": strconv.FormatBool(options.WebSearch && profile.Settings.Search.Enabled), "sourcesEnabled": "true"}, providerID)
+	sequenced, checkpoint, err := conversation.ContextHistory(learnerSeq)
+	history := teacherHistory{messages: sequenced, checkpoint: checkpoint, learnerSeq: learnerSeq, opening: learner.Role == "system"}
+	var composition ai.ComposedPrompt
+	if err == nil {
+		composition, err = composeTeacherHistory(promptCtx, slug, conversation, map[string]string{"webSearchEnabled": strconv.FormatBool(options.WebSearch && profile.Settings.Search.Enabled), "sourcesEnabled": "true"}, history)
+	}
 	turnInstructions, providerMessages := "", composition.Messages
 	if err != nil {
 		message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: "failed", FailureCode: "context_preparation_failed", Blocks: []conversationstore.Block{}, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
@@ -249,9 +254,6 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			return e
 		}
 		turnContext += "\n\n" + steering
-	}
-	if learner.Role == "system" {
-		providerMessages = append(providerMessages, ai.GatewayMessage{Role: "user", Content: teacherOpeningPrompt})
 	}
 
 	var tools []ai.Tool
@@ -379,12 +381,32 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 	}
 
-	// Reserve dynamic context while trimming history, without putting it in
-	// the provider's stable system prefix. The final request places it last.
+	// Count the dynamic appendix here. It is added at the end of the actual request.
 	initial := ai.GatewayRequest{System: turnContext, TurnInstructions: turnInstructions, Messages: providerMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
-	budgetErr := budget.TrimInitial(&initial)
-	providerMessages = initial.Messages
-	sourceLimit := min(12000, budget.Window/4, max(0, budget.Available(initial)-1024))
+	compactionTried := false
+	compact := func(messages []ai.GatewayMessage) ([]ai.GatewayMessage, bool) {
+		compactionTried = true
+		if !s.compactHistory(ctx, slug, conversation, &history, budget, initial, func(event ai.GatewayEvent) {
+			switch event.Type {
+			case "usage":
+				for k, v := range event.Usage {
+					usage[k] += v
+				}
+				emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
+			case "credit-settlement":
+				recordCredit(event.CreditSettlement)
+			}
+		}) {
+			return messages, false
+		}
+		return replaceTeacherHistory(messages, composition, history.providerMessages(slug)), true
+	}
+	if budget.ShouldCompact(initial) && len(history.olderTurns()) > 0 {
+		providerMessages, _ = compact(providerMessages)
+		initial.Messages = providerMessages
+	}
+	budgetErr := budget.Fit(&initial)
+	sourceLimit := budget.SourceLimit(initial)
 	reading := newResponseSources(ctx, slug, sourceLimit)
 	reading.allowed = map[string]bool{}
 	for _, tool := range tools {
@@ -441,7 +463,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		request := ai.GatewayRequest{ReasoningEffort: options.Effort, ShowReasoning: &profile.Settings.ShowReasoning, TurnInstructions: turnInstructions, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.Output}
 		request.Prompt = ai.ManagedPromptReference(promptCtx)
 		request.PromptExposureID = responseID
-		if providerErr = budget.Check(request); providerErr != nil {
+		if providerErr = budget.Fit(&request); providerErr != nil {
 			break
 		}
 		roundTextStart := text.Len()
@@ -490,6 +512,13 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		}
 		for k, v := range roundUsage {
 			usage[k] += v
+		}
+		if requestNumber == 0 && !plannedRound && !compactionTried && ai.IsContextOverflow(providerErr) &&
+			text.Len() == 0 && reasoning.Len() == 0 && len(pending) == 0 && ctx.Err() == nil {
+			if compacted, ok := compact(roundMessages); ok {
+				roundMessages = compacted
+				continue
+			}
 		}
 		if len(pending) == 0 {
 			break
@@ -685,7 +714,7 @@ func messageText(message conversationstore.Message) string {
 var quotedProposalText = regexp.MustCompile("(?s)```.*?```|`[^`]*`|“[^”]*”|‘[^’]*’|「[^」]*」|\"[^\"]*\"")
 
 func providerFailureCode(err error) string {
-	if errors.Is(err, ai.ErrContextBudgetExhausted) {
+	if errors.Is(err, ai.ErrContextBudgetExhausted) || ai.IsContextOverflow(err) {
 		return "context_budget_exhausted"
 	}
 	if errors.Is(err, context.Canceled) {

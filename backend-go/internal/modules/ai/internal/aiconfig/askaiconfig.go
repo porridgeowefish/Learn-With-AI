@@ -28,6 +28,7 @@ func canonicalProviderID(id string) string {
 
 // Provider is one configured Ask-AI model source.
 type Provider struct {
+	ManagedMaxInput     int    `json:"-"`
 	ManagedMaxOutput    int    `json:"-"`
 	MaxConcurrency      int    `json:"maxConcurrency,omitempty"`
 	ID                  string `json:"id"`
@@ -184,7 +185,7 @@ func managedProvider(model llmcloud.Model) *Provider {
 		return nil
 	}
 	return &Provider{ID: ManagedPrefix + model.ID, Kind: ManagedKind, Name: model.Name, Model: model.ID,
-		ContextWindowTokens: model.MaxInput + model.MaxOutput, ManagedMaxOutput: model.MaxOutput}
+		ContextWindowTokens: model.MaxInput + model.MaxOutput, ManagedMaxInput: model.MaxInput, ManagedMaxOutput: model.MaxOutput}
 }
 
 // Load reads local provider settings and the current cloud session without making cloud requests.

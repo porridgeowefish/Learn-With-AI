@@ -114,7 +114,9 @@ func anthropicRequest(p askaiconfig.Provider, in Request, stream bool) map[strin
 		if in.ReasoningEffort != "" {
 			thinkingBudget = map[string]int{"low": 2048, "medium": 4096, "high": 8192, "xhigh": 16384}[in.ReasoningEffort]
 		}
-		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": thinkingBudget}
+		if ceiling := outputLimit(in); ceiling > 1024 {
+			body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": min(thinkingBudget, ceiling-1)}
+		}
 	}
 	if len(in.Tools) > 0 {
 		var tools []map[string]any
@@ -159,6 +161,9 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 			return nil, ErrUpstreamAuthRejected
 		}
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if contextLimitResponse(detail) {
+			return nil, ErrContextOverflow
+		}
 		return nil, fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))
 	}
 	return resp, nil

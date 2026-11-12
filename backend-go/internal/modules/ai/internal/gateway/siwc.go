@@ -122,13 +122,16 @@ func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, em
 		if inManagedStream(ctx) && upstreamAuthRejected(res) {
 			return ErrUpstreamAuthRejected
 		}
+		detail, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
+		if contextLimitResponse(detail) {
+			return ErrContextOverflow
+		}
 		if p.Kind == "siwc" {
 			if upstreamAuthRejected(res) {
 				return ErrChatGPTConnection
 			}
 			return &ChatGPTHTTPError{Status: res.StatusCode}
 		}
-		detail, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
 		return fmt.Errorf("OpenAI request status %d: %s", res.StatusCode, strings.TrimSpace(string(detail)))
 	}
 	scanner := bufio.NewScanner(res.Body)
@@ -203,9 +206,17 @@ func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, em
 			completed = true
 		case "response.failed", "response.incomplete":
 			if frame.Response.Error != nil {
+				if contextLimitMessage(frame.Response.Error.Code, frame.Response.Error.Message) {
+					return ErrContextOverflow
+				}
 				return fmt.Errorf("OpenAI response %s: %s", frame.Response.Error.Code, frame.Response.Error.Message)
 			}
 			return fmt.Errorf("OpenAI response %s", frame.Type)
+		case "error":
+			if contextLimitResponse([]byte(payload)) {
+				return ErrContextOverflow
+			}
+			return errors.New("OpenAI stream returned an error")
 		}
 		if completed {
 			break

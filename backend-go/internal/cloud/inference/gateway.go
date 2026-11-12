@@ -234,6 +234,9 @@ func (g *Gateway) Stream(ctx context.Context, model string, estimatedTokens int,
 			if ctx.Err() != nil {
 				return attempts, ctx.Err()
 			}
+			if ai.IsContextOverflow(err) {
+				return attempts, err
+			}
 			return attempts, ErrUpstream
 		}
 		lease.Finish(actual)

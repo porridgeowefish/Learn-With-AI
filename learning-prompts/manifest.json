@@ -1,5 +1,5 @@
 {
-  "version": "0.10.8",
+  "version": "0.10.9",
   "schemaVersion": 1,
   "resources": [
     {
@@ -9,6 +9,11 @@
       ],
       "path": "learning-prompts/auxiliary/annotation.json",
       "sha256": "98c9661399631ef81183f78e4315336552535d1e3bc694a2a6c8a3fdd26637be"
+    },
+    {
+      "variables": [],
+      "path": "learning-prompts/auxiliary/conversation-compaction.md",
+      "sha256": "f8db567861ff51a5df5e60677ba4a7a3b1aee883dd49dea5b691c1364e52ce5e"
     },
     {
       "variables": [
@@ -132,7 +137,7 @@
     {
       "variables": [],
       "path": "learning-prompts/profiles/teacher/general.json",
-      "sha256": "7b1f5e10d9853f8014038f52e27a45e082b186b372209d2d8faca9a3e48eab2f"
+      "sha256": "0365df6af63985c23b69dbee7b1f235dc5b278fbbd313bf844c0fb5e96b328da"
     },
     {
       "variables": [],

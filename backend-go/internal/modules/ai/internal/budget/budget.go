@@ -6,6 +6,7 @@ import (
 	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
 	gateway "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/gateway"
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
+	"math"
 	"net/url"
 	"strings"
 	"unicode/utf8"
@@ -29,28 +30,66 @@ type Budget struct{ Window, Output, Thinking, Margin int }
 
 var ErrContextBudgetExhausted = errors.New("teacher context budget exhausted; current learner message retained")
 
-func ForProvider(id string) Budget {
-	b := Budget{Window: 124576, Output: platformconfig.ModelOutputTokens, Margin: 1024}
+type TeacherBudget struct{ Window, InputLimit, Output, Margin int }
+
+func ForProvider(id string) TeacherBudget {
+	b := TeacherBudget{Output: platformconfig.ModelOutputTokens}
 	if cfg, err := aiconfig.Load(); err == nil && cfg != nil {
 		p := cfg.Resolve("teacher")
 		if id != "" {
 			p = cfg.Find(id)
 		}
 		if p != nil {
-			b = generationBudget(*p)
+			b.Window = configuredWindow(*p)
+			b.InputLimit = p.ManagedMaxInput
 			b.Output = GenerationOutputTokens(*p)
-			if p.ContextWindowTokens > 0 {
-				b.Window = p.ContextWindowTokens
-			}
-			if p.Kind == "anthropic" && p.Thinking {
-				b.Thinking = 2048
-			}
+			b.Margin = min(1024, b.Window/16)
 		}
 	}
-	if b.Margin > b.Window/16 {
-		b.Margin = b.Window / 16
-	}
 	return b
+}
+
+func (b TeacherBudget) capacity() int {
+	if b.InputLimit > 0 && (b.Window == 0 || b.InputLimit < b.Window) {
+		return b.InputLimit
+	}
+	return b.Window
+}
+
+func (b TeacherBudget) ShouldCompact(req gateway.Request) bool {
+	const standardWindow = 256000
+	capacity := b.capacity()
+	if capacity == 0 || capacity > standardWindow {
+		capacity = standardWindow
+	}
+	return (Budget{}).Input(req) >= capacity*80/100
+}
+
+func (b TeacherBudget) Available(req gateway.Request) int {
+	capacity := b.capacity()
+	if capacity == 0 {
+		return math.MaxInt
+	}
+	return capacity - b.Margin - 1 - (Budget{}).Input(req)
+}
+
+func (b TeacherBudget) Fit(req *gateway.Request) error {
+	if b.Available(*req) < 0 {
+		return ErrContextBudgetExhausted
+	}
+	if b.Window > 0 {
+		room := b.Window - b.Margin - (Budget{}).Input(*req)
+		req.MaxOutputTokens = min(req.MaxOutputTokens, room)
+	}
+	return nil
+}
+
+func (b TeacherBudget) SourceLimit(req gateway.Request) int {
+	limit := 12000
+	if capacity := b.capacity(); capacity > 0 {
+		limit = min(limit, capacity/4)
+	}
+	return min(limit, max(0, b.Available(req)-1024))
 }
 func (b Budget) Input(req gateway.Request) int {
 	n := EstimateTextTokens(req.System) + EstimateTextTokens(req.TurnInstructions) + 64
@@ -111,14 +150,26 @@ func generationBudget(p aiconfig.Provider) Budget {
 	// Unknown connections retain the previous ~23k input allowance plus the explicit output
 	// reservation. This is a local budgeting fallback, not a model capability.
 	b := Budget{Window: 124576, Output: platformconfig.ModelOutputTokens, Margin: 1024}
+	if window := configuredWindow(p); window > 0 {
+		b.Window = window
+	}
+	if p.Kind == "anthropic" && p.Thinking {
+		b.Thinking = 2048
+	}
+	b.Margin = min(b.Margin, b.Window/16)
+	return b
+}
+
+func configuredWindow(p aiconfig.Provider) int {
 	if p.ContextWindowTokens > 0 {
-		b.Window = p.ContextWindowTokens
-	} else if strings.TrimSpace(p.Model) == "glm-5.3" {
+		return p.ContextWindowTokens
+	}
+	if strings.TrimSpace(p.Model) == "glm-5.3" {
 		// Verified GLM-5.3 model capacity (2026-10-11). Legacy connections
 		// omit this field; do not incorrectly constrain the first-party model
 		// to the generic fallback. Unknown relays retain the safe fallback.
 		if endpoint, err := url.Parse(p.BaseURL); err == nil && (endpoint.Hostname() == "open.bigmodel.cn" || endpoint.Hostname() == "api.z.ai") {
-			b.Window = 1000000
+			return 1000000
 		}
 	}
 	if p.ContextWindowTokens == 0 {
@@ -130,52 +181,17 @@ func generationBudget(p aiconfig.Provider) Budget {
 				"deepseek/deepseek-v4-flash-vision-exp", "deepseek-v4-flash-0731", "deepseek-v4-pro-0813", "deepseek-v4-flash", "deepseek-v4-pro",
 				"glm-5.3-flash", "glm-5.3-flashx", "glm-5.3", "glm-5.2", "kimi-k3", "kimi-k2.8-preview", "minimax-m3",
 				"mimo-v2.6-pro", "mimo-v2.6-flash", "mimo-v2.5-pro", "step-5-preview":
-				b.Window = 1000000
+				return 1000000
 			case "hy3", "kimi-k2.7-code-highspeed", "kimi-k2.7-code", "kimi-k2.6":
-				b.Window = 256000
+				return 256000
 			case "glm-5v-turbo", "minimax-m2.7":
-				b.Window = 200000
+				return 200000
 			case "hunyuan-role-latest", "hy-role":
-				b.Window = 32000
+				return 32000
 			}
 		}
 	}
-	if p.Kind == "anthropic" && p.Thinking {
-		b.Thinking = 2048
-	}
-	b.Margin = min(b.Margin, b.Window/16)
-	return b
-}
-func (b Budget) TrimInitial(req *gateway.Request) error {
-	// A large model window is not a reason to resend an unbounded transcript.
-	// This local target does not start a paid summarization request. Keep the
-	// newest learner turn intact even when it alone exceeds the economy target.
-	const historyInputTarget = 24000
-	for b.Available(*req) < 1024 || b.Input(*req) > historyInputTarget {
-		nextTurn := -1
-		firstTurn := -1
-		for i := 0; i < len(req.Messages); i++ {
-			if !req.Messages[i].Pinned && req.Messages[i].Role == "user" && req.Messages[i].ToolCallID == "" {
-				if firstTurn < 0 {
-					firstTurn = i
-					continue
-				}
-				nextTurn = i
-				break
-			}
-		}
-		if nextTurn < 0 {
-			break
-		}
-		retained := make([]gateway.Message, 0, len(req.Messages))
-		for i, m := range req.Messages {
-			if i >= nextTurn || m.Pinned {
-				retained = append(retained, m)
-			}
-		}
-		req.Messages = retained
-	}
-	return b.Check(*req)
+	return 0
 }
 func TruncateTokens(s string, limit int) string {
 	if limit <= 0 {

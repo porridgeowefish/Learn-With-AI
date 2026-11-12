@@ -156,6 +156,9 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 			return nil
 		}
 		if len(chunk.Error) > 0 && string(chunk.Error) != "null" {
+			if contextLimitResponse(chunk.Error) {
+				return ErrContextOverflow
+			}
 			return errors.New("provider stream error")
 		}
 		for _, choice := range chunk.Choices {
@@ -373,6 +376,9 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		}
 		switch event.Type {
 		case "error":
+			if contextLimitResponse(payload) {
+				return ErrContextOverflow
+			}
 			return errors.New("provider stream error")
 		case "message_start":
 			// message_start carries usage nested inside its message envelope;

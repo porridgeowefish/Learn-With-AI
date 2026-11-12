@@ -610,6 +610,10 @@ func (s *Store) sequencedMessages(throughSeq *uint64) ([]SequencedMessage, error
 		cutoff := sort.Search(len(events), func(i int) bool { return events[i].Seq > *throughSeq })
 		events = events[:cutoff]
 	}
+	return visibleMessages(events), nil
+}
+
+func visibleMessages(events []Event) []SequencedMessage {
 	hidden := hiddenTeacherMessages(events)
 	var messages []SequencedMessage
 	for _, event := range events {
@@ -621,7 +625,7 @@ func (s *Store) sequencedMessages(throughSeq *uint64) ([]SequencedMessage, error
 			messages = append(messages, SequencedMessage{Seq: event.Seq, EventID: event.EventID, Message: message})
 		}
 	}
-	return messages, nil
+	return messages
 }
 
 func (s *Store) FindMessage(id string) (Message, bool, error) {
