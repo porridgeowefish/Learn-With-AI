@@ -1,11 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { readCloudDailyHistory, readCloudStatus } from '@/features/cloud-account';
+import { CredentialSetupForm, readCloudDailyHistory, readCloudStatus, type CloudStatus } from '@/features/cloud-account';
+import { Button } from '@/shared/primitive/Button';
 import s from './SettingsPage.module.css';
 
 const points = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 3 });
 
 export function AccountSettings() {
+  const qc = useQueryClient();
+  const [editingAccount, setEditingAccount] = useState<string>();
   const status = useQuery({ queryKey: ['cloud-account'], queryFn: readCloudStatus, retry: false });
   const account = status.data?.account;
   const history = useQuery({
@@ -17,7 +21,7 @@ export function AccountSettings() {
   if (!account) return <section className={s.appearance}>
     <h3>登录后查看个人信息</h3>
     <p>登录 Learn-With-AI 可查看积分余额和签到记录。</p>
-    <Link to="/login">登录 / 注册</Link>
+    <Link to="/login">登录</Link>
   </section>;
   const wallet = status.data.wallet;
   const balance = ((wallet?.balance ?? account.balance) - (wallet?.held ?? 0)) / 1000;
@@ -25,10 +29,19 @@ export function AccountSettings() {
     <section aria-labelledby="profile-title">
       <h3 id="profile-title">账号信息</h3>
       <dl className={s.accountFacts}>
-        <div><dt>账号</dt><dd>{account.name || '邮箱或 GitHub 登录'}</dd></div>
+        <div><dt>用户名</dt><dd>{account.name || '未设置'}</dd></div>
         <div><dt>邮箱</dt><dd>{account.email || '未绑定'}</dd></div>
         <div><dt>GitHub</dt><dd>{account.githubLinked ? '已绑定' : '未绑定'}</dd></div>
       </dl>
+      {account.id && !account.name && (editingAccount === account.id
+        ? <CredentialSetupForm key={account.id} accountId={account.id} dismissLabel="取消"
+          onDismiss={() => setEditingAccount(undefined)} onSaved={updated => {
+            qc.setQueryData<CloudStatus>(['cloud-account'], current =>
+              current && updated.id && current.account?.id === updated.id ? { ...current, account: updated } : current);
+            void qc.invalidateQueries({ queryKey: ['cloud-account'] });
+            setEditingAccount(undefined);
+          }} />
+        : <Button type="button" variant="outline" onClick={() => setEditingAccount(account.id)}>设置用户名和密码</Button>)}
     </section>
     <section aria-labelledby="account-points-title">
       <h3 id="account-points-title">积分与签到</h3>

@@ -53,9 +53,9 @@ func (s *Store) ForgetCode(ctx context.Context, email, purpose string, digest []
 }
 
 type EmailVerification struct {
-	Email, Purpose, Username, PasswordHash string
-	CodeDigest, SessionDigest              []byte
-	Now, SessionExpires                    time.Time
+	Email, Purpose, PasswordHash string
+	CodeDigest, SessionDigest    []byte
+	Now, SessionExpires          time.Time
 }
 
 func checkEmailCode(ctx context.Context, tx *sql.Tx, email, purpose string, supplied []byte, now time.Time) (bool, error) {
@@ -112,22 +112,6 @@ func (s *Store) VerifyEmail(ctx context.Context, in EmailVerification) (Account,
 			if err != nil {
 				return err
 			}
-		}
-		if in.Purpose == "register" {
-			result, err := tx.ExecContext(ctx, `UPDATE account SET username = ?, password_hash = ?
-				WHERE id = ? AND username IS NULL AND NOT EXISTS (SELECT 1 FROM account WHERE username = ?)`,
-				in.Username, in.PasswordHash, account.ID, in.Username)
-			if err != nil {
-				return err
-			}
-			n, err := result.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if n != 1 {
-				return ErrConflict
-			}
-			account.Name = in.Username
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE email_challenge SET used = 1 WHERE email = ? AND purpose = ?", in.Email, in.Purpose); err != nil {
 			return err

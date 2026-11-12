@@ -80,7 +80,8 @@ func (s *Store) ClaimGitHubCallback(ctx context.Context, digest []byte, now time
 	return flow, err
 }
 
-func (s *Store) CompleteGitHub(ctx context.Context, flowID, githubID, email string, now time.Time) error {
+// verifiedEmail is the normalized primary address verified by GitHub, or empty.
+func (s *Store) CompleteGitHub(ctx context.Context, flowID, githubID, verifiedEmail string, now time.Time) error {
 	return s.transaction(ctx, func(tx *sql.Tx) error {
 		var owner string
 		var ownerSession []byte
@@ -108,19 +109,10 @@ func (s *Store) CompleteGitHub(ctx context.Context, flowID, githubID, email stri
 		case !errors.Is(err, sql.ErrNoRows):
 			return err
 		default:
-			if email == "" {
+			if verifiedEmail == "" {
 				return ErrCode
 			}
-			err = tx.QueryRowContext(ctx, "SELECT id FROM account WHERE email=?", email).Scan(&accountID)
-			if err == nil {
-				_, err = tx.ExecContext(ctx, `UPDATE github_flow SET state='email_conflict', account_id=?, link_provider_id=?, verifier=''
-					WHERE id=?`, accountID, githubID, flowID)
-				return err
-			}
-			if !errors.Is(err, sql.ErrNoRows) {
-				return err
-			}
-			account, err := accountForEmail(ctx, tx, email, now)
+			account, err := accountForEmail(ctx, tx, verifiedEmail, now)
 			if err != nil {
 				return err
 			}

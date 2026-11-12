@@ -398,7 +398,11 @@
 .updatePanel { align-items: flex-start; }
 .updatePanel > div { min-width: 0; }
 .updatePanel progress { width: 100%; max-width: 420px; accent-color: var(--accent); }
-.releaseNotes { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; margin-top: 10px; font-size: .8rem; }
+.releaseNotes { max-height: 320px; overflow-y: auto; margin-top: 10px; padding-inline-end: 12px; font-size: .9rem; }
+.releaseNotes > :first-child { margin-top: 0; }
+.tutorial { width: min(100%, 72ch); }
+.tutorialActions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
+.tutorialActions a { color: var(--accent-ink); text-underline-offset: 3px; }
 
 @media (max-width: 720px) {
   .openSource { align-items: flex-start; flex-direction: column; }

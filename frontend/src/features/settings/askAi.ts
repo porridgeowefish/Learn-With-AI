@@ -131,6 +131,7 @@ export function useAskAiSettings() {
 export function useSaveAskAiSettings() {
   const qc = useQueryClient();
   return useMutation({
+    scope: { id: 'ask-ai-settings' },
     mutationFn: async (cfg: AskConfig) => {
       const res = await fetch(`${API_BASE}/api/settings/ask-ai`, {
         method: 'PUT',

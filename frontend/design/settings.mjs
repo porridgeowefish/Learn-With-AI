@@ -141,7 +141,7 @@ export async function settings(ctx) {
     state.update ||= {current:'0.8.14',latest:'0.8.15',available:true,canInstall:true,phase:'idle',downloadedBytes:0,totalBytes:48000000,
       notesUrl:'https://gitee.com/szu-andrew/learn-with-ai/releases/tag/v0.8.15',
       downloadUrl:'https://gitee.com/szu-andrew/learn-with-ai/releases/download/v0.8.15/learn-with-ai-0.8.15-windows-amd64.msi',
-      releaseNotes:'设计预览：以 Gitee 为更新源，支持检查、下载、取消与安装交接。这里不会下载或执行安装程序。'};
+      releaseNotes:'## 登录与模型连接\n\n- 支持 **自动保存** 学习模型。\n- 从设置打开使用教程。\n\n这里不会下载或执行安装程序。\n\n<!-- LWA-UPDATE-PARTS: preview -->'};
     const update=state.update;
     if (path.endsWith('/start')) { update.autoInstall=true; update.error=''; update.phase=update.phase==='ready'?'installing':'downloading'; }
     if (path.endsWith('/prepare') && !['ready','installing'].includes(update.phase)) update.phase='downloading';

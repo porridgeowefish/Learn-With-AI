@@ -10,11 +10,13 @@ import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
 import { useOnboardingStore } from '@/shared/store/slices/onboarding';
 import { Button } from '@/shared/primitive/Button';
+import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { UpdatePanel } from './UpdatePanel';
+import tutorial from './tutorial.md?raw';
 import s from './SettingsPage.module.css';
 import { FONT_SIZES, useFontSize, type FontSize } from '@/shared/lib/fontSize';
 
-const categories = [ ['general', '常规'], ['appearance', '外观'], ['models', '模型连接'], ['learning', '回复、搜索与记忆'], ['notes', '教师笔记'], ['storage', '存储与数据'], ['usage', 'Token 用量'], ['about', '更新与关于'] ] as const;
+const categories = [ ['tutorial', '使用教程'], ['appearance', '外观'], ['models', '模型连接'], ['learning', '回复、搜索与记忆'], ['notes', '教师笔记'], ['storage', '存储与数据'], ['usage', 'Token 用量'], ['about', '更新与关于'] ] as const;
 
 const visibleCategories = ([['account', '个人信息'], ...categories.filter(([id]) => id !== 'usage')] as const);
 export function SettingsPage() {
@@ -22,13 +24,16 @@ export function SettingsPage() {
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState('');
   const requested = params.get('section');
-  const section = visibleCategories.some(([id]) => id === requested) ? requested : requested === 'usage' ? 'account' : 'general';
+  const section = visibleCategories.some(([id]) => id === requested) ? requested : requested === 'usage' ? 'account' : 'tutorial';
   return <div className={s.host}>
     <aside className={s.navigation}><h1>设置</h1><input aria-label="搜索设置" placeholder="搜索设置" value={filter} onChange={e => setFilter(e.target.value)} /><nav aria-label="设置分类">{visibleCategories.filter(([,name]) => name.includes(filter)).map(([id,name]) => <button key={id} type="button" aria-current={section === id ? 'page' : undefined} onClick={() => setParams({section:id})}>{name}</button>)}</nav></aside>
     <div className={s.scroll} data-testid="settings-scroll" key={section}>
       <header className={s.header}><h2 className={s.title}>{visibleCategories.find(([id]) => id === section)?.[1]}</h2></header>
       {section === 'account' && <AccountSettings />}
-      {section === 'general' && <section className={s.appearance}><h2>学习工作台</h2><p>在左侧管理外观、模型、搜索与学习数据。</p>{false}<Link to="/settings?section=learning">管理回复与联网搜索</Link><div><Button onClick={startGuide}>开始屏幕向导</Button></div></section>}
+      {section === 'tutorial' && <section className={s.tutorial} aria-label="Learn-With-AI 使用教程">
+        <div className={s.tutorialActions}><Button variant="primary" onClick={startGuide}>开始屏幕向导</Button><Link to="/settings?section=models">打开模型连接</Link></div>
+        <MarkdownView source={tutorial} />
+      </section>}
       {section === 'appearance' && <AppearanceSection />}
       {section === 'models' && <ModelsPage />}
       {section === 'learning' && <LearningSettings />}

@@ -21,13 +21,12 @@ import (
 )
 
 const (
-	PurposeLogin    = "login"
-	PurposeRegister = "register"
-	PurposeReset    = "reset"
-	sessionTTL      = 30 * 24 * time.Hour
-	passwordRounds  = 600_000
-	passwordMin     = 6
-	passwordMax     = 256
+	PurposeLogin   = "login"
+	PurposeReset   = "reset"
+	sessionTTL     = 30 * 24 * time.Hour
+	passwordRounds = 600_000
+	passwordMin    = 6
+	passwordMax    = 256
 )
 
 var (
@@ -63,7 +62,7 @@ func normalizeEmail(value string) (string, error) {
 }
 
 func validPurpose(purpose string) bool {
-	return purpose == PurposeLogin || purpose == PurposeRegister || purpose == PurposeReset
+	return purpose == PurposeLogin || purpose == PurposeReset
 }
 
 func (s *Service) codeDigest(email, purpose, code string) []byte {
@@ -173,7 +172,7 @@ func (s *Service) UnlinkIdentity(ctx context.Context, token, provider, password 
 }
 
 type EmailInput struct {
-	Email, Purpose, Code, Username, Password string
+	Email, Purpose, Code, Password string
 }
 
 type Session struct {
@@ -182,23 +181,16 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-func (s *Service) RegisterPassword(ctx context.Context, username, password, confirmation string) (Session, error) {
+func (s *Service) SetLoginCredentials(ctx context.Context, token, username, password, confirmation string) (store.Account, error) {
 	username = strings.ToLower(strings.TrimSpace(username))
 	if !usernameFormat.MatchString(username) || password != confirmation || len(password) < passwordMin || len(password) > passwordMax {
-		return Session{}, ErrInvalid
+		return store.Account{}, ErrInvalid
 	}
 	hash, err := hashPassword(password)
 	if err != nil {
-		return Session{}, err
+		return store.Account{}, err
 	}
-	now := s.now()
-	token := rand.Text()
-	expires := now.Add(sessionTTL)
-	account, err := s.store.RegisterPassword(ctx, username, hash, sessionDigest(token), now, expires)
-	if err != nil {
-		return Session{}, err
-	}
-	return Session{Account: account, Token: token, ExpiresAt: expires}, nil
+	return s.store.SetLoginCredentials(ctx, username, hash, sessionDigest(token), s.now())
 }
 
 func (s *Service) VerifyEmail(ctx context.Context, in EmailInput) (Session, error) {
@@ -206,14 +198,8 @@ func (s *Service) VerifyEmail(ctx context.Context, in EmailInput) (Session, erro
 	if err != nil || !validPurpose(in.Purpose) || !validCode(in.Code) {
 		return Session{}, ErrInvalid
 	}
-	var username, hash string
-	if in.Purpose == PurposeRegister {
-		username = strings.ToLower(strings.TrimSpace(in.Username))
-		if !usernameFormat.MatchString(username) {
-			return Session{}, ErrInvalid
-		}
-	}
-	if in.Purpose == PurposeRegister || in.Purpose == PurposeReset {
+	var hash string
+	if in.Purpose == PurposeReset {
 		if len(in.Password) < passwordMin || len(in.Password) > passwordMax {
 			return Session{}, ErrInvalid
 		}
@@ -226,7 +212,7 @@ func (s *Service) VerifyEmail(ctx context.Context, in EmailInput) (Session, erro
 	token := rand.Text()
 	expires := now.Add(sessionTTL)
 	account, err := s.store.VerifyEmail(ctx, store.EmailVerification{
-		Email: email, Purpose: in.Purpose, Username: username, PasswordHash: hash,
+		Email: email, Purpose: in.Purpose, PasswordHash: hash,
 		CodeDigest: s.codeDigest(email, in.Purpose, in.Code), SessionDigest: sessionDigest(token),
 		Now: now, SessionExpires: expires,
 	})

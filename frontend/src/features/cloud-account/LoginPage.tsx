@@ -3,9 +3,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { GitHubLogoIcon, EnvelopeClosedIcon, ArrowLeftIcon } from '@radix-ui/react-icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/primitive/Button';
+import { CredentialSetupForm } from './CredentialSetupForm';
 import { cloudAction, GitHubEmailConfirmation, githubLogin, googleLogin, type Account, type CloudStatus } from './api';
 import googleLogo from './google-g.png';
 import s from './LoginPage.module.css';
+
+const skipKey = (accountId: string) => `lwa:credential-setup-skipped:${accountId}`;
+
+function didSkipSetup(accountId: string) {
+  try { return localStorage.getItem(skipKey(accountId)) === '1'; }
+  catch { return false; }
+}
 
 export function LoginPage() {
   const qc = useQueryClient();
@@ -14,12 +22,12 @@ export function LoginPage() {
   const requested = location.state?.next;
   const next = typeof requested === 'string' && (requested === '/operations' || /^\/project\/[^/]+(?:\/[^/]+)?$/.test(requested))
     ? requested : '/';
-  const [mode, setMode] = useState<'password' | 'email' | 'register' | 'reset' | 'github-email'>('password');
+  const [mode, setMode] = useState<'password' | 'email' | 'reset' | 'github-email'>('password');
+  const [setupAccountId, setSetupAccountId] = useState<string>();
   const [githubFlow, setGitHubFlow] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const register = mode === 'register';
   const reset = mode === 'reset';
   const usesEmail = mode === 'email' || reset;
   const confirmsGitHub = mode === 'github-email';
@@ -30,9 +38,14 @@ export function LoginPage() {
     setMessage('');
   }
 
-  function accept(account: Account) {
+  function accept(account: Account, offerSetup = false) {
     qc.setQueryData<CloudStatus>(['cloud-account'], { signedIn: true, account });
     void qc.invalidateQueries({ queryKey: ['cloud-account'] });
+    if (offerSetup && account.id && !account.name && !didSkipSetup(account.id)) {
+      setSetupAccountId(account.id);
+      setMessage('');
+      return;
+    }
     navigate(next, { replace: true });
   }
 
@@ -49,22 +62,20 @@ export function LoginPage() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const fields = { username: data.get('username'), password: data.get('password') };
-    if ((register || reset) && fields.password !== data.get('confirmPassword')) {
+    if (reset && fields.password !== data.get('confirmPassword')) {
       setMessage('两次输入的密码不一致。');
       return;
     }
     void perform(async () => {
-      if (register) {
-        accept(await cloudAction<Account>('register', { ...fields, confirmPassword: data.get('confirmPassword') }));
-      } else if (confirmsGitHub) {
-        accept(await cloudAction<Account>('github-finish', { flowId: githubFlow, code: data.get('code') }));
+      if (confirmsGitHub) {
+        accept(await cloudAction<Account>('github-finish', { flowId: githubFlow, code: data.get('code') }), true);
       } else if (usesEmail) {
         accept(await cloudAction<Account>('verify-email', {
           email: email.trim(),
           code: data.get('code'),
           purpose,
           ...(reset && { password: fields.password }),
-        }));
+        }), !reset);
       } else {
         accept(await cloudAction<Account>('password', fields));
       }
@@ -97,7 +108,7 @@ export function LoginPage() {
     const waiting = () => setMessage('请在浏览器完成授权。');
     void perform(async () => {
       if (provider === 'google') setMessage('正在打开 Google 授权…');
-      try { accept(await (provider === 'github' ? githubLogin(false, waiting) : googleLogin(waiting))); }
+      try { accept(await (provider === 'github' ? githubLogin(false, waiting) : googleLogin(waiting)), true); }
       catch (error) {
         if (!(error instanceof GitHubEmailConfirmation)) throw error;
         setGitHubFlow(error.flowId);
@@ -112,14 +123,21 @@ export function LoginPage() {
       <section className={s.card}>
         <header className={s.header}>
           <div className={s.brand}><img src="/app-icon.png" alt="" /> Learn-With-AI</div>
-          <h1>{register ? '注册' : reset ? '找回密码' : confirmsGitHub ? '验证邮箱' : usesEmail ? '邮箱验证码登录' : '登录'}</h1>
-          {reset && <p className={s.hint}>请输入已绑定到账号的邮箱。</p>}
-          {confirmsGitHub && <p className={s.hint}>该邮箱已有 Learn-With-AI 账号。验证后可继续使用原账号和积分。</p>}
+          <h1>{setupAccountId ? '设置用户名和密码' : reset ? '找回密码' : confirmsGitHub ? '验证邮箱' : usesEmail ? '邮箱验证码登录' : '登录'}</h1>
+          {setupAccountId && <p className={s.hint}>设置后可用用户名和密码登录。也可以稍后在「设置 → 个人信息」添加。</p>}
+          {!setupAccountId && reset && <p className={s.hint}>请输入已绑定到账号的邮箱。</p>}
+          {!setupAccountId && confirmsGitHub && <p className={s.hint}>该邮箱已有 Learn-With-AI 账号。验证后可继续使用原账号和积分。</p>}
         </header>
+        {setupAccountId ? <CredentialSetupForm accountId={setupAccountId} dismissLabel="跳过"
+          onSaved={accept} onDismiss={() => {
+            try { localStorage.setItem(skipKey(setupAccountId), '1'); }
+            catch { /* A storage restriction should not prevent continuing. */ }
+            navigate(next, { replace: true });
+          }} /> : <>
         <form className={s.form} onSubmit={submit} key={mode}>
           {!usesEmail && !confirmsGitHub && <>
-            <label>账号<input name="username" autoComplete="username" required /></label>
-            <label>密码<input type="password" name="password" autoComplete={register ? 'new-password' : 'current-password'} minLength={register ? 6 : undefined} required /></label>
+            <label>用户名<input name="username" autoComplete="username" required /></label>
+            <label>密码<input type="password" name="password" autoComplete="current-password" required /></label>
           </>}
           {usesEmail && <label>邮箱<input type="email" name="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="QQ 邮箱或 Gmail" /></label>}
           {(usesEmail || confirmsGitHub) &&
@@ -129,17 +147,12 @@ export function LoginPage() {
             </div>
           }
           {reset && <label>新密码<input type="password" name="password" autoComplete="new-password" minLength={6} required /></label>}
-          {(register || reset) && <label>确认密码<input type="password" name="confirmPassword" autoComplete="new-password" required /></label>}
-          <Button type="submit" className={s.submit} variant="outline" loading={busy}>{register ? '注册并登录' : reset ? '重设密码并登录' : '登录'}</Button>
+          {reset && <label>确认密码<input type="password" name="confirmPassword" autoComplete="new-password" required /></label>}
+          <Button type="submit" className={s.submit} variant="outline" loading={busy}>{reset ? '重设密码并登录' : '登录'}</Button>
           {mode === 'password' && <button type="button" className={`${s.textLink} ${s.recoveryLink}`} disabled={busy}
             onClick={() => showMode('reset')}>忘记密码？</button>}
         </form>
-        <div className={s.registration}>
-          {mode === 'password' && <span>没有账号？</span>}
-          <button type="button" className={s.textLink} disabled={busy} onClick={() => showMode(mode === 'password' ? 'register' : 'password')}>
-            {mode === 'password' ? '注册' : '返回登录'}
-          </button>
-        </div>
+        {mode !== 'password' && <button type="button" className={`${s.textLink} ${s.dismissLink}`} disabled={busy} onClick={() => showMode('password')}>返回登录</button>}
         {mode === 'password' && <>
           <div className={s.divider}><span id="other-login-methods">其他登录方式</span></div>
           <div className={s.providers} role="group" aria-labelledby="other-login-methods">
@@ -158,6 +171,7 @@ export function LoginPage() {
           </div>
         </>}
         {message && <p className={s.notice} role="status">{message}</p>}
+        </>}
       </section>
     </main>
   );

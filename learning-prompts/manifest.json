@@ -1,5 +1,5 @@
 {
-  "version": "0.10.4",
+  "version": "0.10.8",
   "schemaVersion": 1,
   "resources": [
     {
@@ -178,7 +178,7 @@
     {
       "variables": [],
       "path": "learning-prompts/teaching/teacher.md",
-      "sha256": "1b7f6fc1eb2c22d5c7d079d2d29cf7a172f87075c1a47be041702f576bf94000"
+      "sha256": "19320cb7c215e30b5fd230f9a78cd811a2c545ff7d5f58e707c9b3d2cb337132"
     },
     {
       "variables": [],

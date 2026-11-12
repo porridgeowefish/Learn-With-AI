@@ -62,11 +62,17 @@ PRAGMA user_version = 11;
 	return tx.Commit()
 }
 
-func (s *Store) RegisterPassword(ctx context.Context, username, passwordHash string, sessionDigest []byte, now, expires time.Time) (Account, error) {
-	account := Account{ID: randomID(), Name: username, Balance: WelcomeCredits}
+func (s *Store) SetLoginCredentials(ctx context.Context, username, passwordHash string, sessionDigest []byte, now time.Time) (Account, error) {
+	var account Account
 	err := s.transaction(ctx, func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `INSERT INTO account(id,username,password_hash,created_at,balance)
-			VALUES(?,?,?,?,?) ON CONFLICT(username) DO NOTHING`, account.ID, username, passwordHash, now.Unix(), account.Balance)
+		var err error
+		account, err = sessionAccount(ctx, tx, sessionDigest, now)
+		if err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE account SET username=?, password_hash=?
+			WHERE id=? AND username IS NULL AND password_hash IS NULL
+			AND NOT EXISTS (SELECT 1 FROM account WHERE username=?)`, username, passwordHash, account.ID, username)
 		if err != nil {
 			return err
 		}
@@ -77,10 +83,8 @@ func (s *Store) RegisterPassword(ctx context.Context, username, passwordHash str
 		if n != 1 {
 			return ErrConflict
 		}
-		if _, err := tx.ExecContext(ctx, "INSERT INTO credit_movement VALUES(?,?,?,?,?)", account.ID, "welcome", "registration", WelcomeCredits, now.Unix()); err != nil {
-			return err
-		}
-		return issueSignedInSession(ctx, tx, account.ID, sessionDigest, now, expires)
+		account.Name = username
+		return nil
 	})
 	return account, err
 }

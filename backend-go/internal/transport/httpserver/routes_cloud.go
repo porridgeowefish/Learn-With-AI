@@ -112,8 +112,8 @@ func (s *Server) handleCloudAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Email, Purpose, Code, Username, Password, ConfirmPassword, Model, FlowID string
-		Link                                                                     bool
+		Email, Purpose, Code, Username, Password, ConfirmPassword, Model, FlowID, AccountID string
+		Link                                                                                bool
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8192)
 	if err := httpx.ReadJSON(r, &in); err != nil {
@@ -137,8 +137,8 @@ func (s *Server) handleCloudAction(w http.ResponseWriter, r *http.Request) {
 		out, err = client.UnlinkIdentity(r.Context(), "github", in.Password)
 	case "password":
 		out, err = client.LoginPassword(r.Context(), in.Username, in.Password)
-	case "register":
-		out, err = client.RegisterPassword(r.Context(), in.Username, in.Password, in.ConfirmPassword)
+	case "set-credentials":
+		out, err = client.SetLoginCredentials(r.Context(), in.AccountID, in.Username, in.Password, in.ConfirmPassword)
 	case "claim":
 		out, err = client.ClaimDaily(r.Context())
 	case "select-model":

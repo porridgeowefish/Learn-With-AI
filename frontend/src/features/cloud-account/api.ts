@@ -45,6 +45,9 @@ async function read<T>(path: string, body?: object): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (data.error === 'github_email_confirmation_required') throw new GitHubEmailConfirmation();
+    if (path === '/api/cloud/set-credentials' && data.error === 'account_conflict') {
+      throw new Error('用户名已被使用，或当前账号已设置用户名和密码。');
+    }
     if (path === '/api/cloud/unbind-email' || path === '/api/cloud/unbind-github') {
       if (data.error === 'invalid_credentials') throw new Error('当前密码有误，请重试。');
       if (data.error === 'account_conflict') throw new Error('此登录方式已解绑，或当前账号未设置密码。');

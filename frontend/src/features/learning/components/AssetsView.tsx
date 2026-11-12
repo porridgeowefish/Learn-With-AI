@@ -38,10 +38,10 @@ export function AssetsView({slug}:{slug:string}) {
  useEffect(()=>setRoundId(null),[asset.data?.meta.currentVersionId]);
  const commit=()=>{if(!asset.data)return;save.mutate({baseEditRevision:asset.data.meta.editRevision,content:draft},{onSuccess:()=>setEditing(false)});};
  return <section className={s.assets}>
-  <div className={s.assetTabs} data-tour="notes-tabs">
-   {(assets.data??[]).map(meta=><button key={meta.key} className={view===meta.key?s.active:''} onClick={()=>{setView(meta.key);setEditing(false);}}>{meta.title}</button>)}
-   <button className={view==='notes'?s.active:''} onClick={()=>{setView('notes');setEditing(false);}}>笔记</button>
-   <button className={view==='feynman'?s.active:''} onClick={()=>{setView('feynman');setEditing(false);}}>讲给教师听</button>
+  <div className={s.assetTabs} data-tour="notes-tabs" role="group" aria-label="笔记与复习视图">
+   {(assets.data??[]).map(meta=><button type="button" key={meta.key} aria-pressed={view===meta.key} onClick={()=>{setView(meta.key);setEditing(false);}}>{meta.title}</button>)}
+   <button type="button" aria-pressed={view==='notes'} onClick={()=>{setView('notes');setEditing(false);}}>笔记</button>
+   <button type="button" aria-pressed={view==='feynman'} onClick={()=>{setView('feynman');setEditing(false);}}>讲给教师听</button>
   </div>
   {view==='notes'?<NotesView slug={slug}/>:view==='feynman'?<div className={s.layout}><article className={s.document}><FeynmanView slug={slug}/></article></div>:<div className={`${s.layout} ${key==='review'?s.withNotes:''}`}>
    <article className={s.document}>

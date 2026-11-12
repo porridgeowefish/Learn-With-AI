@@ -1,7 +1,9 @@
 .assets { height: 100%; display: flex; flex-direction: column; background: var(--bg); }
-.assetTabs { flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 5px; padding: 18px 20px 11px; }
-.assetTabs button { padding: 7px 14px; border: 0; border-radius: 999px; color: var(--muted); background: transparent; font-size: 0.8rem; }
-.assetTabs .active { color: var(--fg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.assetTabs { flex: 0 0 auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; padding: 18px 20px 11px; }
+.assetTabs button { min-height: 38px; padding: 7px 14px; border: 1px solid var(--border); border-radius: 999px; color: var(--fg); background: var(--surface-raised); font-size: .9rem; font-weight: 600; }
+.assetTabs button:hover { border-color: var(--accent-ink); background: var(--surface-tint); }
+.assetTabs button[aria-pressed='true'] { border-color: var(--fg); color: var(--bg); background: var(--fg); }
+.assetTabs button:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
 .layout { flex: 1; min-height: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; align-items: start; gap: 18px; overflow: auto; padding: 10px 18px 24px; }
 .withNotes { grid-template-columns: minmax(0, 1fr); align-items: start; }
 .document { position: relative; width: 100%; min-width: 0; min-height: calc(100vh - 156px); height: max-content; align-self: start; box-sizing: border-box; padding: 28px 36px 58px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow-sm); }

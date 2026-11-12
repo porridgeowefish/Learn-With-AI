@@ -270,8 +270,26 @@ func (c *Client) LoginPassword(ctx context.Context, username, password string) (
 	return c.signIn(ctx, "v1/auth/password", map[string]string{"username": username, "password": password})
 }
 
-func (c *Client) RegisterPassword(ctx context.Context, username, password, confirmation string) (Account, error) {
-	return c.signIn(ctx, "v1/auth/register", map[string]string{"username": username, "password": password, "confirmPassword": confirmation})
+func (c *Client) SetLoginCredentials(ctx context.Context, accountID, username, password, confirmation string) (Account, error) {
+	current := c.currentSession()
+	if current.Token == "" || accountID == "" || current.Account.ID != accountID || !time.Now().Before(current.ExpiresAt) {
+		return Account{}, ErrLoginRequired
+	}
+	var account Account
+	_, err := c.json(ctx, http.MethodPost, "v1/account/credentials", current.Token, map[string]string{
+		"username": username, "password": password, "confirmPassword": confirmation,
+	}, &account)
+	if err != nil {
+		return Account{}, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.session.Token != current.Token || account.ID != accountID {
+		return Account{}, ErrLoginRequired
+	}
+	c.session.Account = account
+	c.persistLocked()
+	return account, nil
 }
 
 func (c *Client) signIn(ctx context.Context, path string, payload any) (Account, error) {

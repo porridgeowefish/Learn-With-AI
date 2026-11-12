@@ -75,10 +75,10 @@ func New(db *store.Store, accounts *auth.Service, gateway Streamer, models []Mod
 	s.mux.HandleFunc("POST /v1/auth/email/bind/verify", s.bindEmail)
 	s.mux.HandleFunc("POST /v1/auth/{provider}/unbind", s.unlinkIdentity)
 	s.mux.HandleFunc("POST /v1/auth/password", s.loginPassword)
-	s.mux.HandleFunc("POST /v1/auth/register", s.registerPassword)
 	s.mux.HandleFunc("POST /v1/auth/refresh", s.refresh)
 	s.mux.HandleFunc("POST /v1/auth/logout", s.logout)
 	s.mux.HandleFunc("GET /v1/account", s.account)
+	s.mux.HandleFunc("POST /v1/account/credentials", s.setLoginCredentials)
 	s.mux.HandleFunc("POST /v1/credits/daily", s.claimDaily)
 	s.mux.HandleFunc("GET /v1/credits/daily/history", s.dailyClaimHistory)
 	s.mux.HandleFunc("POST /v1/credits/settlements", s.creditSettlements)
@@ -158,11 +158,14 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
-	var in auth.EmailInput
+	var in struct {
+		auth.EmailInput
+		Username string // Accepted for compatibility with older desktop clients.
+	}
 	if !decode(w, r, &in, 8192) || !s.allowAuth(w, r, "verify", in.Email, 20) {
 		return
 	}
-	session, err := s.accounts.VerifyEmail(r.Context(), in)
+	session, err := s.accounts.VerifyEmail(r.Context(), in.EmailInput)
 	writeSession(w, session, err)
 }
 
@@ -232,13 +235,25 @@ func (s *Server) loginPassword(w http.ResponseWriter, r *http.Request) {
 	writeSession(w, session, err)
 }
 
-func (s *Server) registerPassword(w http.ResponseWriter, r *http.Request) {
-	var in struct{ Username, Password, ConfirmPassword string }
-	if !decode(w, r, &in, 8192) || !s.allowAuth(w, r, "register", in.Username, 5) {
+func (s *Server) setLoginCredentials(w http.ResponseWriter, r *http.Request) {
+	current, ok := s.authenticated(w, r)
+	if !ok {
 		return
 	}
-	session, err := s.accounts.RegisterPassword(r.Context(), in.Username, in.Password, in.ConfirmPassword)
-	writeSession(w, session, err)
+	var in struct{ Username, Password, ConfirmPassword string }
+	if !decode(w, r, &in, 8192) || !s.allowAuth(w, r, "set-credentials", current.ID, 5) {
+		return
+	}
+	account, err := s.accounts.SetLoginCredentials(r.Context(), bearer(r), in.Username, in.Password, in.ConfirmPassword)
+	if errors.Is(err, store.ErrNotFound) {
+		fail(w, http.StatusUnauthorized, "login_required")
+		return
+	}
+	if err != nil {
+		authError(w, err)
+		return
+	}
+	respond(w, http.StatusOK, account)
 }
 
 func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {

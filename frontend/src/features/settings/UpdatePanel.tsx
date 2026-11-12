@@ -1,4 +1,5 @@
 import { useUpdateAction, useUpdateInfo } from './update';
+import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import s from './SettingsPage.module.css';
 
 const megabytes = (n: number) => (n / 1048576).toFixed(1) + ' MB';
@@ -7,6 +8,7 @@ export function UpdatePanel() {
   const query = useUpdateInfo();
   const action = useUpdateAction();
   const info = query.data;
+  const releaseNotes = info?.releaseNotes?.replace(/<!--[^]*?-->/g, '').trim();
   const phase = info?.phase ?? 'idle';
   const downloading = phase === 'downloading';
   const waiting = phase === 'waiting';
@@ -30,7 +32,7 @@ export function UpdatePanel() {
       {installing && <p role="status">正在退出并安装更新，完成后将重新打开应用。</p>}
       {info?.installResult && <p role="status">{info.installResult}</p>}
       {(info?.error || query.isError || action.isError) && <p role="alert">{action.error?.message || info?.error || query.error?.message}</p>}
-      {info?.releaseNotes && <details><summary>查看更新说明</summary><div className={s.releaseNotes}>{info.releaseNotes}</div></details>}
+      {releaseNotes && <details><summary>查看更新说明</summary><MarkdownView className={s.releaseNotes} source={releaseNotes} /></details>}
     </div>
     <div className={s.settingsActions}>
       <button disabled={busy} onClick={() => action.mutate('check')}>{action.isPending && action.variables === 'check' ? '正在检查…' : '检查更新'}</button>

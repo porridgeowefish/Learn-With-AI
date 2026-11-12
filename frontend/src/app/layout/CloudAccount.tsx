@@ -70,7 +70,7 @@ export function CloudAccount() {
         setOpen(true); void status.refetch();
       }}>
         <span className={s.avatar} aria-hidden="true">{account ? Array.from(name)[0]?.toUpperCase() : <PersonIcon />}</span>
-        <span className={s.accountName}>{account ? name : '登录 / 注册'}</span>
+        <span className={s.accountName}>{account ? name : '登录'}</span>
       </button>
       {account && <Modal open={open} onOpenChange={next => {
         setOpen(next);

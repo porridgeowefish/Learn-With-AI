@@ -28,7 +28,7 @@
 .form input {
   min-width: 0;
   width: 100%;
-  height: var(--control-height);
+  height: var(--control-height, 44px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding-inline: 12px;
@@ -38,7 +38,7 @@
   font-weight: 400;
 }
 .form input:focus-visible, .card button:focus-visible, .back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.form .submit, .form .codeButton { min-height: var(--control-height); font-size: .92rem; }
+.form .submit, .form .codeButton { min-height: var(--control-height, 44px); font-size: .92rem; }
 .form .submit {
   justify-content: flex-start;
   padding-inline: 12px;
@@ -49,8 +49,8 @@
   font-weight: 700;
 }
 .form .submit:hover:not(:disabled) { background: var(--accent-medium); }
-.registration { display: flex; align-items: baseline; gap: 4px; color: var(--muted); font-size: .9rem; }
 .textLink { background: transparent; border: 0; padding: 2px; color: var(--accent-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.dismissLink { justify-self: start; font-size: .9rem; }
 .recoveryLink { justify-self: end; font-size: .9rem; }
 .hint { margin: 0; color: var(--muted); font-size: .9rem; }
 .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .82rem; }
