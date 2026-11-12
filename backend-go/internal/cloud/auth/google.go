@@ -65,7 +65,7 @@ func (g *Google) Available(ctx context.Context) bool {
 	if time.Now().Before(g.readyUntil) {
 		return g.ready
 	}
-	probe, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	probe, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(probe, http.MethodGet, googleUserInfoURL, nil)
 	if err != nil {
