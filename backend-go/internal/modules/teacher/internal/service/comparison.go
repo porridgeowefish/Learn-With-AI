@@ -34,7 +34,7 @@ func compareFirstAnswer(ctx context.Context, slug, providerID string, conversati
 	if err != nil {
 		return false, nil
 	}
-	comparisonID, err := client.StartComparison(ctx, operation)
+	assignment, err := client.StartComparison(ctx, operation)
 	if err != nil {
 		if ctx.Err() == nil {
 			var remote *llmcloud.RemoteError
@@ -49,14 +49,14 @@ func compareFirstAnswer(ctx context.Context, slug, providerID string, conversati
 		}
 		return false, nil
 	}
-	if comparisonID == "" {
+	if assignment.ID == "" {
 		return false, nil
 	}
 	claimed, err := conversation.FirstAnswerComparisonOperation(true)
 	if err != nil || claimed == "" {
 		return false, nil
 	}
-	return true, streamComparison(ctx, client, conversation, comparisonID, input, responseID, messageID, emit)
+	return true, streamComparison(ctx, client, conversation, assignment, input, responseID, messageID, emit)
 }
 
 func firstAnswerInput(slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message) (llmcloud.ComparisonInput, error) {
@@ -128,7 +128,8 @@ func limitComparisonText(value string, maxBytes int) string {
 	return value[:maxBytes]
 }
 
-func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, comparisonID string, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame)) error {
+func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, assignment llmcloud.ComparisonAssignment, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame)) error {
+	comparisonID := assignment.ID
 	emit(StreamFrame{Type: "comparison-started", Data: map[string]any{"comparisonId": comparisonID}})
 	type arm struct {
 		id       string
@@ -186,7 +187,7 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 	if err != nil {
 		return err
 	}
-	if _, err = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": messageID, "status": message.Status}); err != nil {
+	if _, err = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": messageID, "status": message.Status, "model": assignment.Model}); err != nil {
 		return err
 	}
 	if message.Status == "completed" {

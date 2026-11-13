@@ -31,7 +31,7 @@ func (g *Gateway) ProbeTools(ctx context.Context, connectionID string) (ProbeRes
 	result := ProbeResult{Model: upstream.Provider.Model}
 	assistant := ai.GatewayMessage{Role: "assistant"}
 	var content, providerContent, reasoning strings.Builder
-	err := ai.StreamUpstream(ctx, upstream.Provider, request, func(event ai.GatewayEvent) {
+	err := ai.StreamUpstream(ctx, g.client, upstream.Provider, request, func(event ai.GatewayEvent) {
 		switch event.Type {
 		case "tool-call-ready":
 			if event.ToolCall != nil {
@@ -65,7 +65,7 @@ func (g *Gateway) ProbeTools(ctx context.Context, connectionID string) (ProbeRes
 	assistant.ReasoningContent = reasoning.String()
 	request.Messages = append(request.Messages, assistant, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: `{"value":"ping"}`})
 	seenText := false
-	err = ai.StreamUpstream(ctx, upstream.Provider, request, func(event ai.GatewayEvent) {
+	err = ai.StreamUpstream(ctx, g.client, upstream.Provider, request, func(event ai.GatewayEvent) {
 		if event.Type == "text-delta" && strings.TrimSpace(event.Delta) != "" {
 			seenText = true
 		}

@@ -84,6 +84,7 @@ func New(db *store.Store, accounts *auth.Service, gateway Streamer, models []Mod
 	s.mux.HandleFunc("GET /v1/credits/daily/history", s.dailyClaimHistory)
 	s.mux.HandleFunc("POST /v1/credits/settlements", s.creditSettlements)
 	s.mux.HandleFunc("POST /v1/inference", s.stream)
+	s.mux.HandleFunc("POST /v1/reply-feedback", s.submitReplyFeedback)
 	return s, nil
 }
 

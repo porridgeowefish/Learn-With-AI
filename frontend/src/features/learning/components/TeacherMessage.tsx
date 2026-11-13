@@ -81,6 +81,12 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
   const awaitingAnswer = teacher && streaming && !hasAnswer && !message.comparison && message.status !== 'failed';
   const profile = useLearningProfile();
   const citations = message.sourceCitations ?? [];
+  const showActions = actions && !streaming && (!message.comparison || message.comparison.vote);
+  const messageButtons = showActions && <>
+    <button type="button" className={s.iconButton} title={actions.copied ? '已复制' : '复制原文'} aria-label={actions.copied ? '已复制' : '复制原文'} onClick={() => void actions.onCopy(message)}><CopyIcon />{actions.copied && <span className={s.copiedMark}>已复制</span>}</button>
+    {actions.canRegenerate && message.status !== 'failed' && <button type="button" className={s.iconButton} title="重新生成这条回复" aria-label="重新生成这条回复" onClick={actions.onRegenerate}><RegenerateIcon /></button>}
+    <button type="button" className={s.iconButton} title="下载本条文本" aria-label="下载本条文本" onClick={() => actions.onDownload(message)}><DownloadIcon /></button>
+  </>;
   const citationSource = (source: string) => source.replace(/\[\[source:([^\]]+)\]\]/g, (_marker, id: string) => {
     const index = citations.findIndex(item => item.evidenceId === id);
     return index < 0 ? '' : `[资料 ${index + 1}]`;
@@ -105,14 +111,9 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
         {notice && <div className={s.notice}>{notice}</div>}
         {teacher && !streaming && message.status === 'failed' && <TeacherFailure code={message.failureCode}
           retry={actions?.canRegenerate ? actions.onRegenerate : undefined} />}
-        {teacher && !streaming && hasAnswer && message.status !== 'failed' && <AnswerFeedback slug={slug} message={message} />}
-        {actions && !streaming && (!message.comparison || message.comparison.vote) && (
-          <div className={s.messageActions}>
-            <button type="button" className={s.iconButton} title={actions.copied ? '已复制' : '复制原文'} aria-label={actions.copied ? '已复制' : '复制原文'} onClick={() => void actions.onCopy(message)}><CopyIcon />{actions.copied && <span className={s.copiedMark}>已复制</span>}</button>
-            <button type="button" className={s.iconButton} title="下载本条文本" aria-label="下载本条文本" onClick={() => actions.onDownload(message)}><DownloadIcon /></button>
-            {actions.canRegenerate && message.status !== 'failed' && <button type="button" className={s.iconButton} title="重新生成这条回复" aria-label="重新生成这条回复" onClick={actions.onRegenerate}><RegenerateIcon /></button>}
-          </div>
-        )}
+        {teacher && !streaming && hasAnswer && message.status !== 'failed' && (!message.comparison || message.comparison.vote)
+          ? <AnswerFeedback slug={slug} message={message}>{messageButtons}</AnswerFeedback>
+          : showActions && <div className={s.messageActions}>{messageButtons}</div>}
       </div>
     </article>
   );

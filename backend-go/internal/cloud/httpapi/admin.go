@@ -118,6 +118,7 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 	}
 	s.adminAuthorize = allow
 	s.registerComparisonAdmin(allow)
+	s.mux.HandleFunc("GET /v1/admin/reply-feedback", s.listReplyFeedback)
 	s.mux.HandleFunc("POST /v1/admin/logout", func(w http.ResponseWriter, r *http.Request) {
 		if token := bearer(r); token != "" {
 			digest := sha256.Sum256([]byte(token))

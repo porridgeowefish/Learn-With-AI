@@ -29,7 +29,7 @@ export interface ConversationMessage {
 export type ComparisonVote = 'a' | 'b' | 'tie';
 
 export function saveAnswerFeedback(slug: string, messageId: string, value: 'up' | 'down') {
-  return http.post<void>(`/api/projects/${encodeURIComponent(slug)}/conversation/feedback`, { messageId, value });
+  return http.post<{ synced: boolean } | null>(`/api/projects/${encodeURIComponent(slug)}/conversation/feedback`, { messageId, value });
 }
 
 export function saveComparisonVote(slug: string, messageId: string, value: ComparisonVote | 'skipped') {

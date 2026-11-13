@@ -35,6 +35,7 @@ func (s *Store) InitialExperimentConfig(ctx context.Context, id string) (ModelCo
 
 type PublishedComparison struct {
 	ID, Model     string
+	Models        []string
 	Name          string
 	Percent       int
 	BaseVersion   int64
@@ -58,6 +59,7 @@ func (s *Store) PublishedComparisons(ctx context.Context, id string, includeReso
 			WHERE experiment<>'' GROUP BY experiment
 		), ids(id) AS (SELECT id FROM published UNION SELECT id FROM legacy)
 		SELECT ids.id,COALESCE(json_extract(latest.content,'$.comparison.model'),legacy.model,''),
+			COALESCE(json_extract(latest.content,'$.comparison.models'),'null'),
 			COALESCE(NULLIF(TRIM(json_extract(latest.content,'$.comparison.name')),''),ids.id),
 			COALESCE(json_extract(latest.content,'$.comparison.percent'),0),
 			COALESCE(first.version,0),COALESCE(first.created_at,legacy.created_at,0),COALESCE(latest.created_at,0),
@@ -75,8 +77,11 @@ func (s *Store) PublishedComparisons(ctx context.Context, id string, includeReso
 	result := []PublishedComparison{}
 	for rows.Next() {
 		var entry PublishedComparison
-		var config, base string
-		if err := rows.Scan(&entry.ID, &entry.Model, &entry.Name, &entry.Percent, &entry.BaseVersion, &entry.CreatedAt, &entry.PublishedAt, &entry.EndedAt, &entry.Active, &config, &base); err != nil {
+		var models, config, base string
+		if err := rows.Scan(&entry.ID, &entry.Model, &models, &entry.Name, &entry.Percent, &entry.BaseVersion, &entry.CreatedAt, &entry.PublishedAt, &entry.EndedAt, &entry.Active, &config, &base); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(models), &entry.Models); err != nil {
 			return nil, err
 		}
 		entry.Config, entry.BaseResources = json.RawMessage(config), json.RawMessage(base)

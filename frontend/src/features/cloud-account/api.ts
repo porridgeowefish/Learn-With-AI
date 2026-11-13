@@ -3,7 +3,7 @@ import { API_BASE } from '@/shared/lib/constants';
 export type Wallet = { balance: number; held: number; granted?: boolean };
 export type Account = { id?: string; email: string; name?: string; balance: number; githubLinked?: boolean };
 export type CloudStatus = { signedIn: boolean; account?: Account; wallet?: Wallet; selectedModel?: string; dailyClaimed?: boolean };
-export type Model = { id: string; name: string };
+export type Model = { id: string; name: string; multiplier?: number };
 export type DailyHistory = { today: string; entries: { day: string; units: number }[] };
 
 export class GitHubEmailConfirmation extends Error {
@@ -58,8 +58,12 @@ async function read<T>(path: string, body?: object): Promise<T> {
 }
 
 export const readCloudStatus = () => read<CloudStatus>('/api/cloud/account');
-export const readCloudModels = () => read<{ models: Model[] }>('/api/cloud/models');
 export const readCloudGuestModels = () => read<{ models: Model[] }>('/api/cloud/models/guest');
+export function cloudModelLabel(model: Model) {
+  return typeof model.multiplier === 'number' && Number.isFinite(model.multiplier) && model.multiplier > 0
+    ? `${model.name} ${model.multiplier.toFixed(2)}×`
+    : model.name;
+}
 export const readCloudDailyHistory = () => read<DailyHistory>('/api/cloud/daily-history');
 export const cloudAction = <T>(name: string, body: object = {}) => read<T>(`/api/cloud/${name}`, body);
 

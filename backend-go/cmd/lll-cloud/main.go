@@ -30,7 +30,7 @@ import (
 type config struct {
 	httpapi.ModelConfig
 	Budget            httpapi.Budget
-	UpstreamHosts     []string
+	UpstreamHosts     []string // Accepted in existing deployment files. Upstream hosts no longer use a list.
 	TrustedProxyCIDRs []string
 	Operators         map[string]struct{ Role, TOTPEnv string }
 	GitHub            struct {
@@ -159,8 +159,15 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	if err != nil {
 		return err
 	}
-	hosts := append([]string{"open.bigmodel.cn", "api.deepseek.com"}, cfg.UpstreamHosts...)
-	builder := httpapi.NewModelBuilder(hosts, envname.Value)
+	credentialKey, err := base64.StdEncoding.DecodeString(envname.Value("LWA_CLOUD_CREDENTIAL_KEY"))
+	if err != nil {
+		return errors.New("LWA_CLOUD_CREDENTIAL_KEY must encode 32 random bytes")
+	}
+	credentials, err := httpapi.NewUpstreamCredentials(db, credentialKey)
+	if err != nil {
+		return err
+	}
+	builder := httpapi.NewModelBuilder(envname.Value, credentials)
 	active, err := db.ActiveModelConfig(ctx)
 	if err == nil {
 		if err := json.Unmarshal(active.Config, &cfg.ModelConfig); err != nil {
@@ -291,6 +298,7 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 			}
 		}
 		handler.EnableModelAdmin(builder)
+		handler.EnableUpstreamCredentialAdmin(credentials)
 		if len(promptKey) != 0 {
 			handler.EnablePromptAdmin(promptKey)
 		}

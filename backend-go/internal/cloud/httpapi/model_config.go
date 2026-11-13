@@ -26,6 +26,7 @@ type ManagedConnection struct {
 	Limits                                                         routing.Limits
 	Cost                                                           inference.CostRate
 	ToolMode                                                       string `json:",omitempty"`
+	CredentialID                                                   string `json:",omitempty"`
 }
 
 type ModelConfig struct {
@@ -58,7 +59,7 @@ type connectionTarget struct {
 }
 
 func (c ManagedConnection) target() connectionTarget {
-	return connectionTarget{c.ID, c.Model, c.Kind, c.BaseURL, c.UpstreamModel, c.APIKeyEnv}
+	return connectionTarget{c.ID, c.Model, c.Kind, c.BaseURL, c.UpstreamModel, c.APIKeyEnv + "\x00" + c.CredentialID}
 }
 
 func (c ManagedConnection) requiresCacheUsage(rate Rate) bool {
@@ -79,13 +80,9 @@ func modelIndex(models []Model) (map[string]Model, error) {
 
 type ModelBuilder func(ModelConfig) (*inference.Gateway, error)
 
-// NewModelBuilder limits configured connections to operator-allowlisted hosts
-// and resolves secrets from the service environment instead of config records.
-func NewModelBuilder(hosts []string, secret func(string) string) ModelBuilder {
-	allowed := make(map[string]bool, len(hosts))
-	for _, host := range hosts {
-		allowed[strings.ToLower(host)] = true
-	}
+// NewModelBuilder builds public HTTPS connections using stored credential references.
+func NewModelBuilder(secret func(string) string, credentials ...*UpstreamCredentials) ModelBuilder {
+	transport := inference.PublicTransport()
 	return func(cfg ModelConfig) (*inference.Gateway, error) {
 		if len(cfg.Models) > 64 || len(cfg.Connections) > 256 || len(cfg.QuotaGroups) > 256 {
 			return nil, errors.New("managed catalog exceeds capacity")
@@ -101,17 +98,40 @@ func NewModelBuilder(hosts []string, secret func(string) string) ModelBuilder {
 				return nil, fmt.Errorf("connection %q has invalid tool capability", c.ID)
 			}
 			endpoint, err := url.Parse(c.BaseURL)
-			if err != nil || endpoint.Scheme != "https" || !allowed[strings.ToLower(endpoint.Hostname())] ||
+			if err != nil || endpoint.Scheme != "https" || endpoint.Hostname() == "" || endpoint.User != nil ||
+				endpoint.RawQuery != "" || endpoint.ForceQuery || endpoint.Fragment != "" || strings.Contains(c.BaseURL, "#") ||
 				net.ParseIP(endpoint.Hostname()) != nil || (endpoint.Port() != "" && endpoint.Port() != "443") {
-				return nil, fmt.Errorf("connection %q uses an unapproved upstream host", c.ID)
+				return nil, fmt.Errorf("connection %q requires an HTTPS API base URL without credentials, query or fragment", c.ID)
 			}
-			upstreamKey := strings.HasPrefix(c.APIKeyEnv, "LWA_CLOUD_UPSTREAM_") ||
-				strings.HasPrefix(c.APIKeyEnv, "LLL_CLOUD_UPSTREAM_")
-			if !identifier.MatchString(c.ID) || !identifier.MatchString(c.APIKeyEnv) || !upstreamKey ||
-				models[c.Model].ID == "" {
+			host := strings.ToLower(endpoint.Hostname())
+			domain := strings.TrimSuffix(host, ".")
+			if !strings.Contains(domain, ".") || strings.HasSuffix(domain, ".localhost") {
+				return nil, fmt.Errorf("connection %q requires a public HTTPS hostname", c.ID)
+			}
+			path := strings.TrimRight(endpoint.Path, "/")
+			if strings.HasSuffix(path, "/chat/completions") || strings.HasSuffix(path, "/messages") ||
+				strings.HasSuffix(path, "/models") || strings.HasSuffix(path, "/responses") ||
+				(c.Kind == "anthropic" && strings.HasSuffix(path, "/v1")) {
+				return nil, fmt.Errorf("connection %q must use the API base URL, without the protocol endpoint suffix", c.ID)
+			}
+			if c.Kind == "openai" && path == "" && (host == "tokenhub.tencentmaas.com" || host == "tokenhub-intl.tencentcloudmaas.com") {
+				return nil, fmt.Errorf("connection %q requires the TokenHub API base path /v1", c.ID)
+			}
+			if !identifier.MatchString(c.ID) || models[c.Model].ID == "" {
 				return nil, fmt.Errorf("invalid model or credential reference for connection %q", c.ID)
 			}
-			key := secret(c.APIKeyEnv)
+			var key string
+			switch {
+			case c.CredentialID != "" && c.APIKeyEnv == "" && credentialID.MatchString(c.CredentialID) && len(credentials) > 0:
+				key, err = credentials[0].Resolve(context.Background(), c.CredentialID, host)
+				if err != nil {
+					return nil, fmt.Errorf("connection %q: %w", c.ID, err)
+				}
+			case c.CredentialID == "" && upstreamEnvName.MatchString(c.APIKeyEnv):
+				key = secret(c.APIKeyEnv)
+			default:
+				return nil, fmt.Errorf("connection %q requires one valid API credential reference", c.ID)
+			}
 			if key == "" {
 				return nil, fmt.Errorf("missing API credential for connection %q", c.ID)
 			}
@@ -127,7 +147,7 @@ func NewModelBuilder(hosts []string, secret func(string) string) ModelBuilder {
 		if len(counts) != len(models) {
 			return nil, errors.New("every published model needs an upstream connection")
 		}
-		return inference.New(upstreams, cfg.QuotaGroups)
+		return inference.New(upstreams, cfg.QuotaGroups, transport)
 	}
 }
 
@@ -217,7 +237,7 @@ func (s *Server) enableModelAdmin(builder ModelBuilder, probe func(*inference.Ga
 			var err error
 			gateway, err = builder(*in.Config)
 			if err != nil {
-				fail(w, http.StatusBadRequest, "invalid_model_configuration")
+				respond(w, http.StatusBadRequest, map[string]string{"error": "invalid_model_configuration", "detail": err.Error()})
 				return
 			}
 		} else {
@@ -396,12 +416,20 @@ func (s *Server) enableModelAdmin(builder ModelBuilder, probe func(*inference.Ga
 		}
 		defer s.modelMu.Unlock()
 		if prompts := s.prompts.Load(); prompts != nil && prompts.active != nil {
-			if experiment := prompts.active.Comparison; experiment != nil && experiment.Percent > 0 && models[experiment.Model].ID == "" {
-				respond(w, http.StatusConflict, map[string]string{"error": "model_used_by_experiment", "model": experiment.Model})
-				return
+			if experiment := prompts.active.Comparison; experiment != nil && experiment.Percent > 0 {
+				for _, model := range experiment.ModelIDs() {
+					if models[model].ID == "" {
+						respond(w, http.StatusConflict, map[string]string{"error": "model_used_by_experiment", "model": model})
+						return
+					}
+				}
 			}
 		}
 		version, err := s.db.SaveModelConfig(r.Context(), in.BaseVersion, admin.ID, body, time.Now())
+		if errors.Is(err, store.ErrNotFound) {
+			fail(w, http.StatusConflict, "upstream_credential_not_found")
+			return
+		}
 		if errors.Is(err, store.ErrConflict) {
 			fail(w, http.StatusConflict, "model_configuration_changed")
 			return

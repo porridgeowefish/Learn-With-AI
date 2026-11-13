@@ -1,8 +1,10 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
@@ -29,7 +31,18 @@ func (s *Server) handleTeacherFeedback(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "conversation_unavailable")
 		return
 	}
-	writeFeedbackResult(w, store.SaveAnswerFeedback(input.MessageID, input.Value))
+	receipt, err := store.SaveAnswerFeedback(input.MessageID, input.Value)
+	if err != nil {
+		writeFeedbackResult(w, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+	client, err := llmcloud.Default()
+	if err == nil {
+		err = client.SubmitReplyFeedback(ctx, receipt.ReplyID, receipt.Model, input.Value, receipt.Revision)
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"synced": err == nil})
 }
 
 func (s *Server) handleComparisonVote(w http.ResponseWriter, r *http.Request) {

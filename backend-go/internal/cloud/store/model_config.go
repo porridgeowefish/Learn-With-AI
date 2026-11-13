@@ -62,6 +62,17 @@ func (s *Store) SaveModelConfig(ctx context.Context, base int64, actor string, c
 		if current == string(content) {
 			return nil
 		}
+		var missingCredential bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+			SELECT 1 FROM json_each(?, '$.Connections') AS connection
+			WHERE COALESCE(json_extract(connection.value,'$.CredentialID'),'')<>''
+			AND NOT EXISTS (SELECT 1 FROM upstream_credential WHERE id=json_extract(connection.value,'$.CredentialID'))
+		)`, string(content)).Scan(&missingCredential); err != nil {
+			return err
+		}
+		if missingCredential {
+			return ErrNotFound
+		}
 		next++
 		_, err := tx.ExecContext(ctx, `UPDATE model_config_version SET version=?,actor=?,content=?,created_at=? WHERE version=?`, next, actor, string(content), now.Unix(), base)
 		return err
@@ -109,6 +120,7 @@ func (s *Store) publishConfig(ctx context.Context, table string, base int64, act
 				SELECT EXISTS(SELECT 1 FROM prompt_config_version,proposed
 				WHERE json_extract(content,'$.comparison.id')=json_extract(data,'$.comparison.id')
 				AND (json_extract(content,'$.comparison.model') IS NOT json_extract(data,'$.comparison.model')
+				 OR json_extract(content,'$.comparison.models') IS NOT json_extract(data,'$.comparison.models')
 				 OR json_extract(content,'$.comparison.a') IS NOT json_extract(data,'$.comparison.a')
 				 OR json_extract(content,'$.comparison.b') IS NOT json_extract(data,'$.comparison.b')
 				 OR json_extract(content,'$.comparison.variants') IS NOT json_extract(data,'$.comparison.variants')))`, string(content)).Scan(&changed)

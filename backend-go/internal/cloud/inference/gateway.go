@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -60,6 +61,7 @@ type Gateway struct {
 	pool      *routing.Pool
 	providers map[string]Upstream
 	waiting   chan struct{}
+	client    *http.Client
 }
 
 func RequiresTools(tools []ai.Tool, messages []ai.GatewayMessage) bool {
@@ -114,7 +116,7 @@ func (g *Gateway) Capacity() Capacity {
 	return Capacity{Capacity: g.pool.Capacity(), Waiting: len(g.waiting), WaitingLimit: cap(g.waiting)}
 }
 
-func New(upstreams []Upstream, groups map[string]routing.Limits) (*Gateway, error) {
+func New(upstreams []Upstream, groups map[string]routing.Limits, transports ...http.RoundTripper) (*Gateway, error) {
 	connections := make([]routing.Connection, 0, len(upstreams))
 	providers := make(map[string]Upstream, len(upstreams))
 	for _, upstream := range upstreams {
@@ -137,7 +139,11 @@ func New(upstreams []Upstream, groups map[string]routing.Limits) (*Gateway, erro
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{pool: pool, providers: providers, waiting: make(chan struct{}, 32)}, nil
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	if len(transports) > 0 {
+		client.Transport = transports[0]
+	}
+	return &Gateway{pool: pool, providers: providers, waiting: make(chan struct{}, 32), client: client}, nil
 }
 
 func (g *Gateway) acquire(ctx context.Context, model string, estimatedTokens int, preferred string, needsTools bool, tried []string, wait time.Duration) (*routing.Lease, error) {
@@ -206,7 +212,7 @@ func (g *Gateway) stream(ctx context.Context, model string, estimatedTokens int,
 		upstream := g.providers[id]
 		var usage map[string]int
 		started := time.Now()
-		err = ai.StreamUpstream(ctx, upstream.Provider, request, func(event ai.GatewayEvent) {
+		err = ai.StreamUpstream(ctx, g.client, upstream.Provider, request, func(event ai.GatewayEvent) {
 			if event.Type == "usage" {
 				usage = maps.Clone(event.Usage)
 			}

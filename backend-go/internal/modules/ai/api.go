@@ -3,6 +3,8 @@ package ai
 
 import (
 	"context"
+	"net/http"
+
 	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai/internal/budget"
 	gateway "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/gateway"
@@ -50,8 +52,8 @@ var GenerationOutputTokens = budget.GenerationOutputTokens
 var GenerationThinkingTokens = budget.GenerationThinkingTokens
 
 // StreamUpstream sends a request whose concurrency is managed by the caller.
-func StreamUpstream(ctx context.Context, p ProviderConfig, request GatewayRequest, emit func(GatewayEvent)) error {
-	return gateway.StreamUpstream(ctx, p, request, emit)
+func StreamUpstream(ctx context.Context, client *http.Client, p ProviderConfig, request GatewayRequest, emit func(GatewayEvent)) error {
+	return gateway.StreamUpstream(ctx, client, p, request, emit)
 }
 
 func Stream(ctx context.Context, p Provider, system string, messages []AIMessage, emit func(AIFrame)) error {

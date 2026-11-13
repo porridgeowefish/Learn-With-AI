@@ -145,8 +145,8 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 		req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	}
 	client := http.DefaultClient
-	if inManagedStream(ctx) {
-		client = noRedirectClient(client)
+	if upstream := managedStreamClient(ctx); upstream != nil {
+		client = upstream
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -216,23 +216,20 @@ func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emi
 }
 
 // StreamUpstream sends an already admitted request using the provider protocol.
-func StreamUpstream(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+func StreamUpstream(ctx context.Context, client *http.Client, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	in.upstreamOutputLimit = in.MaxOutputTokens
-	return streamUpstream(context.WithValue(ctx, managedStreamKey{}, true), p, in, emit)
+	return streamUpstream(context.WithValue(ctx, managedStreamKey{}, client), p, in, emit)
 }
 
 type managedStreamKey struct{}
 
 func inManagedStream(ctx context.Context) bool {
-	value, _ := ctx.Value(managedStreamKey{}).(bool)
-	return value
+	return managedStreamClient(ctx) != nil
 }
 
-func noRedirectClient(base *http.Client) *http.Client {
-	return &http.Client{
-		Transport: base.Transport, Timeout: base.Timeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
+func managedStreamClient(ctx context.Context) *http.Client {
+	client, _ := ctx.Value(managedStreamKey{}).(*http.Client)
+	return client
 }
 
 func outputLimit(in Request) int {

@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { CheckIcon, ChevronDownIcon, LockClosedIcon } from '@radix-ui/react-icons';
-import { managedProviderPrefix, readCloudGuestModels, readCloudModels, type CloudStatus } from '@/features/cloud-account';
+import { cloudModelLabel, managedProviderPrefix, useCloudModelCatalog, type CloudStatus } from '@/features/cloud-account';
 import s from './TeacherView.module.css';
 
 export function TeacherModelPicker({ status, selected, localModels, onSelect }: {
@@ -14,15 +13,11 @@ export function TeacherModelPicker({ status, selected, localModels, onSelect }: 
   const { pathname } = useLocation();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const signedIn = !!status?.signedIn;
-  const models = useQuery({
-    queryKey: [signedIn ? 'cloud-models' : 'cloud-guest-models'],
-    queryFn: signedIn ? readCloudModels : readCloudGuestModels,
-    enabled: open || (signedIn && selected.startsWith(managedProviderPrefix)), retry: false,
-  });
+  const models = useCloudModelCatalog(open, selected.startsWith(managedProviderPrefix));
   const cloudModels = models.data?.models ?? [];
+  const selectedCloud = cloudModels.find(model => managedProviderPrefix + model.id === selected);
   const selectedName = localModels.find(model => model.id === selected)?.label ||
-    cloudModels.find(model => managedProviderPrefix + model.id === selected)?.name ||
+    (selectedCloud && cloudModelLabel(selectedCloud)) ||
     (selected.startsWith(managedProviderPrefix) ? selected.slice(managedProviderPrefix.length) : undefined);
 
   function select(id: string) {
@@ -41,14 +36,14 @@ export function TeacherModelPicker({ status, selected, localModels, onSelect }: 
     {open && <div className={s.modelPickerPanel} aria-label="可选模型">
       <h3>云端模型</h3>
       {models.isPending && <p role="status">正在读取模型…</p>}
-      {models.isError && <p role="status">暂时无法读取云端模型。</p>}
+      {models.isError && <button type="button" onClick={() => void models.refetch()}>云端模型读取失败，点击重试</button>}
       {models.data && !cloudModels.length && <p>暂无已发布的云端模型。</p>}
       {cloudModels.map(model => status?.signedIn
         ? <button key={model.id} type="button" onClick={() => select(managedProviderPrefix + model.id)}>
-          {model.name}{selected === managedProviderPrefix + model.id && <CheckIcon />}
+          {cloudModelLabel(model)}{selected === managedProviderPrefix + model.id && <CheckIcon />}
         </button>
         : <Link key={model.id} className={s.lockedModel} to="/login" state={{ next: pathname }} title="请先登录">
-          {model.name}<span><LockClosedIcon aria-hidden="true" />请先登录</span>
+          {cloudModelLabel(model)}<span><LockClosedIcon aria-hidden="true" />请先登录</span>
         </Link>)}
       {!!localModels.length && <>
         <h3>本机连接</h3>

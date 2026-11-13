@@ -6,11 +6,9 @@ export async function cloud({path, request, method, state, json}) {
     wallet: demo.signedIn ? {balance: (demo.claimed ? 600000 : 500000) - (demo.spent ?? 0), held: 0} : undefined,
   });
   if (path === '/api/cloud/google-config') return json({available:true});
-  if (path === '/api/cloud/models') return json({models:[
-    {id:'glm-5.3', name:'GLM-5.3'}, {id:'deepseek-flash', name:'DeepSeek V4.1 Flash'},
-  ]});
-  if (path === '/api/cloud/models/guest') return json({models:[
-    {id:'glm-5.3', name:'GLM-5.3'}, {id:'deepseek-flash', name:'DeepSeek V4.1 Flash'},
+  if (path === '/api/cloud/models' || path === '/api/cloud/models/guest') return json({models:[
+    {id:'glm-5.3', name:'GLM-5.3', multiplier:1/6}, {id:'deepseek-flash', name:'DeepSeek V4.1 Flash', multiplier:1/3},
+    {id:'hy4', name:'混元 Hy4', multiplier:2/3}, {id:'kimi-k3.1', name:'Kimi-K3.1', multiplier:1},
   ]});
   if (path === '/api/cloud/daily-history') {
     if (!demo.signedIn) return json({error:'login_required'}, 401);

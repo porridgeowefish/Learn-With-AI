@@ -1,6 +1,8 @@
 package conversationstore
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -64,24 +66,32 @@ func (s *Store) PendingComparison() (bool, error) {
 	return message.Comparison != nil && message.Comparison.Vote == "", nil
 }
 
-func (s *Store) SaveAnswerFeedback(id, value string) error {
+type FeedbackReceipt struct {
+	ReplyID  string
+	Model    string
+	Revision uint64
+}
+
+func (s *Store) SaveAnswerFeedback(id, value string) (FeedbackReceipt, error) {
 	if value != "up" && value != "down" {
-		return errors.New("invalid answer feedback")
+		return FeedbackReceipt{}, errors.New("invalid answer feedback")
 	}
-	return s.recordAnswerFeedback(id, value, nil)
+	var receipt FeedbackReceipt
+	err := s.recordAnswerFeedback(id, value, nil, &receipt)
+	return receipt, err
 }
 
 func (s *Store) SaveComparisonVote(id, value string, submit func(string) error) error {
 	if value != "a" && value != "b" && value != "tie" && value != "skipped" {
 		return errors.New("invalid comparison vote")
 	}
-	return s.recordAnswerFeedback(id, value, submit)
+	return s.recordAnswerFeedback(id, value, submit, nil)
 }
 
-func (s *Store) recordAnswerFeedback(id, value string, submit func(string) error) error {
+func (s *Store) recordAnswerFeedback(id, value string, submit func(string) error, receipt *FeedbackReceipt) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, events, err := s.loadLocked()
+	meta, events, err := s.loadLocked()
 	if err != nil {
 		return err
 	}
@@ -108,9 +118,6 @@ func (s *Store) recordAnswerFeedback(id, value string, submit func(string) error
 			}
 			eventType = "answer-comparison-voted"
 		} else {
-			if m.Feedback == value {
-				return nil
-			}
 			visible := false
 			for _, b := range m.Blocks {
 				visible = visible || (b.Type == "markdown" && strings.TrimSpace(b.Source) != "")
@@ -118,8 +125,33 @@ func (s *Store) recordAnswerFeedback(id, value string, submit func(string) error
 			if !visible || (m.Status != "completed" && m.Status != "interrupted") {
 				return ErrFeedbackNotFound
 			}
+			digest := sha256.Sum256([]byte(meta.ID + "\x00" + id))
+			receipt.ReplyID = hex.EncodeToString(digest[:])
+			for _, event := range events {
+				switch event.Type {
+				case "teacher-response-finished":
+					var row struct{ MessageID, Model string }
+					if json.Unmarshal(event.Data, &row) == nil && row.MessageID == id {
+						receipt.Model = row.Model
+					}
+				case "answer-feedback":
+					var row answerFeedback
+					if json.Unmarshal(event.Data, &row) == nil && row.MessageID == id {
+						receipt.Revision = event.Seq
+					}
+				}
+			}
+			if m.Comparison != nil && receipt.Model == "" {
+				receipt.Model = "提示词实验"
+			}
+			if m.Feedback == value && receipt.Revision != 0 {
+				return nil
+			}
 		}
-		_, err = s.appendLocked(eventType, answerFeedback{MessageID: id, Value: value})
+		event, err := s.appendLocked(eventType, answerFeedback{MessageID: id, Value: value})
+		if err == nil && receipt != nil {
+			receipt.Revision = event.Seq
+		}
 		return err
 	}
 	return ErrFeedbackNotFound

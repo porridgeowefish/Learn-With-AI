@@ -43,9 +43,8 @@ func (g *Gateway) Probe(ctx context.Context, connectionID string) (ProbeResult, 
 	} else {
 		req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	}
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	result := ProbeResult{Status: "unavailable", Model: p.Model}
-	response, err := client.Do(req)
+	response, err := g.client.Do(req)
 	if err != nil {
 		return result, nil
 	}
@@ -86,7 +85,7 @@ func (g *Gateway) ProbeUsage(ctx context.Context, connectionID string) (ProbeRes
 	result := ProbeResult{Status: "unavailable", Model: upstream.Provider.Model}
 	seenText := false
 	var usage map[string]int
-	err := ai.StreamUpstream(ctx, upstream.Provider, ai.GatewayRequest{
+	err := ai.StreamUpstream(ctx, g.client, upstream.Provider, ai.GatewayRequest{
 		Messages:        []ai.GatewayMessage{{Role: "user", Content: "Reply with OK."}},
 		MaxOutputTokens: probeOutputLimit(upstream, 64),
 	}, func(event ai.GatewayEvent) {

@@ -303,6 +303,7 @@ function conversation(ctx, s, parts, b) {
     if (action === 'feedback') {
       if (!['up', 'down'].includes(b.value)) return json({ error: 'invalid_answer_feedback' }, 400);
       target.feedback = b.value;
+      return json({ synced: true });
     } else {
       if (!target.comparison || !['a', 'b', 'tie', 'skipped'].includes(b.value)) return json({ error: 'invalid_comparison_vote' }, 400);
       target.comparison.vote = b.value;

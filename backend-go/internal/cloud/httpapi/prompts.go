@@ -155,10 +155,11 @@ func (s *Server) EnablePromptAdmin(key ed25519.PrivateKey) {
 		s.modelMu.RLock()
 		defer s.modelMu.RUnlock()
 		if candidate := catalog.Comparison; candidate != nil && candidate.Percent > 0 {
-			_, exists := s.models[candidate.Model]
-			if !exists {
-				respond(w, http.StatusBadRequest, map[string]string{"error": "invalid_prompt_configuration", "detail": "comparison model must be active"})
-				return
+			for _, model := range candidate.ModelIDs() {
+				if _, exists := s.models[model]; !exists {
+					respond(w, http.StatusBadRequest, map[string]string{"error": "invalid_prompt_configuration", "detail": "comparison models must be active"})
+					return
+				}
 			}
 		}
 		body, err := json.Marshal(in.Config)
@@ -169,7 +170,7 @@ func (s *Server) EnablePromptAdmin(key ed25519.PrivateKey) {
 		publishedAt := time.Now()
 		version, err := s.db.PublishPromptConfig(r.Context(), in.BaseVersion, admin.ID, body, publishedAt)
 		if errors.Is(err, store.ErrComparisonExperimentChanged) {
-			respond(w, http.StatusConflict, map[string]string{"error": "comparison_experiment_immutable", "detail": "Create a new experiment to change the model or prompt variants."})
+			respond(w, http.StatusConflict, map[string]string{"error": "comparison_experiment_immutable", "detail": "Create a new experiment to change the models or prompt variants."})
 			return
 		}
 		if errors.Is(err, store.ErrConflict) {

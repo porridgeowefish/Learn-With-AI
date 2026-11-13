@@ -107,8 +107,8 @@ func streamResponses(ctx context.Context, p askaiconfig.Provider, in Request, em
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	client := siwcHTTPClient
-	if inManagedStream(ctx) {
-		client = noRedirectClient(client)
+	if upstream := managedStreamClient(ctx); upstream != nil {
+		client = upstream
 	}
 	res, err := client.Do(req)
 	if err != nil {

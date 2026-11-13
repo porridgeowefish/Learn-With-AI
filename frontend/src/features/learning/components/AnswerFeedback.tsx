@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/shared/client';
 import { Button } from '@/shared/primitive/Button';
@@ -9,7 +9,7 @@ import s from './AnswerFeedback.module.css';
 
 type Feedback = NonNullable<ConversationMessage['feedback']>;
 
-export function AnswerFeedback({ slug, message }: { slug: string; message: ConversationMessage }) {
+export function AnswerFeedback({ slug, message, children }: { slug: string; message: ConversationMessage; children?: ReactNode }) {
   const client = useQueryClient();
   const [saved, setSaved] = useState<Feedback>();
   const vote = useMutation({
@@ -20,12 +20,15 @@ export function AnswerFeedback({ slug, message }: { slug: string; message: Conve
     },
   });
   const value = saved ?? message.feedback;
-  return <div className={s.feedback} role="group" aria-label="回答反馈">
+  return <div className={s.feedback} role="group" aria-label="回复操作">
     <button type="button" aria-label="喜欢这个回答" title="喜欢这个回答" aria-pressed={value === 'up'}
       disabled={vote.isPending} onClick={() => vote.mutate('up')}><Thumb /></button>
     <button type="button" aria-label="不喜欢这个回答" title="不喜欢这个回答" aria-pressed={value === 'down'}
       disabled={vote.isPending} onClick={() => vote.mutate('down')}><Thumb down /></button>
-    {vote.isError ? <span role="alert">反馈未保存，请重试。</span> : value && <span role="status">感谢您的反馈</span>}
+    {children}
+    {vote.isError ? <span role="alert">反馈未保存，请重试。</span> : vote.data?.synced === false && value ?
+      <span role="status">已保存在本机，尚未同步 <Button variant="ghost" size="sm" disabled={vote.isPending} onClick={() => vote.mutate(value)}>重试同步</Button></span>
+      : value && <span role="status">感谢您的反馈</span>}
   </div>;
 }
 

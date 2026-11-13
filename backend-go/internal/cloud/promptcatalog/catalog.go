@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
@@ -26,10 +27,18 @@ type ComparisonDraft struct {
 	ID       string              `json:"id"`
 	Name     string              `json:"name,omitempty"`
 	Model    string              `json:"model"`
+	Models   []string            `json:"models,omitempty"`
 	Percent  int                 `json:"percent"`
 	A        string              `json:"a"`
 	B        string              `json:"b"`
 	Variants *ComparisonVariants `json:"variants,omitempty"`
+}
+
+func (d ComparisonDraft) ModelIDs() []string {
+	if d.Models != nil {
+		return d.Models
+	}
+	return []string{d.Model}
 }
 
 type ComparisonVariants struct {
@@ -89,9 +98,20 @@ func BuildWithExperimentBase(draft Draft, experimentBase map[string]string, key 
 		c.stable[scene] = base
 	}
 	if config := draft.Comparison; config != nil {
-		if !experimentID.MatchString(config.ID) || !experimentID.MatchString(config.Model) ||
+		if !experimentID.MatchString(config.ID) ||
 			config.Percent < 0 || config.Percent > 100 || len(config.Name) > 240 {
 			return nil, errors.New("invalid teacher answer comparison")
+		}
+		models := config.ModelIDs()
+		if len(models) == 0 || len(models) > 64 || (config.Models != nil && config.Model != "") {
+			return nil, errors.New("select at least one comparison model")
+		}
+		seenModels := make(map[string]bool, len(models))
+		for _, model := range models {
+			if !experimentID.MatchString(model) || seenModels[model] {
+				return nil, errors.New("invalid or duplicate comparison model")
+			}
+			seenModels[model] = true
 		}
 		if experimentBase == nil {
 			return nil, errors.New("comparison template baseline is unavailable")
@@ -143,6 +163,7 @@ func BuildWithExperimentBase(draft Draft, experimentBase map[string]string, key 
 			return nil, errors.New("experiment A and B must differ")
 		}
 		copy := *config
+		copy.Models = slices.Clone(config.Models)
 		c.Comparison, c.A, c.B = &copy, a, b
 	}
 	return c, nil

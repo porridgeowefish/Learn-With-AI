@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -76,8 +77,9 @@ type Model struct {
 }
 
 type GuestModel struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Multiplier float64 `json:"multiplier,omitempty"`
 }
 
 type session struct {
@@ -456,7 +458,7 @@ func (c *Client) ModelForConversation(ctx context.Context, id string) Model {
 	if !active {
 		return Model{}
 	}
-	if !fresh {
+	if !fresh || !slices.ContainsFunc(models, func(model Model) bool { return model.ID == id }) {
 		if _, err := c.Models(ctx); err != nil {
 			return Model{}
 		}

@@ -1,7 +1,6 @@
 api /api/activity?{}
 api /api/cloud/account
 api /api/cloud/daily-history
-api /api/cloud/models
 api /api/cloud/models/guest
 api /api/cloud/set-credentials
 api /api/cloud/unbind-email

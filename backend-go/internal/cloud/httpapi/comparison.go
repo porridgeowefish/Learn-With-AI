@@ -97,8 +97,10 @@ func (s *Server) startComparison(w http.ResponseWriter, r *http.Request) {
 	catalog := s.prompts.Load().active
 	next := store.Comparison{Audience: audience, Decision: "disabled"}
 	if config := catalog.Comparison; config != nil {
-		next.Experiment, next.Model, next.Decision = config.ID, config.Model, "not_sampled"
 		hash := sha256.Sum256([]byte(config.ID + "\x00" + subject + "\x00" + input.Operation))
+		models := config.ModelIDs()
+		model := models[binary.BigEndian.Uint64(hash[8:16])%uint64(len(models))]
+		next.Experiment, next.Model, next.Decision = config.ID, model, "not_sampled"
 		if binary.BigEndian.Uint64(hash[:8])%100 < uint64(config.Percent) {
 			next.Decision = "sampled"
 			next.PackA, _ = json.Marshal(catalog.A)
@@ -114,7 +116,7 @@ func (s *Server) startComparison(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	respond(w, http.StatusOK, map[string]string{"id": result.ID})
+	respond(w, http.StatusOK, map[string]string{"id": result.ID, "model": result.Model})
 }
 
 func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
@@ -391,6 +393,7 @@ type comparisonExperiment struct {
 	ID            string                            `json:"id"`
 	Name          string                            `json:"name"`
 	Model         string                            `json:"model"`
+	Models        []string                          `json:"models,omitempty"`
 	Percent       int                               `json:"percent"`
 	CreatedAt     int64                             `json:"createdAt"`
 	PublishedAt   int64                             `json:"publishedAt"`
@@ -404,6 +407,6 @@ type comparisonExperiment struct {
 }
 
 func experimentResponse(row store.PublishedComparison) comparisonExperiment {
-	return comparisonExperiment{ID: row.ID, Name: row.Name, Model: row.Model, Percent: row.Percent,
+	return comparisonExperiment{ID: row.ID, Name: row.Name, Model: row.Model, Models: row.Models, Percent: row.Percent,
 		CreatedAt: row.CreatedAt, PublishedAt: row.PublishedAt, EndedAt: row.EndedAt, BaseVersion: row.BaseVersion, Active: row.Active}
 }
