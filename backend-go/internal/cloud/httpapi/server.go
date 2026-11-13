@@ -56,7 +56,7 @@ func New(db *store.Store, accounts *auth.Service, gateway Streamer, models []Mod
 	if s.models, err = modelIndex(models); err != nil {
 		return nil, err
 	}
-	s.guestModels, _ = guestModelCatalog(nil, models)
+	s.guestModels = guestModelCatalog(models)
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	s.mux.HandleFunc("GET /v1/models", func(w http.ResponseWriter, _ *http.Request) {
 		s.modelMu.RLock()

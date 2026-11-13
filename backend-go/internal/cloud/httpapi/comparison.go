@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/cloud/inference"
+	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
-	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
 func (s *Server) comparisonSubject(w http.ResponseWriter, r *http.Request) (string, string, bool) {
@@ -56,16 +56,13 @@ func (s *Server) servePrompt(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "prompt_scene_unavailable")
 		return
 	}
-	if scene == "teacher/general" {
-		experiment := ""
-		if catalog.Comparison != nil {
-			experiment = catalog.Comparison.ID
-		}
+	if catalog.Comparison != nil {
+		experiment := catalog.Comparison.ID
 		raw, err := s.db.SelectedComparisonPrompt(r.Context(), subject, experiment)
 		if err == nil && len(raw) > 0 {
-			var selected promptpack.Pack
+			var selected promptcatalog.ComparisonPack
 			if err = json.Unmarshal(raw, &selected); err == nil {
-				pack, err = catalog.SelectedTeacher(selected)
+				pack, err = catalog.Selected(scene, selected)
 			}
 		}
 		if err != nil {
@@ -125,11 +122,14 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var input struct{ ID, Arm, Question string }
+	var input struct {
+		ID, Arm, Question, Mode, Context string
+		Opening                          bool
+	}
 	if !decode(w, r, &input, 256<<10) {
 		return
 	}
-	if !identifier.MatchString(input.ID) || (input.Arm != "a" && input.Arm != "b") || strings.TrimSpace(input.Question) == "" || len(input.Question) > 64<<10 {
+	if !identifier.MatchString(input.ID) || (input.Arm != "a" && input.Arm != "b") || strings.TrimSpace(input.Question) == "" || len(input.Question) > 64<<10 || len(input.Context) > 16<<10 || !comparisonMode(input.Mode) {
 		fail(w, http.StatusBadRequest, "invalid_comparison_request")
 		return
 	}
@@ -152,13 +152,27 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	if input.Arm == "b" {
 		raw = cmp.PackB
 	}
-	var pack promptpack.Pack
+	var pack promptcatalog.ComparisonPack
 	if json.Unmarshal(raw, &pack) != nil || pack.Content.Resources["teaching/teacher"] == "" {
 		fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
 		return
 	}
 	system := pack.Content.Resources["teaching/teacher"]
-	estimated := ai.EstimateTextTokens(system) + ai.EstimateTextTokens(input.Question) + 128
+	if input.Mode != "" {
+		modePrompt := pack.Content.Resources["modes/"+input.Mode]
+		if modePrompt != "" {
+			system += "\n\n" + modePrompt
+		}
+	}
+	question := input.Question
+	if input.Opening && pack.Opening != "" {
+		question = pack.Opening
+	}
+	messages := []ai.GatewayMessage{{Role: "user", Content: question}}
+	if input.Context != "" {
+		messages = append([]ai.GatewayMessage{{Role: "user", Content: input.Context}}, messages...)
+	}
+	estimated := ai.EstimateTextTokens(system) + ai.EstimateTextTokens(question) + ai.EstimateTextTokens(input.Context) + 128
 	if estimated > min(model.MaxInput, 64_000) {
 		fail(w, http.StatusRequestEntityTooLarge, "model_input_limit")
 		return
@@ -179,6 +193,10 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	}
 	start := time.Now()
 	questionDigest := sha256.Sum256([]byte(input.Question))
+	if input.Mode != "" || input.Context != "" || input.Opening {
+		binding, _ := json.Marshal([]any{input.Question, input.Mode, input.Context, input.Opening})
+		questionDigest = sha256.Sum256(binding)
+	}
 	if err = s.db.ReserveComparisonArm(r.Context(), cmp.ID, input.Arm, hex.EncodeToString(questionDigest[:]), start, hold); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			fail(w, http.StatusConflict, "comparison_arm_already_started")
@@ -208,7 +226,7 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	var hasText bool
 	hidden := false
 	request := ai.GatewayRequest{
-		System: system, Messages: []ai.GatewayMessage{{Role: "user", Content: input.Question}}, MaxOutputTokens: maxOutput, ShowReasoning: &hidden,
+		System: system, Messages: messages, MaxOutputTokens: maxOutput, ShowReasoning: &hidden,
 	}
 	forwardText := func(event ai.GatewayEvent) {
 		if event.Type == "text-delta" {
@@ -251,6 +269,15 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	emit(map[string]string{"type": "done"})
 }
 
+func comparisonMode(mode string) bool {
+	switch mode {
+	case "", "general", "history", "book", "concept":
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Server) voteComparison(w http.ResponseWriter, r *http.Request) {
 	subject, _, ok := s.comparisonSubject(w, r)
 	if !ok {
@@ -279,6 +306,51 @@ func (s *Server) voteComparison(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) registerComparisonAdmin(allow func(http.ResponseWriter, *http.Request, bool) (store.Account, bool)) {
+	s.mux.HandleFunc("GET /v1/admin/answer-comparisons/experiments", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := allow(w, r, false); !ok {
+			return
+		}
+		rows, err := s.db.PublishedComparisons(r.Context(), "", false)
+		if err != nil {
+			fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
+			return
+		}
+		result := make([]comparisonExperiment, len(rows))
+		for i, row := range rows {
+			result[i] = experimentResponse(row)
+		}
+		respond(w, http.StatusOK, result)
+	})
+	s.mux.HandleFunc("GET /v1/admin/answer-comparisons/experiments/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := allow(w, r, true); !ok {
+			return
+		}
+		id := r.PathValue("id")
+		if !identifier.MatchString(id) {
+			fail(w, http.StatusBadRequest, "invalid_comparison_experiment")
+			return
+		}
+		rows, err := s.db.PublishedComparisons(r.Context(), id, true)
+		if err != nil {
+			fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
+			return
+		}
+		if len(rows) == 0 {
+			fail(w, http.StatusNotFound, "comparison_experiment_not_found")
+			return
+		}
+		result := experimentResponse(rows[0])
+		if len(rows[0].Config) > 0 {
+			var config promptcatalog.ComparisonDraft
+			if json.Unmarshal(rows[0].Config, &config) != nil {
+				fail(w, http.StatusInternalServerError, "comparison_unavailable")
+				return
+			}
+			result.A, result.B, result.Variants = config.A, config.B, config.Variants
+		}
+		result.BaseResources = rows[0].BaseResources
+		respond(w, http.StatusOK, result)
+	})
 	s.mux.HandleFunc("GET /v1/admin/answer-comparisons", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := allow(w, r, false); !ok {
 			return
@@ -313,4 +385,25 @@ func (s *Server) registerComparisonAdmin(allow func(http.ResponseWriter, *http.R
 		}
 		respond(w, http.StatusOK, rows)
 	})
+}
+
+type comparisonExperiment struct {
+	ID            string                            `json:"id"`
+	Name          string                            `json:"name"`
+	Model         string                            `json:"model"`
+	Percent       int                               `json:"percent"`
+	CreatedAt     int64                             `json:"createdAt"`
+	PublishedAt   int64                             `json:"publishedAt"`
+	EndedAt       int64                             `json:"endedAt,omitempty"`
+	BaseVersion   int64                             `json:"baseVersion"`
+	Active        bool                              `json:"active"`
+	A             string                            `json:"a,omitempty"`
+	B             string                            `json:"b,omitempty"`
+	Variants      *promptcatalog.ComparisonVariants `json:"variants,omitempty"`
+	BaseResources json.RawMessage                   `json:"baseResources,omitempty"`
+}
+
+func experimentResponse(row store.PublishedComparison) comparisonExperiment {
+	return comparisonExperiment{ID: row.ID, Name: row.Name, Model: row.Model, Percent: row.Percent,
+		CreatedAt: row.CreatedAt, PublishedAt: row.PublishedAt, EndedAt: row.EndedAt, BaseVersion: row.BaseVersion, Active: row.Active}
 }

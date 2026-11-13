@@ -9,7 +9,9 @@ const { once } = require('node:events');
 const { setTimeout: wait } = require('node:timers/promises');
 const { msiIdentity } = require('./windows-msi');
 
-const oldDigest = '0982050a25ec2ce496ec85e9ca7c9ca3299e5a9e4e96ca5ef6534a40c5a2fc10';
+const previousVersion = '0.10.11';
+const nextVersion = require('../../package.json').version;
+const oldDigest = '1d1ac882fda2faef70306035c1ea39e41fc4ccb211645a1b30a50b167de55b96';
 const slug = 'installer-upgrade-fixture';
 const title = 'Existing learning project';
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
@@ -87,12 +89,12 @@ async function main([oldFile, newFile, mode]) {
   const inspect = mode === '--inspect' || newFile === '--inspect';
   assert.equal(sha256(fs.readFileSync(oldPath)), oldDigest, 'Previous official MSI digest mismatch');
   const old = metadata(oldPath);
-  const family = `{${msiIdentity('0.10.10', 'amd64').upgradeCode}}`;
-  assert.equal(old.ProductVersion, '0.10.10');
+  const family = `{${msiIdentity(previousVersion, 'amd64').upgradeCode}}`;
+  assert.equal(old.ProductVersion, previousVersion);
   assert.equal(old.UpgradeCode.toUpperCase(), family);
   const next = nextPath && metadata(nextPath);
   if (next) {
-    assert.equal(next.ProductVersion, '0.10.11');
+    assert.equal(next.ProductVersion, nextVersion);
     assert.equal(next.UpgradeCode.toUpperCase(), family);
     assert.notEqual(next.ProductCode.toUpperCase(), old.ProductCode.toUpperCase());
   }
@@ -151,7 +153,7 @@ async function main([oldFile, newFile, mode]) {
     assert(!registered(next.ProductCode) && !fs.existsSync(binary));
     assert.equal(fs.readFileSync(sentinel, 'utf8'), note);
     assert.equal(sha256(fs.readFileSync(state)), previousHash);
-    console.log('Actual Windows MSI upgrade 0.10.10 → 0.10.11 replaced the prior product and kept learner data after upgrade and uninstall');
+    console.log(`Actual Windows MSI upgrade ${previousVersion} → ${nextVersion} replaced the prior product and kept learner data after upgrade and uninstall`);
   } finally {
     if (desktop) await desktop.stop();
     for (const { ProductCode } of [next, old]) {

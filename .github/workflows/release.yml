@@ -8,7 +8,7 @@ on:
       version:
         description: Release version (numeric major.minor.patch)
         required: true
-        default: '0.10.11'
+        default: '0.10.12'
       publish:
         description: Publish GitHub Release v<version> from this commit after all smokes pass
         type: boolean
@@ -71,19 +71,19 @@ jobs:
         run: |
           $version = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
           node tools/release/ci-run.js --temp-logs learn-msi-smoke- -- node tools/release/msi-smoke.js "dist/releases/$version/learn-with-ai-$version-windows-amd64.msi"
-      - name: Windows upgrade from the published 0.10.10 MSI
-        if: runner.os == 'Windows' && (inputs.version == '0.10.11' || github.ref_name == 'v0.10.11')
+      - name: Windows upgrade from the published 0.10.11 MSI
+        if: runner.os == 'Windows' && (inputs.version == '0.10.12' || github.ref_name == 'v0.10.12')
         shell: pwsh
         timeout-minutes: 12
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $old = 'learn-with-ai-0.10.10-windows-amd64.msi'
+          $old = 'learn-with-ai-0.10.11-windows-amd64.msi'
           $target = 'trash/verification/release/previous-msi'
           New-Item -ItemType Directory -Force -Path $target | Out-Null
-          gh release download v0.10.10 --repo "$env:GITHUB_REPOSITORY" --pattern $old --dir $target
+          gh release download v0.10.11 --repo "$env:GITHUB_REPOSITORY" --pattern $old --dir $target
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node tools/release/ci-run.js --temp-logs learn-msi-upgrade- -- node tools/release/msi-upgrade-smoke.js "$target/$old" 'dist/releases/0.10.11/learn-with-ai-0.10.11-windows-amd64.msi'
+          node tools/release/ci-run.js --temp-logs learn-msi-upgrade- -- node tools/release/msi-upgrade-smoke.js "$target/$old" 'dist/releases/0.10.12/learn-with-ai-0.10.12-windows-amd64.msi'
       - name: Validate Debian package manifests
         if: runner.os == 'Linux'
         shell: bash

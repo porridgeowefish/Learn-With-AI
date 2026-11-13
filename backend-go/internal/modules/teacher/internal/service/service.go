@@ -243,7 +243,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	sequenced, checkpoint, err := conversation.ContextHistory(learnerSeq)
 	history := teacherHistory{messages: sequenced, checkpoint: checkpoint, learnerSeq: learnerSeq, opening: learner.Role == "system"}
 	if err == nil {
-		if compared, compareErr := compareFirstAnswer(ctx, conversation, history, learner, responseID, teacherMessageID, emit); compared {
+		if compared, compareErr := compareFirstAnswer(ctx, slug, effectiveProviderID, conversation, history, learner, responseID, teacherMessageID, emit); compared {
 			return compareErr
 		}
 	}

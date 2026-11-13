@@ -210,12 +210,19 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 		switch {
 		case err == nil:
 			err = json.Unmarshal(active.Config, &draft)
-			if err == nil && draft.Resources != nil && draft.Resources["review"] == "" {
+			if err == nil && draft.Resources != nil && !promptcatalog.HasReviewHTMLContract(draft.Resources["review"]) {
 				var review string
 				review, err = promptcatalog.ReadResource(cfg.Prompts.Root, "review")
 				if err == nil {
-					err = db.FillMissingReviewPrompt(ctx, review)
+					if !promptcatalog.HasReviewHTMLContract(review) {
+						return errors.New("cloud review prompt bundle must contain the HTML review contract")
+					}
 					draft.Resources["review"] = review
+					var body []byte
+					body, err = json.Marshal(draft)
+					if err == nil {
+						active.Version, err = db.PublishPromptConfig(ctx, active.Version, "system-review-html", body, time.Now())
+					}
 				}
 			}
 		case errors.Is(err, store.ErrNotFound):
@@ -224,7 +231,25 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 		if err != nil {
 			return err
 		}
-		catalog, err := promptcatalog.Build(draft, promptKey)
+		base := draft.Resources
+		if draft.Comparison != nil && active.Version > 0 {
+			initial, err := db.InitialExperimentConfig(ctx, draft.Comparison.ID)
+			if err != nil {
+				return err
+			}
+			var original promptcatalog.Draft
+			if err := json.Unmarshal(initial.Config, &original); err != nil {
+				return err
+			}
+			base = original.Resources
+			if base == nil {
+				return errors.New("experiment template baseline missing")
+			}
+			if !promptcatalog.HasReviewHTMLContract(base["review"]) {
+				base["review"] = draft.Resources["review"]
+			}
+		}
+		catalog, err := promptcatalog.BuildWithExperimentBase(draft, base, promptKey)
 		if err != nil {
 			return err
 		}
@@ -279,9 +304,28 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	if checkOnly {
 		return nil
 	}
+	if err := db.ExpireInferenceHolds(ctx, time.Now()); err != nil {
+		return fmt.Errorf("expire stale inference holds: %w", err)
+	}
 	server := &http.Server{Addr: address, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	done := make(chan struct{})
 	defer close(done)
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case now := <-ticker.C:
+				if err := db.ExpireInferenceHolds(ctx, now); err != nil && ctx.Err() == nil {
+					log.Printf("expire stale inference holds: %v", err)
+				}
+			case <-ctx.Done():
+				return
+			case <-done:
+				return
+			}
+		}
+	}()
 	go func() {
 		select {
 		case <-ctx.Done():

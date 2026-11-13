@@ -301,6 +301,8 @@ func prompt(ctx context.Context, kind string) (ai.ComposedPrompt, *promptpack.Re
 	scene := "generation/" + kind
 	if kind == "practice" {
 		ctx = ai.CloudPromptContext(ctx, scene)
+	} else if kind == "review" {
+		ctx = ai.CloudPromptContext(ctx, "generation/review-html")
 	}
 	composed, err := ai.ComposePrompt(ctx, scene, nil, nil)
 	if err != nil {

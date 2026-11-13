@@ -8,26 +8,33 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
+	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
 )
 
-func compareFirstAnswer(ctx context.Context, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message, responseID, messageID string, emit func(StreamFrame)) (bool, error) {
-	if learner.Role != "learner" || ctx.Value(skipMemoryObservation{}) != nil || strings.TrimSpace(messageText(learner)) == "" {
+var resolveComparisonClient = llmcloud.Default
+
+func compareFirstAnswer(ctx context.Context, slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message, responseID, messageID string, emit func(StreamFrame)) (bool, error) {
+	if ctx.Value(skipMemoryObservation{}) != nil || (learner.Role != "learner" && !history.opening) {
 		return false, nil
 	}
-	for _, entry := range history.messages {
-		if entry.Seq < history.learnerSeq && entry.Message.Role == "learner" && entry.Message.OperationID != "starter-methodology-v1-question" {
-			return false, nil
-		}
+	operation, err := conversation.FirstAnswerComparisonOperation(false)
+	if err != nil || operation == "" {
+		return false, nil
 	}
-	client, err := llmcloud.Default()
+	client, err := resolveComparisonClient()
 	if err != nil {
 		return false, nil
 	}
-	comparisonID, err := client.StartComparison(ctx, learner.OperationID)
+	input, err := firstAnswerInput(slug, providerID, conversation, history, learner)
+	if err != nil {
+		return false, nil
+	}
+	comparisonID, err := client.StartComparison(ctx, operation)
 	if err != nil {
 		if ctx.Err() == nil {
 			var remote *llmcloud.RemoteError
@@ -45,10 +52,83 @@ func compareFirstAnswer(ctx context.Context, conversation *conversationstore.Sto
 	if comparisonID == "" {
 		return false, nil
 	}
-	return true, streamComparison(ctx, client, conversation, comparisonID, messageText(learner), responseID, messageID, emit)
+	claimed, err := conversation.FirstAnswerComparisonOperation(true)
+	if err != nil || claimed == "" {
+		return false, nil
+	}
+	return true, streamComparison(ctx, client, conversation, comparisonID, input, responseID, messageID, emit)
 }
 
-func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, comparisonID, question, responseID, messageID string, emit func(StreamFrame)) error {
+func firstAnswerInput(slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message) (llmcloud.ComparisonInput, error) {
+	project, err := projects.ReadProjectState(slug)
+	if err != nil {
+		return llmcloud.ComparisonInput{}, err
+	}
+	guideline, err := conversation.LearningGuideline()
+	if err != nil {
+		return llmcloud.ComparisonInput{}, err
+	}
+	question := messageText(learner)
+	if history.opening {
+		question = teacherOpeningPrompt
+	} else if question == "" {
+		question = "请根据本次学习主题和我提供的内容开始讲解。"
+	}
+	contextText := "学习项目：" + limitComparisonText(project.Title, 1024)
+	if ai.IsManagedProvider(providerID) {
+		instructions, err := conversation.SystemPrompt()
+		if err != nil {
+			return llmcloud.ComparisonInput{}, err
+		}
+		if text := strings.TrimSpace(instructions); text != "" {
+			contextText += "\n\n学习者对当前项目的要求：\n" + limitComparisonText(text, 8<<10)
+		}
+		if scope := softScopeAppendix(slug); scope != "" {
+			contextText += "\n\n项目范围：\n" + limitComparisonText(scope, 3<<10)
+		}
+		// Preserve relevant text after a previous turn failed without giving an
+		// answer. Keep original media and other project history local.
+		var earlier strings.Builder
+		for _, entry := range history.uncompacted() {
+			if entry.Seq >= history.learnerSeq || entry.Message.Role != "learner" || entry.Message.OperationID == "starter-methodology-v1-question" {
+				continue
+			}
+			if text := messageText(entry.Message); text != "" {
+				earlier.WriteString(limitComparisonText(text, 2<<10))
+				earlier.WriteByte('\n')
+			}
+			if earlier.Len() >= 2<<10 {
+				break
+			}
+		}
+		if earlier.Len() > 0 {
+			contextText += "\n\n先前尚未获得回复的学习者消息：\n" + limitComparisonText(earlier.String(), 2<<10)
+		}
+		var media strings.Builder
+		for _, block := range learner.Blocks {
+			if (block.Type == "chat-image" || block.Type == "chat-audio") && block.Source != "" {
+				media.WriteString(limitComparisonText(block.Source, 2<<10))
+				media.WriteByte('\n')
+			}
+		}
+		if media.Len() > 0 {
+			contextText += "\n\n本条消息附带的文字：\n" + limitComparisonText(media.String(), 1024)
+		}
+	}
+	return llmcloud.ComparisonInput{Question: question, Context: limitComparisonText(contextText, 16<<10), Mode: guideline.LearningMode, Opening: history.opening}, nil
+}
+
+func limitComparisonText(value string, maxBytes int) string {
+	if len(value) <= maxBytes {
+		return value
+	}
+	for !utf8.RuneStart(value[maxBytes]) {
+		maxBytes--
+	}
+	return value[:maxBytes]
+}
+
+func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, comparisonID string, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame)) error {
 	emit(StreamFrame{Type: "comparison-started", Data: map[string]any{"comparisonId": comparisonID}})
 	type arm struct {
 		id       string
@@ -62,7 +142,7 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 	for _, side := range []*arm{&left, &right} {
 		group.Go(func() {
 			var reply strings.Builder
-			err := client.StreamComparison(ctx, comparisonID, side.id, question, func(raw json.RawMessage) error {
+			err := client.StreamComparison(ctx, comparisonID, side.id, input, func(raw json.RawMessage) error {
 				var event ai.GatewayEvent
 				if err := json.Unmarshal(raw, &event); err != nil {
 					return err

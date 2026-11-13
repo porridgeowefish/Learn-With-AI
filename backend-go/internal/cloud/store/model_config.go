@@ -28,10 +28,6 @@ func (s *Store) ActiveModelConfig(ctx context.Context) (ModelConfigVersion, erro
 	return readModelConfig(s.db.QueryRowContext(ctx, "SELECT version,content,created_at FROM model_config_version ORDER BY version DESC LIMIT 1"))
 }
 
-func (s *Store) ModelConfig(ctx context.Context, version int64) (ModelConfigVersion, error) {
-	return readModelConfig(s.db.QueryRowContext(ctx, "SELECT version,content,created_at FROM model_config_version WHERE version=?", version))
-}
-
 func readModelConfig(row *sql.Row) (ModelConfigVersion, error) {
 	var v ModelConfigVersion
 	var content string
@@ -45,6 +41,32 @@ func readModelConfig(row *sql.Row) (ModelConfigVersion, error) {
 
 func (s *Store) PublishModelConfig(ctx context.Context, base int64, actor string, content json.RawMessage, now time.Time) (int64, error) {
 	return s.publishConfig(ctx, "model_config_version", base, actor, content, now)
+}
+
+// SaveModelConfig replaces the live config and advances its concurrency token.
+func (s *Store) SaveModelConfig(ctx context.Context, base int64, actor string, content json.RawMessage, now time.Time) (int64, error) {
+	if base <= 0 || !json.Valid(content) || actor == "" {
+		return 0, ErrConflict
+	}
+	var next int64
+	err := s.transaction(ctx, func(tx *sql.Tx) error {
+		var version int64
+		var current string
+		if err := tx.QueryRowContext(ctx, `SELECT version,content FROM model_config_version ORDER BY version DESC LIMIT 1`).Scan(&version, &current); err != nil {
+			return err
+		}
+		if version != base {
+			return ErrConflict
+		}
+		next = version
+		if current == string(content) {
+			return nil
+		}
+		next++
+		_, err := tx.ExecContext(ctx, `UPDATE model_config_version SET version=?,actor=?,content=?,created_at=? WHERE version=?`, next, actor, string(content), now.Unix(), base)
+		return err
+	})
+	return next, err
 }
 
 func (s *Store) ActivePromptConfig(ctx context.Context) (ModelConfigVersion, error) {
@@ -88,7 +110,8 @@ func (s *Store) publishConfig(ctx context.Context, table string, base int64, act
 				WHERE json_extract(content,'$.comparison.id')=json_extract(data,'$.comparison.id')
 				AND (json_extract(content,'$.comparison.model') IS NOT json_extract(data,'$.comparison.model')
 				 OR json_extract(content,'$.comparison.a') IS NOT json_extract(data,'$.comparison.a')
-				 OR json_extract(content,'$.comparison.b') IS NOT json_extract(data,'$.comparison.b')))`, string(content)).Scan(&changed)
+				 OR json_extract(content,'$.comparison.b') IS NOT json_extract(data,'$.comparison.b')
+				 OR json_extract(content,'$.comparison.variants') IS NOT json_extract(data,'$.comparison.variants')))`, string(content)).Scan(&changed)
 			if err != nil {
 				return err
 			}

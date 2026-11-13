@@ -26,9 +26,21 @@ func (c *Client) StartComparison(ctx context.Context, operation string) (string,
 	return result.ID, nil
 }
 
-func (c *Client) StreamComparison(ctx context.Context, id, arm, question string, emit func(json.RawMessage) error) error {
+type ComparisonInput struct {
+	Question string `json:"question"`
+	Context  string `json:"context,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+	Opening  bool   `json:"opening,omitempty"`
+}
+
+func (c *Client) StreamComparison(ctx context.Context, id, arm string, input ComparisonInput, emit func(json.RawMessage) error) error {
 	token, _ := c.promptSubject()
-	return c.streamAt(ctx, "v1/answer-comparison/stream", token, map[string]string{"id": id, "arm": arm, "question": question}, emit)
+	request := struct {
+		ID  string `json:"id"`
+		Arm string `json:"arm"`
+		ComparisonInput
+	}{id, arm, input}
+	return c.streamAt(ctx, "v1/answer-comparison/stream", token, request, emit)
 }
 
 func (c *Client) VoteComparison(ctx context.Context, id, vote string) error {

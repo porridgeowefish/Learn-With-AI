@@ -32,7 +32,6 @@ type ModelConfig struct {
 	Models      []Model
 	Connections []ManagedConnection
 	QuotaGroups map[string]routing.Limits
-	GuestModels []GuestModel
 }
 
 func publishedRouteRevision(version int64) string {
@@ -41,11 +40,7 @@ func publishedRouteRevision(version int64) string {
 
 // SetStartupModelRevision identifies the initial gateway before it serves requests.
 func (s *Server) SetStartupModelRevision(config ModelConfig, version int64) error {
-	guest, err := guestModelCatalog(config.GuestModels, config.Models)
-	if err != nil {
-		return err
-	}
-	s.guestModels = guest
+	s.guestModels = guestModelCatalog(config.Models)
 	if version > 0 {
 		s.routeRevision = publishedRouteRevision(version)
 		return nil
@@ -290,35 +285,31 @@ func (s *Server) enableModelAdmin(builder ModelBuilder, probe func(*inference.Ga
 			return
 		}
 		active, err := s.db.ActiveModelConfig(r.Context())
-		if err != nil {
+		var config ModelConfig
+		if err != nil || json.Unmarshal(active.Config, &config) != nil {
 			fail(w, http.StatusInternalServerError, "model_configuration_unavailable")
 			return
 		}
-		respond(w, http.StatusOK, active)
+		respond(w, http.StatusOK, struct {
+			Version int64       `json:"version"`
+			Config  ModelConfig `json:"config"`
+		}{active.Version, config})
 	})
-	s.mux.HandleFunc("POST /v1/admin/models/publish", func(w http.ResponseWriter, r *http.Request) {
+	s.mux.HandleFunc("POST /v1/admin/models/save", func(w http.ResponseWriter, r *http.Request) {
 		admin, ok := s.adminAuthorize(w, r, true)
 		if !ok {
 			return
 		}
 		var in struct {
 			BaseVersion int64
-			RollbackTo  int64
 			Config      *ModelConfig
 		}
 		if !decode(w, r, &in, 1<<20) {
 			return
 		}
-		if (in.RollbackTo > 0) == (in.Config != nil) {
+		if in.Config == nil || in.BaseVersion <= 0 {
 			fail(w, http.StatusBadRequest, "invalid_model_configuration")
 			return
-		}
-		if in.RollbackTo > 0 {
-			old, err := s.db.ModelConfig(r.Context(), in.RollbackTo)
-			if err != nil || json.Unmarshal(old.Config, &in.Config) != nil {
-				fail(w, http.StatusNotFound, "model_configuration_unavailable")
-				return
-			}
 		}
 		gateway, err := builder(*in.Config)
 		if err != nil {
@@ -330,82 +321,69 @@ func (s *Server) enableModelAdmin(builder ModelBuilder, probe func(*inference.Ga
 			fail(w, http.StatusBadRequest, "invalid_model_configuration")
 			return
 		}
-		if in.RollbackTo == 0 {
-			active, err := s.db.ActiveModelConfig(r.Context())
-			var before ModelConfig
-			if err != nil || json.Unmarshal(active.Config, &before) != nil {
-				fail(w, http.StatusInternalServerError, "model_configuration_unavailable")
-				return
-			}
-			if active.Version != in.BaseVersion {
-				fail(w, http.StatusConflict, "model_configuration_changed")
-				return
-			}
-			if in.Config.GuestModels == nil {
-				in.Config.GuestModels = before.GuestModels
-			}
-			previous := make(map[connectionTarget]ManagedConnection, len(before.Connections))
-			for _, connection := range before.Connections {
-				previous[connection.target()] = connection
-			}
-			previousRates := make(map[string]Rate, len(before.Models))
-			for _, model := range before.Models {
-				previousRates[model.ID] = model.Rate
-			}
-			var needsProbe, needsTools, needsCache []string
-			modelUsage := make(map[string]bool, len(in.Config.Models))
-			cacheRequired := make(map[string]bool)
-			now := time.Now()
-			verificationMu.Lock()
-			for _, connection := range in.Config.Connections {
-				target := connection.target()
-				proof := verified[target]
-				old, exists := previous[target]
-				if !exists && !now.Before(proof.expires) {
-					needsProbe = append(needsProbe, connection.ID)
-				}
-				if connection.ToolMode == "tools" && old.ToolMode != "tools" && !now.Before(proof.toolExpires) {
-					needsTools = append(needsTools, connection.ID)
-				}
-				usageVerified := now.Before(proof.usageExpires)
-				if usageVerified {
-					modelUsage[connection.Model] = true
-				}
-				if connection.requiresCacheUsage(models[connection.Model].Rate) &&
-					(!exists || !old.requiresCacheUsage(previousRates[connection.Model])) &&
-					(!usageVerified || !proof.cacheBreakdown) {
-					needsCache = append(needsCache, connection.ID)
-					cacheRequired[connection.Model] = true
-				}
-			}
-			verificationMu.Unlock()
-			if len(needsProbe) > 0 {
-				respond(w, http.StatusPreconditionFailed, map[string]any{"error": "model_probe_required", "connections": needsProbe})
-				return
-			}
-			var needsUsage []string
-			for _, model := range in.Config.Models {
-				_, wasPublished := previousRates[model.ID]
-				if cacheRequired[model.ID] || (!wasPublished && !modelUsage[model.ID]) {
-					needsUsage = append(needsUsage, model.ID)
-				}
-			}
-			if len(needsUsage) > 0 {
-				respond(w, http.StatusPreconditionFailed, map[string]any{"error": "model_usage_probe_required", "models": needsUsage, "connections": needsCache})
-				return
-			}
-			if len(needsTools) > 0 {
-				respond(w, http.StatusPreconditionFailed, map[string]any{"error": "model_tool_probe_required", "connections": needsTools})
-				return
-			}
-		}
-		guest, err := guestModelCatalog(in.Config.GuestModels, in.Config.Models)
-		if err != nil {
-			respond(w, http.StatusBadRequest, map[string]string{"error": "invalid_model_configuration", "detail": err.Error()})
+		active, err := s.db.ActiveModelConfig(r.Context())
+		var before ModelConfig
+		if err != nil || json.Unmarshal(active.Config, &before) != nil {
+			fail(w, http.StatusInternalServerError, "model_configuration_unavailable")
 			return
 		}
-		if in.Config.GuestModels != nil {
-			in.Config.GuestModels = guest
+		if active.Version != in.BaseVersion {
+			fail(w, http.StatusConflict, "model_configuration_changed")
+			return
+		}
+		previous := make(map[connectionTarget]ManagedConnection, len(before.Connections))
+		for _, connection := range before.Connections {
+			previous[connection.target()] = connection
+		}
+		previousRates := make(map[string]Rate, len(before.Models))
+		for _, model := range before.Models {
+			previousRates[model.ID] = model.Rate
+		}
+		var needsProbe, needsTools, needsCache []string
+		modelUsage := make(map[string]bool, len(in.Config.Models))
+		cacheRequired := make(map[string]bool)
+		now := time.Now()
+		verificationMu.Lock()
+		for _, connection := range in.Config.Connections {
+			target := connection.target()
+			proof := verified[target]
+			old, exists := previous[target]
+			if !exists && !now.Before(proof.expires) {
+				needsProbe = append(needsProbe, connection.ID)
+			}
+			if connection.ToolMode == "tools" && old.ToolMode != "tools" && !now.Before(proof.toolExpires) {
+				needsTools = append(needsTools, connection.ID)
+			}
+			usageVerified := now.Before(proof.usageExpires)
+			if usageVerified {
+				modelUsage[connection.Model] = true
+			}
+			if connection.requiresCacheUsage(models[connection.Model].Rate) &&
+				(!exists || !old.requiresCacheUsage(previousRates[connection.Model])) &&
+				(!usageVerified || !proof.cacheBreakdown) {
+				needsCache = append(needsCache, connection.ID)
+				cacheRequired[connection.Model] = true
+			}
+		}
+		verificationMu.Unlock()
+		if len(needsProbe) > 0 {
+			respond(w, http.StatusPreconditionFailed, map[string]any{"error": "model_probe_required", "connections": needsProbe})
+			return
+		}
+		var needsUsage []string
+		for _, model := range in.Config.Models {
+			_, wasPublished := previousRates[model.ID]
+			if cacheRequired[model.ID] || (!wasPublished && !modelUsage[model.ID]) {
+				needsUsage = append(needsUsage, model.ID)
+			}
+		}
+		if len(needsUsage) > 0 {
+			respond(w, http.StatusPreconditionFailed, map[string]any{"error": "model_usage_probe_required", "models": needsUsage, "connections": needsCache})
+			return
+		}
+		if len(needsTools) > 0 {
+			respond(w, http.StatusPreconditionFailed, map[string]any{"error": "model_tool_probe_required", "connections": needsTools})
+			return
 		}
 		body, err := json.Marshal(in.Config)
 		if err != nil {
@@ -417,7 +395,13 @@ func (s *Server) enableModelAdmin(builder ModelBuilder, probe func(*inference.Ga
 			return
 		}
 		defer s.modelMu.Unlock()
-		version, err := s.db.PublishModelConfig(r.Context(), in.BaseVersion, admin.ID, body, time.Now())
+		if prompts := s.prompts.Load(); prompts != nil && prompts.active != nil {
+			if experiment := prompts.active.Comparison; experiment != nil && experiment.Percent > 0 && models[experiment.Model].ID == "" {
+				respond(w, http.StatusConflict, map[string]string{"error": "model_used_by_experiment", "model": experiment.Model})
+				return
+			}
+		}
+		version, err := s.db.SaveModelConfig(r.Context(), in.BaseVersion, admin.ID, body, time.Now())
 		if errors.Is(err, store.ErrConflict) {
 			fail(w, http.StatusConflict, "model_configuration_changed")
 			return
@@ -426,11 +410,15 @@ func (s *Server) enableModelAdmin(builder ModelBuilder, probe func(*inference.Ga
 			fail(w, http.StatusInternalServerError, "model_configuration_unavailable")
 			return
 		}
+		if version == in.BaseVersion {
+			respond(w, http.StatusOK, map[string]int64{"version": version})
+			return
+		}
 		if previous, ok := s.gateway.(*inference.Gateway); ok {
 			gateway.CarryCapacity(previous)
 		}
 		s.gateway, s.models, s.list = gateway, models, append([]Model{}, in.Config.Models...)
-		s.guestModels = guest
+		s.guestModels = guestModelCatalog(in.Config.Models)
 		s.routeRevision = publishedRouteRevision(version)
 		respond(w, http.StatusOK, map[string]int64{"version": version})
 	})
