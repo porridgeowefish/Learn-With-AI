@@ -34,6 +34,7 @@ type Server struct {
 	list           []Model
 	guestModels    []GuestModel
 	prompts        atomic.Pointer[promptState]
+	comparisonKey  []byte
 	promptPublish  sync.Mutex
 	mux            *http.ServeMux
 	limit          authLimit
@@ -82,7 +83,6 @@ func New(db *store.Store, accounts *auth.Service, gateway Streamer, models []Mod
 	s.mux.HandleFunc("POST /v1/credits/daily", s.claimDaily)
 	s.mux.HandleFunc("GET /v1/credits/daily/history", s.dailyClaimHistory)
 	s.mux.HandleFunc("POST /v1/credits/settlements", s.creditSettlements)
-	s.mux.HandleFunc("POST /v1/experiments/teaching-rating", s.teachingRating)
 	s.mux.HandleFunc("POST /v1/inference", s.stream)
 	return s, nil
 }
@@ -158,14 +158,11 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		auth.EmailInput
-		Username string // Accepted for compatibility with older desktop clients.
-	}
+	var in auth.EmailInput
 	if !decode(w, r, &in, 8192) || !s.allowAuth(w, r, "verify", in.Email, 20) {
 		return
 	}
-	session, err := s.accounts.VerifyEmail(r.Context(), in.EmailInput)
+	session, err := s.accounts.VerifyEmail(r.Context(), in)
 	writeSession(w, session, err)
 }
 

@@ -55,62 +55,15 @@ func (s *Store) PromptConfig(ctx context.Context, version int64) (ModelConfigVer
 	return readModelConfig(s.db.QueryRowContext(ctx, "SELECT version,content,created_at FROM prompt_config_version WHERE version=?", version))
 }
 
-func (s *Store) PromptConfigsForExperiments(ctx context.Context, ids []string) ([]json.RawMessage, error) {
-	keys, err := json.Marshal(ids)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.db.QueryContext(ctx, `SELECT p.content FROM prompt_config_version p WHERE EXISTS (
-		SELECT 1 FROM json_each(p.content,'$.experiments') AS e
-		WHERE json_extract(e.value,'$.id') IN (SELECT value FROM json_each(?))
-	)`, string(keys))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var configs []json.RawMessage
-	for rows.Next() {
-		var content string
-		if err := rows.Scan(&content); err != nil {
-			return nil, err
-		}
-		configs = append(configs, json.RawMessage(content))
-	}
-	return configs, rows.Err()
-}
-
-type RetiredPromptConfig struct {
-	Config    json.RawMessage
-	RetiredAt time.Time
-}
-
-// RetiredPromptConfigs selects versions by the time they stopped being active,
-// including a long-lived version whose own publication predates the window.
-func (s *Store) RetiredPromptConfigs(ctx context.Context, since time.Time) ([]RetiredPromptConfig, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT prior.content, successor.created_at
-		FROM prompt_config_version successor
-		JOIN prompt_config_version prior ON prior.version = (
-			SELECT MAX(version) FROM prompt_config_version WHERE version < successor.version
-		)
-		WHERE successor.created_at >= ? ORDER BY successor.version DESC`, since.Unix())
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var configs []RetiredPromptConfig
-	for rows.Next() {
-		var content string
-		var retired int64
-		if err := rows.Scan(&content, &retired); err != nil {
-			return nil, err
-		}
-		configs = append(configs, RetiredPromptConfig{json.RawMessage(content), time.Unix(retired, 0)})
-	}
-	return configs, rows.Err()
-}
-
 func (s *Store) PublishPromptConfig(ctx context.Context, base int64, actor string, content json.RawMessage, now time.Time) (int64, error) {
 	return s.publishConfig(ctx, "prompt_config_version", base, actor, content, now)
+}
+
+func (s *Store) FillMissingReviewPrompt(ctx context.Context, text string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE prompt_config_version
+		SET content=json_insert(content,'$.resources.review',?)
+		WHERE json_type(content,'$.resources')='object' AND json_type(content,'$.resources.review') IS NULL`, text)
+	return err
 }
 
 func (s *Store) publishConfig(ctx context.Context, table string, base int64, actor string, content json.RawMessage, now time.Time) (int64, error) {

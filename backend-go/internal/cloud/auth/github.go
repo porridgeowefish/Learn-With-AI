@@ -8,8 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,8 +21,6 @@ type GitHub struct {
 	db                   *store.Store
 	id, secret, callback string
 	client               *http.Client
-	tokenDirect          *http.Client
-	tokenProxy           *http.Client
 }
 
 func NewGitHub(db *store.Store, id, secret, callback string) (*GitHub, error) {
@@ -34,25 +30,22 @@ func NewGitHub(db *store.Store, id, secret, callback string) (*GitHub, error) {
 		endpoint.RawQuery != "" || endpoint.Fragment != "" {
 		return nil, ErrInvalid
 	}
-	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+	client := &http.Client{Timeout: 18 * time.Second, Transport: oauthDirectTransport(), CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
 	return &GitHub{db: db, id: id, secret: secret, callback: callback, client: client}, nil
 }
 
-// SetTokenProxy configures a fallback used only when the token endpoint cannot be dialed.
-func (g *GitHub) SetTokenProxy(proxyURL string) error {
-	proxy, err := oauthLoopbackProxyTransport(proxyURL)
+// SetTokenProxy configures bounded fallbacks for the token and identity endpoints.
+func (g *GitHub) SetTokenProxy(proxyURL string, fallbackURLs ...string) error {
+	if proxyURL != "" {
+		fallbackURLs = append([]string{proxyURL}, fallbackURLs...)
+	}
+	routes, err := newOAuthRoutes(fallbackURLs, true)
 	if err != nil {
 		return err
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
-	transport.DialContext = (&net.Dialer{Timeout: 3 * time.Second, KeepAlive: 30 * time.Second}).DialContext
-	direct, fallback := *g.client, *g.client
-	direct.Transport = transport
-	fallback.Transport = proxy
-	g.tokenDirect, g.tokenProxy = &direct, &fallback
+	g.client.Transport = routes
 	return nil
 }
 
@@ -165,22 +158,7 @@ func (g *GitHub) user(ctx context.Context, path, token string, body any) error {
 }
 
 func (g *GitHub) exchangeToken(req *http.Request, body any) error {
-	if g.tokenProxy == nil {
-		return decodeGitHubResponse(g.client, req, body)
-	}
-	err := decodeGitHubResponse(g.tokenDirect, req, body)
-	var dial *net.OpError
-	if !errors.As(err, &dial) || dial.Op != "dial" {
-		return err
-	}
-	// A failed dial could not have sent the single-use authorization code.
-	retry := req.Clone(req.Context())
-	retry.Body, err = req.GetBody()
-	if err != nil {
-		return err
-	}
-	log.Print("GitHub OAuth token exchange using configured proxy after direct dial failed")
-	return decodeGitHubResponse(g.tokenProxy, retry, body)
+	return decodeGitHubResponse(g.client, req, body)
 }
 
 func decodeGitHubResponse(client *http.Client, req *http.Request, body any) error {

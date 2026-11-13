@@ -1,4 +1,4 @@
-// Package auth implements verified email and password sign-in for LLL accounts.
+// Package auth implements email-verified registration and password sign-in.
 package auth
 
 import (
@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	PurposeLogin   = "login"
-	PurposeReset   = "reset"
-	sessionTTL     = 30 * 24 * time.Hour
-	passwordRounds = 600_000
-	passwordMin    = 6
-	passwordMax    = 256
+	PurposeRegister = "register"
+	PurposeReset    = "reset"
+	sessionTTL      = 30 * 24 * time.Hour
+	passwordRounds  = 600_000
+	passwordMin     = 6
+	passwordMax     = 256
 )
 
 var (
@@ -62,7 +62,7 @@ func normalizeEmail(value string) (string, error) {
 }
 
 func validPurpose(purpose string) bool {
-	return purpose == PurposeLogin || purpose == PurposeReset
+	return purpose == PurposeRegister || purpose == PurposeReset
 }
 
 func (s *Service) codeDigest(email, purpose, code string) []byte {
@@ -172,7 +172,7 @@ func (s *Service) UnlinkIdentity(ctx context.Context, token, provider, password 
 }
 
 type EmailInput struct {
-	Email, Purpose, Code, Password string
+	Email, Purpose, Code, Username, Password string
 }
 
 type Session struct {
@@ -198,21 +198,20 @@ func (s *Service) VerifyEmail(ctx context.Context, in EmailInput) (Session, erro
 	if err != nil || !validPurpose(in.Purpose) || !validCode(in.Code) {
 		return Session{}, ErrInvalid
 	}
-	var hash string
-	if in.Purpose == PurposeReset {
-		if len(in.Password) < passwordMin || len(in.Password) > passwordMax {
-			return Session{}, ErrInvalid
-		}
-		hash, err = hashPassword(in.Password)
-		if err != nil {
-			return Session{}, err
-		}
+	username := strings.ToLower(strings.TrimSpace(in.Username))
+	if len(in.Password) < passwordMin || len(in.Password) > passwordMax ||
+		(in.Purpose == PurposeRegister && !usernameFormat.MatchString(username)) {
+		return Session{}, ErrInvalid
+	}
+	hash, err := hashPassword(in.Password)
+	if err != nil {
+		return Session{}, err
 	}
 	now := s.now()
 	token := rand.Text()
 	expires := now.Add(sessionTTL)
 	account, err := s.store.VerifyEmail(ctx, store.EmailVerification{
-		Email: email, Purpose: in.Purpose, PasswordHash: hash,
+		Email: email, Purpose: in.Purpose, Username: username, PasswordHash: hash,
 		CodeDigest: s.codeDigest(email, in.Purpose, in.Code), SessionDigest: sessionDigest(token),
 		Now: now, SessionExpires: expires,
 	})

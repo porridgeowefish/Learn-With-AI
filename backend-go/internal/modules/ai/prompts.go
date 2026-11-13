@@ -14,8 +14,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-
-	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
 )
 
 type PromptSource struct {
@@ -215,17 +213,8 @@ func ManagedPromptReference(ctx context.Context) *promptpack.Reference {
 	return content.Reference()
 }
 
-func ManagedPromptIsExperimental(ctx context.Context) bool {
-	content, _ := ctx.Value(managedPromptKey{}).(promptpack.Content)
-	return content.Experiment != ""
-}
-
-// ManagedPromptContext captures the signed template snapshot for an explicitly
-// managed request. Custom provider connections never call the prompt service.
-func ManagedPromptContext(ctx context.Context, providerID, scene string) context.Context {
-	if !aiconfig.IsManagedProvider(providerID) {
-		return ctx
-	}
+// CloudPromptContext captures the cloud template while keeping request assembly local.
+func CloudPromptContext(ctx context.Context, scene string) context.Context {
 	client, err := llmcloud.Default()
 	if err != nil {
 		return ctx
@@ -234,6 +223,10 @@ func ManagedPromptContext(ctx context.Context, providerID, scene string) context
 	if err != nil {
 		return ctx
 	}
+	return WithPromptContent(ctx, content)
+}
+
+func WithPromptContent(ctx context.Context, content promptpack.Content) context.Context {
 	return context.WithValue(ctx, managedPromptKey{}, content)
 }
 

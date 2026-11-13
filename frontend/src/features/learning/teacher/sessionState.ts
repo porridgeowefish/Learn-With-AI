@@ -11,6 +11,7 @@ export interface LiveResponse {
   teacherId?: string;
   responseId?: string;
   text: string;
+  comparison?: ConversationMessage['comparison'];
   reasoning: string;
   searches: SearchStatus[];
   notice?: string;
@@ -64,6 +65,13 @@ function reduceLive(current: LiveResponse | null, frame: TeacherStreamFrame): Li
     if (!current) return current;
     if (frame.type === 'turn-accepted') return { ...current, responseId: String(frame.data.responseId), learner: { ...current.learner, id: String(frame.data.learnerMessageId) } };
     if (frame.type === 'message-started') return { ...current, teacherId: String(frame.data.teacherMessageId) };
+    if (frame.type === 'comparison-started') return { ...current, comparison: { id: String(frame.data.comparisonId), a: '', b: '' } };
+    if (frame.type === 'comparison-delta' && current.comparison) {
+      const arm = frame.data.arm;
+      if (arm === 'a' || arm === 'b') return { ...current, comparison: {
+        ...current.comparison, [arm]: current.comparison[arm] + String(frame.data.delta ?? ''),
+      } };
+    }
     if (frame.type === 'message-reset') return { ...current, text: '', reasoning: '', notice: '', searches: [], reading: undefined };
     if (frame.type === 'message-completed' || frame.type === 'message-failed') return { ...current, reading: undefined };
     if (frame.type === 'source-reading') {
@@ -73,9 +81,12 @@ function reduceLive(current: LiveResponse | null, frame: TeacherStreamFrame): Li
     }
     if (frame.type === 'text-delta') return { ...current, text: current.text + String(frame.data.delta ?? '') };
     if (frame.type === 'reasoning-summary-delta') return { ...current, reasoning: current.reasoning + String(frame.data.delta ?? '') };
+    if ((frame.type === 'search-started' || frame.type === 'search-completed' || frame.type === 'search-failed') &&
+      (frame.data as Record<string, unknown>).source === 'open-figures') return current;
     if (frame.type === 'search-started') return { ...current, searches: [...current.searches, { query: String(frame.data.query ?? '') }] };
     if (frame.type === 'search-completed' || frame.type === 'search-failed') {
-      return { ...current, searches: current.searches.map((search, index) => index === current.searches.length - 1 && !search.count && !search.failed
+      const pending = current.searches.findIndex(search => search.query === String(frame.data.query ?? '') && search.count === undefined && !search.failed);
+      return { ...current, searches: current.searches.map((search, index) => index === pending
         ? (frame.type === 'search-completed' ? { ...search, count: Number(frame.data.count ?? 0) } : { ...search, failed: true })
         : search) };
     }
@@ -90,7 +101,7 @@ export function projectTeacherMessages(messages: ConversationMessage[], live: Li
   const learnerAccepted = live.learner.operationId && visible.some(message => message.operationId === live.learner.operationId);
   if (live.learner.id !== 'teacher-opening' && !ids.has(live.learner.id) && !learnerAccepted) visible.push(live.learner);
   const id = live.teacherId ?? 'streaming-teacher';
-  if (!ids.has(id)) visible.push({ id, role: 'teacher', status: 'completed', createdAt: '', blocks: [
+  if (!ids.has(id)) visible.push({ id, role: 'teacher', status: 'completed', createdAt: '', comparison: live.comparison, blocks: [
     ...(live.reasoning ? [{ id: 'reasoning', type: 'reasoning-summary' as const, source: live.reasoning }] : []),
     ...(live.text ? [{ id: 'text', type: 'markdown' as const, source: live.text }] : []),
   ] });

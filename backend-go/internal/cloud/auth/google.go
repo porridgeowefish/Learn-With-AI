@@ -35,22 +35,23 @@ type Google struct {
 	ready      bool
 }
 
-func NewGoogle(db *store.Store, id, secret, proxyURL string) (*Google, error) {
+func NewGoogle(db *store.Store, id, secret, proxyURL string, fallbackURLs ...string) (*Google, error) {
 	if db == nil || !strings.HasSuffix(id, ".apps.googleusercontent.com") || secret == "" {
 		return nil, errors.New("invalid Google desktop OAuth configuration")
 	}
+	if proxyURL != "" {
+		fallbackURLs = append([]string{proxyURL}, fallbackURLs...)
+	}
+	routes, err := newOAuthRoutes(fallbackURLs, false)
+	if err != nil {
+		return nil, err
+	}
 	client := &http.Client{
-		Timeout:       15 * time.Second,
+		Timeout:       18 * time.Second,
+		Transport:     routes,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	if proxyURL != "" {
-		transport, err := oauthLoopbackProxyTransport(proxyURL)
-		if err != nil {
-			return nil, err
-		}
-		client.Transport = transport
-	}
-	return &Google{id: id, secret: secret, db: db, client: client, proxied: proxyURL != ""}, nil
+	return &Google{id: id, secret: secret, db: db, client: client, proxied: len(routes) > 1}, nil
 }
 
 func (g *Google) ClientID() string { return g.id }
@@ -65,7 +66,7 @@ func (g *Google) Available(ctx context.Context) bool {
 	if time.Now().Before(g.readyUntil) {
 		return g.ready
 	}
-	probe, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	probe, cancel := context.WithTimeout(context.WithoutCancel(ctx), 17*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(probe, http.MethodGet, googleUserInfoURL, nil)
 	if err != nil {

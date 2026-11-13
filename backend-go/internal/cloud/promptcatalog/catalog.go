@@ -3,88 +3,41 @@ package promptcatalog
 
 import (
 	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 
 	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
 var experimentID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$`)
 
-type Experiment struct {
-	ID, Scene, Root, Version string
-	Percent                  int
-}
-
 type Draft struct {
-	Version     string            `json:"version"`
-	Resources   map[string]string `json:"resources"`
-	Experiments []VariantDraft    `json:"experiments"`
+	Version    string            `json:"version"`
+	Resources  map[string]string `json:"resources"`
+	Comparison *ComparisonDraft  `json:"comparison,omitempty"`
 }
 
-type VariantDraft struct {
-	ID        string            `json:"id"`
-	Scene     string            `json:"scene"`
-	Version   string            `json:"version"`
-	Percent   int               `json:"percent"`
-	Overrides map[string]string `json:"overrides"`
+type ComparisonDraft struct {
+	ID      string `json:"id"`
+	Model   string `json:"model"`
+	Percent int    `json:"percent"`
+	A       string `json:"a"`
+	B       string `json:"b"`
 }
 
 type Catalog struct {
 	stable     map[string]promptpack.Pack
-	experiment map[string]variant
+	signingKey ed25519.PrivateKey
+	Comparison *ComparisonDraft
+	A, B       promptpack.Pack
 }
 
-type variant struct {
-	control, treatment promptpack.Pack
-	percent            int
-}
-
-type ExperimentAllocation struct {
-	ID               string `json:"id"`
-	Scene            string `json:"scene"`
-	TreatmentPercent int    `json:"treatmentPercent"`
-}
-
-func (c *Catalog) ExperimentAllocations() []ExperimentAllocation {
-	out := make([]ExperimentAllocation, 0, len(c.experiment))
-	for scene, item := range c.experiment {
-		out = append(out, ExperimentAllocation{item.control.Content.Experiment, scene, item.percent})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
-}
-
-func New(root, version string, key ed25519.PrivateKey, tests []Experiment) (*Catalog, error) {
-	draft, err := LoadDraft(root, version, tests)
-	if err != nil {
-		return nil, err
-	}
-	return Build(draft, key)
-}
-
-func LoadDraft(root, version string, tests []Experiment) (Draft, error) {
+func LoadDraft(root, version string) (Draft, error) {
 	contents, err := readResources(root)
-	if err != nil {
-		return Draft{}, err
-	}
-	draft := Draft{Version: version, Resources: contents}
-	for _, test := range tests {
-		experimental, err := readResources(test.Root)
-		if err != nil {
-			return Draft{}, err
-		}
-		draft.Experiments = append(draft.Experiments, VariantDraft{
-			ID: test.ID, Scene: test.Scene, Version: test.Version, Percent: test.Percent, Overrides: experimental,
-		})
-	}
-	return draft, nil
+	return Draft{Version: version, Resources: contents}, err
 }
 
 func Build(draft Draft, key ed25519.PrivateKey) (*Catalog, error) {
@@ -93,111 +46,78 @@ func Build(draft Draft, key ed25519.PrivateKey) (*Catalog, error) {
 			return nil, errors.New("missing required cloud prompt resource")
 		}
 	}
-	c := &Catalog{stable: make(map[string]promptpack.Pack), experiment: make(map[string]variant)}
-	for _, scene := range []string{"teacher/general", "auxiliary/section-summary", "generation/practice", "auxiliary/notes"} {
-		base, err := promptpack.Sign(promptpack.Content{Version: draft.Version, Scene: scene, Resources: draft.Resources}, key)
+	c := &Catalog{stable: make(map[string]promptpack.Pack), signingKey: key}
+	for _, scene := range []string{"teacher/general", "auxiliary/section-summary", "generation/review", "generation/practice", "auxiliary/notes"} {
+		resources := maps.Clone(draft.Resources)
+		if scene != "generation/review" {
+			delete(resources, "review")
+		}
+		base, err := promptpack.Sign(promptpack.Content{Version: draft.Version, Scene: scene, Resources: resources}, key)
 		if err != nil {
 			return nil, err
 		}
 		c.stable[scene] = base
 	}
-	ids := make(map[string]bool, len(draft.Experiments))
-	for _, test := range draft.Experiments {
-		base, exists := c.stable[test.Scene]
-		if !exists || !experimentID.MatchString(test.ID) || ids[test.ID] || len(test.Overrides) == 0 || test.Percent < 0 || test.Percent > 100 || c.experiment[test.Scene].control.Digest != "" {
-			return nil, errors.New("invalid or duplicate prompt experiment")
+	if config := draft.Comparison; config != nil {
+		if !experimentID.MatchString(config.ID) || !experimentID.MatchString(config.Model) ||
+			config.Percent < 0 || config.Percent > 100 || config.A == config.B || config.A == "" || config.B == "" {
+			return nil, errors.New("invalid teacher answer comparison")
 		}
-		ids[test.ID] = true
-		experimental := maps.Clone(draft.Resources)
-		for name, value := range test.Overrides {
-			experimental[name] = value
+		scene := "teacher/general"
+		signed := func(variant, text string) (promptpack.Pack, error) {
+			resources := maps.Clone(c.stable[scene].Content.Resources)
+			resources["teaching/teacher"] = text
+			return promptpack.Sign(promptpack.Content{Version: draft.Version, Scene: scene, Experiment: config.ID, Variant: variant, Resources: resources}, key)
 		}
-		control := base.Content
-		control.Experiment, control.Variant = test.ID, "control"
-		a, err := promptpack.Sign(control, key)
+		a, err := signed("a", config.A)
 		if err != nil {
 			return nil, err
 		}
-		b, err := promptpack.Sign(promptpack.Content{
-			Version: test.Version, Scene: test.Scene, Experiment: test.ID, Variant: "treatment", Resources: experimental,
-		}, key)
+		b, err := signed("b", config.B)
 		if err != nil {
 			return nil, err
 		}
-		c.experiment[test.Scene] = variant{control: a, treatment: b, percent: test.Percent}
+		copy := *config
+		c.Comparison, c.A, c.B = &copy, a, b
 	}
 	return c, nil
 }
 
-func (c *Catalog) ForAccount(scene, account string) (promptpack.Pack, bool) {
-	if v, exists := c.experiment[scene]; exists {
-		if assignedTreatment(v.control.Content.Experiment, account, v.percent) {
-			return v.treatment, true
-		}
-		return v.control, true
-	}
+func (c *Catalog) Stable(scene string) (promptpack.Pack, bool) {
 	base, exists := c.stable[scene]
 	return base, exists
 }
 
-func assignedTreatment(experiment, account string, percent int) bool {
-	hash := sha256.Sum256([]byte(experiment + "\x00" + account))
-	return binary.BigEndian.Uint64(hash[:8])%100 < uint64(percent)
-}
-
-type Exposure struct {
-	Experiment, Variant, Version, Digest string
-}
-
-type exposureVariants struct {
-	control, treatment Exposure
-	percent            int
-}
-
-type ExposureIndex map[string]exposureVariants
-
-// ExposureIndex retains assignment metadata without retaining retired templates.
-func (c *Catalog) ExposureIndex() ExposureIndex {
-	result := make(ExposureIndex, len(c.experiment))
-	exposure := func(p promptpack.Pack) Exposure {
-		return Exposure{p.Content.Experiment, p.Content.Variant, p.Content.Version, p.Digest}
-	}
-	for scene, variant := range c.experiment {
-		result[scene] = exposureVariants{exposure(variant.control), exposure(variant.treatment), variant.percent}
-	}
-	return result
-}
-
-func (i ExposureIndex) Match(account string, ref promptpack.Reference) (Exposure, bool) {
-	variant, exists := i[ref.Scene]
-	if !exists {
-		return Exposure{}, false
-	}
-	exposure := variant.control
-	if assignedTreatment(exposure.Experiment, account, variant.percent) {
-		exposure = variant.treatment
-	}
-	if exposure.Digest != ref.Digest {
-		return Exposure{}, false
-	}
-	return exposure, true
+func (c *Catalog) SelectedTeacher(selected promptpack.Pack) (promptpack.Pack, error) {
+	content := c.stable["teacher/general"].Content
+	content.Resources = maps.Clone(content.Resources)
+	content.Resources["teaching/teacher"] = selected.Content.Resources["teaching/teacher"]
+	content.Experiment = selected.Content.Experiment
+	content.Variant = selected.Content.Variant
+	return promptpack.Sign(content, c.signingKey)
 }
 
 func readResources(root string) (map[string]string, error) {
 	contents := make(map[string]string)
 	for _, name := range promptpack.ResourceNames() {
-		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(name+".md")))
+		text, err := ReadResource(root, name)
 		if err != nil {
 			return nil, err
 		}
-		if !info.Mode().IsRegular() || info.Size() > 128<<10 {
-			return nil, errors.New("invalid cloud prompt file")
-		}
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name+".md")))
-		if err != nil {
-			return nil, err
-		}
-		contents[name] = string(data)
+		contents[name] = text
 	}
 	return contents, nil
+}
+
+func ReadResource(root, name string) (string, error) {
+	path := filepath.Join(root, filepath.FromSlash(name+".md"))
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Size() > 128<<10 {
+		return "", errors.New("invalid cloud prompt file")
+	}
+	data, err := os.ReadFile(path)
+	return string(data), err
 }

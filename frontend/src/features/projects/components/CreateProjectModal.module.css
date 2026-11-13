@@ -72,6 +72,9 @@
   font-weight: 600;
   color: var(--fg);
 }
+.modelField > div { color: var(--muted); font-size: .78rem; }
+.modelField > div:empty { display: none; }
+.modelField a { color: var(--accent-ink); text-underline-offset: 3px; }
 
 .field input[type='text'],
 .field select,

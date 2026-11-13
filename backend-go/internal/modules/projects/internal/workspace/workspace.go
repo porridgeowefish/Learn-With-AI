@@ -36,6 +36,7 @@ type ProjectState struct {
 	Title         string      `json:"title"`
 	Slug          string      `json:"slug"`
 	ProjectType   ProjectType `json:"projectType"`
+	ProviderID    string      `json:"providerId,omitempty"`
 	Status        string      `json:"status"`
 	CreatedAt     time.Time   `json:"createdAt"`
 	UpdatedAt     time.Time   `json:"updatedAt"`
@@ -215,6 +216,7 @@ func writeProjectSkeleton(root, slug, title string, in ProjectInput) error {
 		Title:         title,
 		Slug:          slug,
 		ProjectType:   projectType,
+		ProviderID:    in.ProviderID,
 		Status:        "active",
 		CreatedAt:     parsed,
 		UpdatedAt:     parsed,
@@ -369,6 +371,7 @@ func IsSlugConflict(err error) bool {
 
 // ProjectInput captures creation-time context. Legacy questionnaire fields are ignored.
 type ProjectInput struct {
+	ProviderID    string
 	SystemPrompt  string // learner-owned conversation instructions
 	LearningMode  string
 	ProjectType   ProjectType

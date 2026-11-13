@@ -18,7 +18,7 @@ const physicsReview =
 // Simulate the teacher's per-turn footer using the same wire format as production.
 function previewAnswer(physics, question = '') {
   if (/芯片|智能制造|制造组图/.test(question)) return previewManufacturingAnswer;
-  if (question.includes('开放图示')) return previewFigureAnswer;
+  if (/开放图示|化学结构|工业图示/.test(question)) return previewFigureAnswer;
   if (!question) return physics
     ? '小球下落时高度降低、速度增大。忽略空气阻力，减少的重力势能主要转化成哪种能量？\n\n```suggested-replies\n["动能","内能","化学能","还不确定，先看讲解"]\n```'
     : '向量加法表示连续发生的位移。先向东走 3 步，再向西走 2 步，最后停在哪里？\n\n```suggested-replies\n["向东 1 步","向东 5 步","回到起点","还不确定，先看讲解"]\n```';
@@ -221,7 +221,7 @@ function initialize(project, dialogue) {
     learningMode: project.learningMode || 'general',
   };
 }
-function stream(frames, delay = 0, interrupted = () => false) {
+function stream(frames, delay = 0, interrupted = () => undefined) {
   let index = 0;
   return new Response(
     new ReadableStream({
@@ -229,9 +229,10 @@ function stream(frames, delay = 0, interrupted = () => false) {
         if (delay && index > 1)
           await new Promise((done) => setTimeout(done, delay));
         let [event, data] = frames[index++];
-        if (interrupted()) {
+        const partial = interrupted();
+        if (partial !== undefined) {
           event = 'message-failed';
-          data = { ...data, code: 'stopped', partialPreserved: true };
+          data = { ...data, code: 'interrupted', partialPreserved: partial };
           index = frames.length;
         }
         const wire =
@@ -258,6 +259,18 @@ function releaseQueue(s) {
       message('teacher', previewAnswer(s.physics, item.content)),
     );
   }
+}
+function interruptPreview(s) {
+  s.stoppedId = s.responseId;
+  s.streamingUntil = 0;
+  const last = s.messages.at(-1);
+  if (last?.role !== 'teacher') return;
+  last.status = 'interrupted';
+  const elapsed = Date.now() - s.streamingStartedAt;
+  const sentChunks = Math.max(0, Math.floor(elapsed / 300) - (s.streamingPrelude ?? 0));
+  const chunks = last.blocks[0].source.match(/[\s\S]{1,40}/gu) || [];
+  last.blocks[0].source = chunks.slice(0, sentChunks).join('');
+  s.stoppedWithText = !!last.blocks[0].source;
 }
 function conversation(ctx, s, parts, b) {
   const { method, json } = ctx;
@@ -286,13 +299,18 @@ function conversation(ctx, s, parts, b) {
       queuePaused: !!s.queuePaused,
       latestResponseId: s.responseId,
     });
-  if (action === 'lesson-rating' && method === 'POST') {
-    const target = s.messages.find(item => item.id === b.messageId && item.lessonEnded);
-    if (!target) return json({ error: 'lesson_end_not_found' }, 404);
-    if (!Number.isInteger(b.stars) || b.stars < 0 || b.stars > 5) return json({ error: 'invalid_lesson_rating' }, 400);
-    if (target.lessonRating !== undefined && target.lessonRating !== b.stars) return json({ error: 'lesson_already_rated' }, 409);
-    target.lessonRating = b.stars;
-    ctx.dirty();
+  if ((action === 'feedback' || action === 'comparison-vote') && method === 'POST') {
+    const target = s.messages.find(item => item.id === b.messageId && item.role === 'teacher');
+    if (!target) return json({ error: 'answer_unavailable' }, 404);
+    if (action === 'feedback') {
+      if (!['up', 'down'].includes(b.value)) return json({ error: 'invalid_answer_feedback' }, 400);
+      target.feedback = b.value;
+    } else {
+      if (!target.comparison || !['a', 'b', 'tie', 'skipped'].includes(b.value)) return json({ error: 'invalid_comparison_vote' }, 400);
+      target.comparison.vote = b.value;
+      ctx.state.teacherComparisonChoice = b.value === 'b' ? 'b' : 'a';
+      target.blocks = [{ id: id(), type: 'markdown', source: target.comparison[ctx.state.teacherComparisonChoice] }];
+    }
     return new Response(null, { status: 204 });
   }
   if (action === 'instructions') {
@@ -322,12 +340,7 @@ function conversation(ctx, s, parts, b) {
   if (key === 'active' || (action === 'opening' && s.messages.length))
     return new Response(null, { status: 204 });
   if (op === 'stop') {
-    if (key === s.responseId) {
-      s.queuePaused = true;
-      s.stoppedId = key;
-      const m = s.messages.at(-1);
-      if (m?.role === 'teacher') m.status = 'interrupted';
-    }
+    if (key === s.responseId && s.streamingUntil > Date.now()) interruptPreview(s);
     return json({ stopped: true });
   }
   if (action === 'turns' && key === 'queue') {
@@ -349,6 +362,7 @@ function conversation(ctx, s, parts, b) {
     }
     s.queue = s.queue.filter((q) => q !== item);
     if (op === 'discard') return json({ queueId: key, discarded: true });
+    if (s.streamingUntil > Date.now()) interruptPreview(s);
     b = item;
   }
   if (['turns', 'opening', 'responses', 'queue'].includes(action)) {
@@ -380,8 +394,13 @@ function conversation(ctx, s, parts, b) {
     if (op === 'regenerate' && s.messages.at(-1)?.role === 'teacher')
       s.messages.pop();
     const question = b.content || s.messages.findLast(m => m.role === 'learner')?.blocks[0]?.source || '';
-    if (question.trim() === '模拟 ChatGPT 请求失败') {
-      const failureCode = 'chatgpt_request_rejected';
+    const failureCode = {
+      '模拟 ChatGPT 请求失败': 'chatgpt_request_rejected',
+      '模拟积分不足': 'insufficient_credits',
+      '模拟 API 密钥错误': 'teacher_api_key_rejected',
+      '模拟模型限流': 'teacher_provider_rate_limited',
+    }[question.trim()];
+    if (failureCode) {
       const teacher = message('teacher', '', { status: 'failed', failureCode });
       teacher.blocks = [];
       s.messages.push(teacher);
@@ -393,7 +412,8 @@ function conversation(ctx, s, parts, b) {
       ]);
     }
     let answer = previewAnswer(s.physics, question);
-    if (!question.includes('开放图示') && !/换.*(讲|方法)|直接|先讲/.test(question)) {
+    const visual = /开放图示|化学结构|工业图示|芯片|智能制造|制造组图/.test(question);
+    if (!visual && !/换.*(讲|方法)|直接|先讲/.test(question)) {
       if (s.learningMode === 'history') answer = '进度：Part 1/3 · 本 part：来龙去脉\n\n这是历史脉络的设计演示。我们可以从背景、关键转折与影响梳理一条时间线，再选择你感兴趣的阶段展开。实际教学会依据项目主题与资料。';
       if (s.learningMode === 'book') answer = '进度：Part 1/3 · 本 part：阅读地图\n\n这是书籍导读的设计演示。可以先从书的类型、成书背景与篇章结构建立阅读地图。目前没有核对具体版本和目录，不虚构章节。你可以上传目录，或直接选择想讨论的段落。';
       if (s.learningMode === 'concept') answer = '进度：Part 1/3 · 本 part：理解概念\n\n这是概念探究的设计演示。我们可以从它解决的问题、一个例子和适用边界建立直觉，再和相近概念对照。也可以直接从你当前的疑惑开始。';
@@ -401,17 +421,34 @@ function conversation(ctx, s, parts, b) {
     const controls = ctx.state.settings?.learning;
     if (controls?.length === 'short' && !answer.includes('```')) answer = answer.split('。')[0] + '。';
     if (controls?.length === 'long' && !answer.includes('```')) answer += '\n\n我们可以再用坐标验证：先向东走 3 步，再向北走 4 步，得到位移 (3, 4)。横纵坐标分别记录两个方向的变化。';
-    const searched = controls?.search.enabled && b.options?.webSearch;
+    const searched = controls?.search.enabled && b.options?.webSearch && !visual;
     if (searched) {
       const searchText = '\n\n搜索结果演示：[向量资料](https://zh.wikipedia.org/wiki/向量)。';
       const footer = answer.indexOf('\n\n```suggested-replies\n');
       answer = footer < 0 ? answer + searchText : answer.slice(0, footer) + searchText + answer.slice(footer);
     }
-    const prior = s.messages.findLast(m => m.role === 'teacher')?.blocks[0]?.source || '';
-    const lessonEnded = /^(结束本次教学|没有其他问题|没有了)[。！!\s]*$/.test(question) && prior.includes('还有其他问题吗？');
     if (question.trim() === '教学进度') answer = '我们已梳理阅读、练习和讲解三种学习形式。\n\n教学进度：已完成 3/3 项。\n\n还有其他问题吗？如果没有，可以结束本次教学。';
-    if (lessonEnded) answer = '本次教学到这里。你可以用弹出的星级控件为本次教学评分。';
-    const teacher = message('teacher', answer, lessonEnded ? { lessonEnded: true } : {});
+    if (/^(结束本次教学|没有其他问题|没有了|学完了)[。！!\s]*$/.test(question)) answer = '本次教学到这里。以后有新的问题，可以随时回来继续。';
+    const teacher = message('teacher', answer);
+    if (question.trim() === '体验回答对比') {
+      const comparison = {id: id(),
+        a: '可以把学习分成三步。\n\n先读一个具体例子，接着独立做一道题，最后用自己的话讲清楚为什么。\n\n比如学向量加法，可以先看两段位移，再换一组数字自己画图。',
+        b: '先挑一个你还讲不清的概念。\n\n试着把它讲给一个没学过的人听，卡住时回到资料，只补那一个缺口。\n\n讲完后，用一个新例子检查你是否能把它用出来。'};
+      teacher.comparison = comparison;
+      teacher.blocks = [];
+      s.messages.push(teacher);
+      const responseId = (s.responseId = id());
+      const left = comparison.a.match(/[\s\S]{1,24}/gu);
+      const right = comparison.b.match(/[\s\S]{1,24}/gu);
+      const deltas = left.flatMap((delta, index) => [['comparison-delta', {arm:'a', delta}],
+        ...(right[index] ? [['comparison-delta', {arm:'b', delta:right[index]}]] : [])]);
+      if (right.length > left.length) for (const delta of right.slice(left.length)) deltas.push(['comparison-delta', {arm:'b', delta}]);
+      return stream([
+        ['turn-accepted', {learnerMessageId: learner.id}], ['message-started', {teacherMessageId: teacher.id}],
+        ['comparison-started', {comparisonId:comparison.id}], ...deltas,
+        ['message-completed', {messageId:teacher.id,latestSeq:s.messages.length}],
+      ].map(([event,data],index) => [event,{...data,responseId,frameSeq:index+1}]), 160);
+    }
     const cloudAccount = ctx.state.cloud;
     const managed = b.providerId ? b.providerId.startsWith('lwa-cloud:') || b.providerId.startsWith('lll-cloud:') : cloudAccount?.selectedModel;
     if (cloudAccount?.signedIn && managed) {
@@ -426,7 +463,9 @@ function conversation(ctx, s, parts, b) {
     }
     s.messages.push(teacher);
     const deltas = answer.match(/[\s\S]{1,40}/gu) || [];
-    s.streamingUntil = Date.now() + 300 * (deltas.length + 1);
+    s.streamingStartedAt = Date.now();
+    s.streamingPrelude = Number(!!reasoning) + (searched ? 2 : 0);
+    s.streamingUntil = s.streamingStartedAt + 300 * (deltas.length + s.streamingPrelude + 1);
     const responseId = (s.responseId = id());
     return stream(
       [
@@ -450,7 +489,7 @@ function conversation(ctx, s, parts, b) {
         { ...data, responseId: s.responseId, frameSeq: i + 1 },
       ]),
       300,
-      () => s.stoppedId === responseId,
+      () => s.stoppedId === responseId ? !!s.stoppedWithText : undefined,
     );
   }
 }

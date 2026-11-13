@@ -294,10 +294,10 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 	}
 	return chosen, nil
 }
-func prompt(ctx context.Context, kind, providerID string) (ai.ComposedPrompt, *promptpack.Reference, error) {
+func prompt(ctx context.Context, kind string) (ai.ComposedPrompt, *promptpack.Reference, error) {
 	scene := "generation/" + kind
-	if kind == "practice" {
-		ctx = ai.ManagedPromptContext(ctx, providerID, scene)
+	if kind == "review" || kind == "practice" {
+		ctx = ai.CloudPromptContext(ctx, scene)
 	}
 	composed, err := ai.ComposePrompt(ctx, scene, nil, nil)
 	if err != nil {
@@ -374,11 +374,15 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	if queued >= 32 {
 		return Job{}, problem("generation-queue-full", 429)
 	}
-	p, e := resolveProvider(in)
+	providerInput := in
+	if providerInput.ProviderID == "" {
+		providerInput.ProviderID = state.ProviderID
+	}
+	p, e := resolveProvider(providerInput)
 	if e != nil {
 		return Job{}, e
 	}
-	composed, reference, e := prompt(ctx, in.Kind, p.ID)
+	composed, reference, e := prompt(ctx, in.Kind)
 	if e != nil {
 		return Job{}, e
 	}

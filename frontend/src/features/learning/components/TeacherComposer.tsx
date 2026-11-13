@@ -12,8 +12,8 @@ export interface TeacherComposerHandle { sendText: (text: string) => void }
 
 
 export const TeacherComposer = forwardRef<TeacherComposerHandle, {
-  slug: string; title: string; session: TeacherSession; sourceCount: number; cloudStatus?: CloudStatus;
-}>(function TeacherComposer({ slug, title, session, sourceCount, cloudStatus }, ref) {
+  slug: string; title: string; initialProviderId?: string; session: TeacherSession; sourceCount: number; cloudStatus?: CloudStatus;
+}>(function TeacherComposer({ slug, title, initialProviderId, session, sourceCount, cloudStatus }, ref) {
   const media = useChatMedia(slug);
   const settings = useAskAiSettings();
   const profile = useLearningProfile();
@@ -22,23 +22,22 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   const models = (settings.data?.providers ?? []).filter(provider => provider.id && provider.model && (provider.kind === 'siwc' || provider.baseURL));
   const managedModel = cloudStatus?.signedIn ? cloudStatus.selectedModel : undefined;
   const managedId = managedModel ? managedProviderPrefix + managedModel : '';
-  const [preferredProvider, setPreferredProvider] = useState(() => readConversationModel(slug));
+  const [preferredProvider, setPreferredProvider] = useState(() => readConversationModel(slug) || initialProviderId || '');
   const selectProvider = (id: string) => {
     setPreferredProvider(id);
     localStorage.setItem(conversationModelKey(slug), id);
   };
   const preferredManaged = preferredProvider.startsWith(managedProviderPrefix) ? preferredProvider : '';
-  const needsLogin = cloudStatus?.signedIn === false && !!preferredManaged;
   const defaultLocal = settings.data?.bindings?.teacher?.providerId || settings.data?.default;
   const localProvider = models.find(provider => provider.id === preferredProvider);
-  const providerId = preferredManaged || localProvider?.id || managedId ||
+  const providerId = preferredManaged || localProvider?.id || initialProviderId || managedId ||
     models.find(provider => provider.id === defaultLocal)?.id || models[0]?.id || '';
   const capabilities = profile.data?.capabilities[providerId] ?? [];
   const preferredEffort = chosenEffort || profile.data?.settings.effort || 'medium';
   const effort = capabilities.includes(preferredEffort) ? preferredEffort : capabilities.includes('medium') ? 'medium' : '';
   const searchEnabled = !!profile.data?.settings.search.enabled;
   useEffect(() => { if (!searchEnabled) setWebSearch(false); }, [searchEnabled]);
-  const allowOpening = !!providerId && (!providerId.startsWith(managedProviderPrefix) || !!cloudStatus?.signedIn);
+  const allowOpening = !!providerId && (providerId.startsWith(managedProviderPrefix) ? !!cloudStatus?.signedIn : models.some(model => model.id === providerId));
   useEffect(() => {
     session.configure({ providerId, allowOpening, options: { effort, webSearch: searchEnabled && webSearch } });
   }, [session.configure, providerId, allowOpening, effort, webSearch, searchEnabled]);
@@ -49,6 +48,8 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   const voiceGeneration = useRef(0);
   const [failed, setFailed] = useState<TeacherSubmission>();
   const [pending, setPending] = useState(false);
+  const comparison = session.conversation.data?.messages?.at(-1)?.comparison;
+  const waitingForVote = Boolean(comparison && !comparison.vote);
   const submitting = useRef(false);
   const submittingVersion = useRef(-1);
   const pendingOperation = useRef('');
@@ -67,10 +68,10 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   }, [input]);
 
   const send = async (text: string, retry?: TeacherSubmission, voiceDraft?: { version: number; input: string; generation: number }) => {
+    if (waitingForVote) return;
     if (!voiceDraft && ((submitting.current && submittingVersion.current === version.current) || media.pending || media.hasRecording || voiceBusy.current || composing.current)) return;
     const content = text.trim() || (media.attachments.some(a => a.kind === 'source') ? '请结合附件继续讲解。' : '');
     if (!content && !media.attachments.length && !retry?.attachments.length) return;
-    if (needsLogin) { session.reportError('使用系统模型，请先登录。'); return; }
     const snapshot = voiceDraft?.version ?? version.current;
     const selectedProviderId = providerId || undefined;
     const sameFailure = failed && failed.content === content && failed.attachments.map(a => a.attachmentId).join() === media.attachments.map(a => a.attachmentId).join();
@@ -118,7 +119,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     try {
       const text = await media.stopRecording();
       if (!mounted.current || token !== voiceGeneration.current || text === undefined) return;
-      if (direct && !needsLogin) {
+      if (direct && !waitingForVote) {
         item.content = [snapshot.input.trim(), text.trim()].filter(Boolean).join('\n');
         await send(item.content, item, snapshot);
       } else {
@@ -148,7 +149,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
           if (event.key === 'Enter' && !event.shiftKey && !composing.current && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
             event.preventDefault(); event.currentTarget.form?.requestSubmit();
           }
-        }} placeholder={session.live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
+        }} placeholder={waitingForVote ? '提交回答选择后可继续提问' : session.live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
       <ChatMediaInput media={media} leadingActions={searchEnabled && <label className={s.searchToggle}>
         <span>联网搜索</span>
         <input type="checkbox" role="switch" aria-label="联网搜索" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} />
@@ -162,8 +163,8 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
           }}>{!capabilities.length && <option value="">思考：不可调节</option>}{capabilities.map(value => <option key={value} value={value}>思考：{effortNames[value]}</option>)}</select>
         </span>}
         <ChatMicrophone media={media} onStop={() => void finishVoice(false)} />
-        {session.live?.responseId && <button type="button" className={s.stop} aria-label="停止" title="停止回答并暂停队列" onClick={() => void session.stop()}><StopIcon size={21} /></button>}
-        <button type="submit" className={s.send} aria-label={media.hasRecording ? '转写并发送' : session.live || session.conversation.data?.queuePaused ? '排队' : '发送'} title={media.hasRecording ? '结束录音，转写后直接发送' : session.live ? '加入等待队列' : '发送'} disabled={!profile.data || pending || voiceFinalizing || (!input.trim() && !media.attachments.length && !media.hasRecording) || media.pending}><SendIcon size={22} /></button>
+        {session.live?.responseId && <button type="button" className={s.stop} aria-label="停止" title="停止当前回答" onClick={() => void session.stop()}><StopIcon size={21} /></button>}
+        <button type="submit" className={s.send} aria-label={media.hasRecording ? '转写并发送' : session.live || (session.conversation.data?.queuePaused && session.conversation.data.queue?.length) ? '排队' : '发送'} title={waitingForVote ? '先提交回答选择' : media.hasRecording ? '结束录音，转写后直接发送' : session.live ? '加入等待队列' : '发送'} disabled={waitingForVote || !profile.data || pending || voiceFinalizing || (!input.trim() && !media.attachments.length && !media.hasRecording) || media.pending}><SendIcon size={22} /></button>
       </ChatMediaInput>
       {(media.hasRecording || media.voicePending) && <div className={s.voiceStatus}>
         <span>{media.recording ? '录音中 · 停止转写可编辑，也可直接发送' : media.voicePending ? '正在完成转写…' : '录音已停止，可重试转写'}</span>

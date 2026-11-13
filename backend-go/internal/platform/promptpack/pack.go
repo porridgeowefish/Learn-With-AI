@@ -17,7 +17,7 @@ const MaxResponseBytes = 1 << 20
 
 var names = []string{
 	"teaching/teacher", "modes/general", "modes/history", "modes/book", "modes/concept",
-	"auxiliary/section-summary", "practice", "auxiliary/notes",
+	"auxiliary/section-summary", "review", "practice", "auxiliary/notes",
 }
 
 func ResourceNames() []string { return append([]string(nil), names...) }

@@ -164,13 +164,22 @@ func requestProvider(ctx context.Context, url string, p askaiconfig.Provider, bo
 		if contextLimitResponse(detail) {
 			return nil, ErrContextOverflow
 		}
-		return nil, fmt.Errorf("provider status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))
+		return nil, &UpstreamHTTPError{Status: resp.StatusCode, Detail: strings.TrimSpace(string(detail))}
 	}
 	return resp, nil
 }
 
 // UpstreamRateLimit denotes an HTTP rejection before any response stream.
 type UpstreamRateLimit struct{ RetryAfter time.Duration }
+
+type UpstreamHTTPError struct {
+	Status int
+	Detail string
+}
+
+func (e *UpstreamHTTPError) Error() string {
+	return fmt.Sprintf("provider status %d: %s", e.Status, e.Detail)
+}
 
 var ErrUpstreamAuthRejected = errors.New("upstream authentication rejected")
 

@@ -21,6 +21,6 @@ export function ProjectPage() {
   if (isLoading) return <div className={s.host}>加载中…</div>;
   if (error || !data?.project) return <div className={s.host}><EmptyState title={`暂时无法打开「${slug}」`} description={(error as Error)?.message ?? '请从主页选择一个已有项目。'} /></div>;
 
-  if (data.project.projectType === 'discipline-map') return <DisciplineOverview slug={slug} title={data.project.title} />;
+  if (data.project.projectType === 'discipline-map') return <DisciplineOverview slug={slug} title={data.project.title} providerId={data.project.providerId} />;
   return <LearningWorkspace project={data.project} />;
 }

@@ -33,7 +33,7 @@ const errors: Record<string, string> = {
   google_flow_expired: '本次 Google 授权已过期，请重新发起。',
   google_authorization_failed: 'Google 授权未完成。',
   google_unavailable: 'Google 登录暂时不可用，请稍后重试。',
-  google_verified_email_required: '请使用已验证的 Gmail 或 Google Workspace 邮箱，或使用邮箱验证码。',
+  google_verified_email_required: '请使用已验证的 Gmail 或 Google Workspace 邮箱，或返回登录页使用邮箱注册。',
   google_local_callback_unavailable: '当前无法接收 Google 登录回调。请从桌面应用发起登录。',
   login_required: '请先登录。',
 };

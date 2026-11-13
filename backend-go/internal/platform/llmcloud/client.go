@@ -115,7 +115,11 @@ func New(endpoint string, public ed25519.PublicKey, transport http.RoundTripper)
 
 var defaultClient = sync.OnceValues(func() (*Client, error) {
 	endpoint := envname.Value("LWA_CLOUD_URL")
+	testBinary := strings.HasSuffix(strings.ToLower(os.Args[0]), ".test.exe") || strings.HasSuffix(os.Args[0], ".test")
 	if endpoint == "" {
+		if testBinary {
+			return nil, errors.New("cloud endpoint must be set explicitly in tests")
+		}
 		endpoint = DefaultEndpoint
 	}
 	key := envname.Value("LWA_CLOUD_PROMPT_PUBLIC_KEY")
@@ -124,8 +128,7 @@ var defaultClient = sync.OnceValues(func() (*Client, error) {
 	}
 	decoded, _ := base64.StdEncoding.DecodeString(key)
 	client, err := New(endpoint, decoded, netproxy.Transport())
-	if err == nil && endpoint == DefaultEndpoint &&
-		!strings.HasSuffix(strings.ToLower(os.Args[0]), ".test.exe") && !strings.HasSuffix(os.Args[0], ".test") {
+	if err == nil && endpoint == DefaultEndpoint && !testBinary {
 		client.vault = newSessionVault()
 		if client.vault != nil {
 			client.session, client.selected = client.vault.load()
@@ -425,19 +428,6 @@ func (c *Client) SettledCredits(ctx context.Context, requestIDs []string) (map[s
 	return settled, err
 }
 
-func (c *Client) RateTeaching(ctx context.Context, exposureID string, stars int) error {
-	s := c.currentSession()
-	if s.Token == "" {
-		return ErrLoginRequired
-	}
-	_, err := c.json(ctx, http.MethodPost, "v1/experiments/teaching-rating", s.Token,
-		struct {
-			ExposureID string `json:"exposureId"`
-			Stars      int    `json:"stars"`
-		}{exposureID, stars}, nil)
-	return c.sessionError(s.Token, err)
-}
-
 func (c *Client) Models(ctx context.Context) ([]Model, error) {
 	c.mu.RLock()
 	version := c.sessionVersion
@@ -546,18 +536,26 @@ func (c *Client) Logout(ctx context.Context) error {
 }
 
 func (c *Client) Prompts(ctx context.Context, scene string) (promptpack.Content, error) {
-	s := c.currentSession()
-	if c.prompts == nil || s.Token == "" || !time.Now().Before(s.ExpiresAt) {
-		return promptpack.Content{}, ErrLoginRequired
+	if c.prompts == nil {
+		return promptpack.Content{}, errors.New("cloud prompt verification is unavailable")
 	}
+	token, subject := c.promptSubject()
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	content, err := c.prompts.Fetch(ctx, s.Account.ID, s.Token, scene)
+	content, err := c.prompts.Fetch(ctx, subject, token, scene)
 	if errors.Is(err, promptpack.ErrUnauthorized) {
-		c.clearSession(s.Token)
+		c.clearSession(token)
 		return promptpack.Content{}, ErrLoginRequired
 	}
 	return content, err
+}
+
+func (c *Client) promptSubject() (token, subject string) {
+	s := c.currentSession()
+	if s.Token != "" && time.Now().Before(s.ExpiresAt) {
+		return s.Token, s.Account.ID
+	}
+	return "", "guest"
 }
 
 func (c *Client) Stream(ctx context.Context, payload any, emit func(json.RawMessage) error) error {
@@ -565,13 +563,17 @@ func (c *Client) Stream(ctx context.Context, payload any, emit func(json.RawMess
 	if s.Token == "" || !time.Now().Before(s.ExpiresAt) {
 		return ErrLoginRequired
 	}
-	response, err := c.request(ctx, http.MethodPost, "v1/inference", s.Token, payload)
+	return c.streamAt(ctx, "v1/inference", s.Token, payload, emit)
+}
+
+func (c *Client) streamAt(ctx context.Context, path, token string, payload any, emit func(json.RawMessage) error) error {
+	response, err := c.request(ctx, http.MethodPost, path, token, payload)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return c.sessionError(s.Token, remoteError(response))
+		return c.sessionError(token, remoteError(response))
 	}
 	scanner := bufio.NewScanner(response.Body)
 	scanner.Buffer(make([]byte, 64<<10), 4<<20)

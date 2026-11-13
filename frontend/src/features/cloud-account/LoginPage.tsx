@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { GitHubLogoIcon, EnvelopeClosedIcon, ArrowLeftIcon } from '@radix-ui/react-icons';
+import { GitHubLogoIcon, ArrowLeftIcon } from '@radix-ui/react-icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/primitive/Button';
 import { CredentialSetupForm } from './CredentialSetupForm';
@@ -22,19 +22,21 @@ export function LoginPage() {
   const requested = location.state?.next;
   const next = typeof requested === 'string' && (requested === '/operations' || /^\/project\/[^/]+(?:\/[^/]+)?$/.test(requested))
     ? requested : '/';
-  const [mode, setMode] = useState<'password' | 'email' | 'reset' | 'github-email'>('password');
+  const [mode, setMode] = useState<'password' | 'register' | 'reset' | 'github-email'>('password');
   const [setupAccountId, setSetupAccountId] = useState<string>();
   const [githubFlow, setGitHubFlow] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const reset = mode === 'reset';
-  const usesEmail = mode === 'email' || reset;
+  const register = mode === 'register';
+  const usesEmail = register || reset;
   const confirmsGitHub = mode === 'github-email';
-  const purpose = reset ? 'reset' : 'login';
+  const purpose = reset ? 'reset' : 'register';
 
   function showMode(nextMode: typeof mode) {
     setMode(nextMode);
+    setEmail('');
     setMessage('');
   }
 
@@ -74,8 +76,9 @@ export function LoginPage() {
           email: email.trim(),
           code: data.get('code'),
           purpose,
-          ...(reset && { password: fields.password }),
-        }), !reset);
+          password: fields.password,
+          ...(register && { username: fields.username }),
+        }));
       } else {
         accept(await cloudAction<Account>('password', fields));
       }
@@ -123,7 +126,7 @@ export function LoginPage() {
       <section className={s.card}>
         <header className={s.header}>
           <div className={s.brand}><img src="/app-icon.png" alt="" /> Learn-With-AI</div>
-          <h1>{setupAccountId ? '设置用户名和密码' : reset ? '找回密码' : confirmsGitHub ? '验证邮箱' : usesEmail ? '邮箱验证码登录' : '登录'}</h1>
+          <h1>{setupAccountId ? '设置用户名和密码' : reset ? '找回密码' : confirmsGitHub ? '验证邮箱' : register ? '注册' : '登录'}</h1>
           {setupAccountId && <p className={s.hint}>设置后可用用户名和密码登录。也可以稍后在「设置 → 个人信息」添加。</p>}
           {!setupAccountId && reset && <p className={s.hint}>请输入已绑定到账号的邮箱。</p>}
           {!setupAccountId && confirmsGitHub && <p className={s.hint}>该邮箱已有 Learn-With-AI 账号。验证后可继续使用原账号和积分。</p>}
@@ -135,9 +138,12 @@ export function LoginPage() {
             navigate(next, { replace: true });
           }} /> : <>
         <form className={s.form} onSubmit={submit} key={mode}>
-          {!usesEmail && !confirmsGitHub && <>
-            <label>用户名<input name="username" autoComplete="username" required /></label>
-            <label>密码<input type="password" name="password" autoComplete="current-password" required /></label>
+          {(mode === 'password' || register) && <>
+            <label>用户名<input name="username" autoComplete="username" required
+              pattern={register ? '[A-Za-z0-9][A-Za-z0-9_.\\-]{2,31}' : undefined}
+              title={register ? '3 至 32 位英文字母、数字、下划线、点或连字符，以字母或数字开头' : undefined} /></label>
+            <label>密码<input type="password" name="password" autoComplete={register ? 'new-password' : 'current-password'}
+              minLength={register ? 6 : undefined} maxLength={register ? 256 : undefined} required /></label>
           </>}
           {usesEmail && <label>邮箱<input type="email" name="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="QQ 邮箱或 Gmail" /></label>}
           {(usesEmail || confirmsGitHub) &&
@@ -148,13 +154,14 @@ export function LoginPage() {
           }
           {reset && <label>新密码<input type="password" name="password" autoComplete="new-password" minLength={6} required /></label>}
           {reset && <label>确认密码<input type="password" name="confirmPassword" autoComplete="new-password" required /></label>}
-          <Button type="submit" className={s.submit} variant="outline" loading={busy}>{reset ? '重设密码并登录' : '登录'}</Button>
+          <Button type="submit" className={s.submit} variant="outline" loading={busy}>{reset ? '重设密码并登录' : register ? '注册并登录' : '登录'}</Button>
           {mode === 'password' && <button type="button" className={`${s.textLink} ${s.recoveryLink}`} disabled={busy}
             onClick={() => showMode('reset')}>忘记密码？</button>}
         </form>
         {mode !== 'password' && <button type="button" className={`${s.textLink} ${s.dismissLink}`} disabled={busy} onClick={() => showMode('password')}>返回登录</button>}
         {mode === 'password' && <>
-          <div className={s.divider}><span id="other-login-methods">其他登录方式</span></div>
+          <p className={s.registerLink}>没有账号？<button type="button" className={s.textLink} disabled={busy} onClick={() => showMode('register')}>注册</button></p>
+          <div className={s.divider}><span id="other-login-methods">第三方注册 / 登录</span></div>
           <div className={s.providers} role="group" aria-labelledby="other-login-methods">
             <Button type="button" className={s.provider} title="Google 授权登录"
               aria-label="Google 授权登录" disabled={busy} onClick={() => oauth('google')}>
@@ -163,10 +170,6 @@ export function LoginPage() {
             <Button type="button" className={s.provider} title="GitHub 授权登录"
               aria-label="GitHub 授权登录" disabled={busy} onClick={() => oauth('github')}>
               <GitHubLogoIcon aria-hidden="true" />
-            </Button>
-            <Button type="button" className={s.provider} title="邮箱验证码登录"
-              aria-label="邮箱验证码登录" disabled={busy} onClick={() => showMode('email')}>
-              <EnvelopeClosedIcon aria-hidden="true" />
             </Button>
           </div>
         </>}

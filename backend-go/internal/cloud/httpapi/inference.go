@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/cloud/inference"
-	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
 	"github.com/xmz14/lll/backend-go/internal/cloud/routing"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
@@ -61,17 +59,18 @@ func (rate Rate) creditUnits(weighted int64) int64 {
 }
 
 type inferenceInput struct {
-	Prompt           *promptpack.Reference `json:"prompt"`
-	PromptExposureID string                `json:"promptExposureId"`
-	Model            string                `json:"model"`
-	RequestID        string                `json:"requestId"`
-	System           string                `json:"system"`
-	TurnInstructions string                `json:"turnInstructions"`
-	Messages         []ai.GatewayMessage   `json:"messages"`
-	Tools            []ai.Tool             `json:"tools"`
-	MaxOutputTokens  int                   `json:"maxOutputTokens"`
-	ReasoningEffort  string                `json:"reasoningEffort"`
-	ShowReasoning    *bool                 `json:"showReasoning"`
+	Prompt *promptpack.Reference `json:"prompt"`
+	// v0.10.9 sends this field on teacher requests. It has no effect on inference.
+	LegacyExposureID string              `json:"promptExposureId,omitempty"`
+	Model            string              `json:"model"`
+	RequestID        string              `json:"requestId"`
+	System           string              `json:"system"`
+	TurnInstructions string              `json:"turnInstructions"`
+	Messages         []ai.GatewayMessage `json:"messages"`
+	Tools            []ai.Tool           `json:"tools"`
+	MaxOutputTokens  int                 `json:"maxOutputTokens"`
+	ReasoningEffort  string              `json:"reasoningEffort"`
+	ShowReasoning    *bool               `json:"showReasoning"`
 }
 
 func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
@@ -83,10 +82,15 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in, 2<<20) {
 		return
 	}
+	in.LegacyExposureID = ""
 	s.modelMu.RLock()
 	defer s.modelMu.RUnlock()
 	model, known := s.models[in.Model]
-	if !known || !identifier.MatchString(in.RequestID) || len(in.Messages) == 0 || len(in.Tools) > 32 ||
+	if !known {
+		fail(w, http.StatusNotFound, "model_unavailable")
+		return
+	}
+	if !identifier.MatchString(in.RequestID) || len(in.Messages) == 0 || len(in.Tools) > 32 ||
 		in.MaxOutputTokens < 0 || in.MaxOutputTokens > model.MaxOutput {
 		fail(w, http.StatusBadRequest, "invalid_inference_request")
 		return
@@ -146,10 +150,6 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	startedAt := time.Now()
-	var exposure promptcatalog.Exposure
-	if in.Prompt != nil && identifier.MatchString(in.PromptExposureID) {
-		exposure, _ = s.promptExposure(account.ID, *in.Prompt, startedAt)
-	}
 	started := false
 	emit := func(value any) {
 		if !started {
@@ -185,15 +185,7 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 	}
 	accounting, accountingCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 	defer accountingCancel()
-	var experiment *store.ExperimentUse
-	if exposure.Experiment != "" {
-		experiment = &store.ExperimentUse{
-			ExposureID: in.PromptExposureID, Experiment: exposure.Experiment, Variant: exposure.Variant,
-			Version: exposure.Version, Completed: streamErr == nil, Teaching: strings.HasPrefix(in.Prompt.Scene, "teacher/"),
-			Elapsed: time.Since(startedAt),
-		}
-	}
-	receipt, err := s.finalize(accounting, account.ID, in.RequestID, model, startedAt, attempts, experiment)
+	receipt, err := s.finalize(accounting, account.ID, in.RequestID, model, startedAt, attempts)
 	if err != nil {
 		_ = s.db.MarkPending(accounting, account.ID, in.RequestID, time.Now())
 		receipt = ai.CreditSettlement{Pending: true}
@@ -213,10 +205,14 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		code := "inference_interrupted"
 		if ai.IsContextOverflow(streamErr) {
 			code = "model_input_limit"
+		} else if errors.Is(streamErr, context.DeadlineExceeded) {
+			code = "inference_timeout"
 		}
 		emit(map[string]string{"type": "error", "code": code})
 	} else if ai.IsContextOverflow(streamErr) {
 		failWithSettlement(w, http.StatusRequestEntityTooLarge, "model_input_limit", receipt)
+	} else if errors.Is(streamErr, context.DeadlineExceeded) {
+		failWithSettlement(w, http.StatusGatewayTimeout, "inference_timeout", receipt)
 	} else if errors.Is(streamErr, routing.ErrCapacity) {
 		w.Header().Set("Retry-After", "5")
 		failWithSettlement(w, http.StatusTooManyRequests, "model_busy", receipt)
@@ -229,7 +225,7 @@ func failWithSettlement(w http.ResponseWriter, status int, code string, receipt 
 	respond(w, status, map[string]any{"error": code, "creditSettlement": receipt})
 }
 
-func (s *Server) finalize(ctx context.Context, user, request string, model Model, at time.Time, attempts []inference.Attempt, experiment *store.ExperimentUse) (ai.CreditSettlement, error) {
+func (s *Server) finalize(ctx context.Context, user, request string, model Model, at time.Time, attempts []inference.Attempt) (ai.CreditSettlement, error) {
 	metrics := make([]store.AttemptMetric, 0, len(attempts))
 	for _, attempt := range attempts {
 		metrics = append(metrics, store.AttemptMetric{
@@ -239,7 +235,7 @@ func (s *Server) finalize(ctx context.Context, user, request string, model Model
 			Currency: attempt.Currency, CostNanos: attempt.CostNanos,
 		})
 	}
-	if err := s.db.RecordAttempts(ctx, user, request, model.ID, s.routeRevision, at, metrics, experiment); err != nil {
+	if err := s.db.RecordAttempts(ctx, user, request, model.ID, s.routeRevision, at, metrics); err != nil {
 		return ai.CreditSettlement{}, err
 	}
 	return s.settle(ctx, user, request, model.Rate, attempts)

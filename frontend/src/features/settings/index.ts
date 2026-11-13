@@ -3,3 +3,4 @@ export { SettingsPage } from './SettingsPage';
 export { ModelsPage } from './ModelsPage';
 
 export * from './learning';
+export { defaultProjectModel, ProjectModelSelect, useProjectModelOptions } from './ProjectModelSelect';

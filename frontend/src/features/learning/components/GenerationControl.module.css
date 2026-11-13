@@ -8,6 +8,9 @@
 .fields fieldset { min-width:0; border:1px solid var(--border); padding:12px; display:grid; gap:10px; }
 .fields .source { display:flex; align-items:center; flex-wrap:wrap; overflow-wrap:anywhere; }
 .fields small { color:var(--muted); }
+.modelField { display:grid; gap:5px; }
+.modelField > div { color:var(--muted); font-size:.8rem; }
+.modelField a { color:var(--accent-ink); }
 .referenceBox { display:grid; gap:8px; padding:16px; border:1px solid var(--border); border-radius:10px; background:var(--card); }
 .referenceBox p { margin:0; color:var(--muted); font-size:0.86667rem; line-height:1.6; }
 .draft { max-height:60vh; overflow:auto; min-width:0; }

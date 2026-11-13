@@ -65,6 +65,8 @@ func New(deps Dependencies) *Server {
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/projects/{id}/conversation/feedback", s.handleTeacherFeedback)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/comparison-vote", s.handleComparisonVote)
 	mux.HandleFunc("GET /api/projects/{id}/teaching-summaries", s.teachingSummaries)
 	mux.HandleFunc("GET /api/projects/{id}/course-summaries", s.courseSummaries)
 	mux.HandleFunc("POST /api/projects/{id}/course-binding", s.confirmCourseBinding)
@@ -129,7 +131,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/projects/{id}/learning-plan", s.handlePutDisciplineLearningPlan)
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
-	mux.HandleFunc("POST /api/projects/{id}/conversation/lesson-rating", s.handleLessonRating)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/instructions", s.handleConversationInstructions)
 	mux.HandleFunc("GET /api/system/speech", s.handleSpeechCapability)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/transcribe", s.handleVoiceTranscription)

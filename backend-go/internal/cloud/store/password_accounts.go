@@ -70,21 +70,25 @@ func (s *Store) SetLoginCredentials(ctx context.Context, username, passwordHash 
 		if err != nil {
 			return err
 		}
-		result, err := tx.ExecContext(ctx, `UPDATE account SET username=?, password_hash=?
-			WHERE id=? AND username IS NULL AND password_hash IS NULL
-			AND NOT EXISTS (SELECT 1 FROM account WHERE username=?)`, username, passwordHash, account.ID, username)
-		if err != nil {
+		if err := setCredentials(ctx, tx, account.ID, username, passwordHash); err != nil {
 			return err
-		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if n != 1 {
-			return ErrConflict
 		}
 		account.Name = username
 		return nil
 	})
 	return account, err
+}
+
+func setCredentials(ctx context.Context, tx *sql.Tx, accountID, username, passwordHash string) error {
+	result, err := tx.ExecContext(ctx, `UPDATE account SET username=?, password_hash=?
+		WHERE id=? AND username IS NULL AND password_hash IS NULL
+		AND NOT EXISTS (SELECT 1 FROM account WHERE username=?)`, username, passwordHash, accountID, username)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err == nil && n != 1 {
+		return ErrConflict
+	}
+	return err
 }

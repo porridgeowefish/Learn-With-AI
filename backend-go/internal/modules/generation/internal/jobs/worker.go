@@ -297,7 +297,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	}
 	req := ai.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: outputBudget, MaxThinkingTokens: thinkingBudget}
 	if p.Kind == ai.ManagedKind && f.PromptReference != nil {
-		req.Prompt, req.PromptExposureID = f.PromptReference, j.RootJobID
+		req.Prompt = f.PromptReference
 	}
 	if len(f.Sources) > 0 {
 		req.Tools, e = sources.CheckedTools()

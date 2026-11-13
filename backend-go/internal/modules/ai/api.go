@@ -17,9 +17,11 @@ type GatewayEvent = gateway.Event
 type CreditSettlement = gateway.CreditSettlement
 type GatewayRequest = gateway.Request
 type UpstreamRateLimit = gateway.UpstreamRateLimit
+type UpstreamHTTPError = gateway.UpstreamHTTPError
 type ChatGPTHTTPError = gateway.ChatGPTHTTPError
 
 var ErrUpstreamAuthRejected = gateway.ErrUpstreamAuthRejected
+var ErrProviderNotConfigured = gateway.ErrProviderNotConfigured
 var ErrChatGPTConnection = gateway.ErrChatGPTConnection
 
 type Configured = gateway.Configured

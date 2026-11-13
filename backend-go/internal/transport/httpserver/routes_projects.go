@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/generation"
+	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
 )
 
 // handleDeleteProject permanently removes one learning project and its local
@@ -57,6 +59,7 @@ type createProjectRequest struct {
 	Title        string                      `json:"title"`
 	Slug         string                      `json:"slug,omitempty"`
 	ProjectType  projects.ProjectType        `json:"projectType,omitempty"`
+	ProviderID   string                      `json:"providerId,omitempty"`
 	Why          string                      `json:"why,omitempty"`
 	Current      string                      `json:"current,omitempty"`
 	Target       string                      `json:"target,omitempty"`
@@ -113,6 +116,31 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid_project_type")
 		return
 	}
+	providerID := strings.TrimSpace(req.ProviderID)
+	if providerID != "" {
+		cfg, err := ai.LoadConfig()
+		if err != nil {
+			httpx.Error(w, http.StatusServiceUnavailable, "project_model_unavailable")
+			return
+		}
+		if ai.IsManagedProvider(providerID) {
+			client, err := llmcloud.Default()
+			if err != nil {
+				httpx.Error(w, http.StatusServiceUnavailable, "project_model_unavailable")
+				return
+			}
+			if _, signedIn := client.Current(); !signedIn {
+				httpx.Error(w, http.StatusUnauthorized, "project_model_login_required")
+				return
+			}
+		}
+		provider := cfg.FindExact(providerID)
+		if provider == nil || !provider.HasConnection() || provider.Model == "" {
+			httpx.Error(w, http.StatusConflict, "project_model_unavailable")
+			return
+		}
+		providerID = provider.ID
+	}
 	var scope *projects.Scope
 	if req.ScopeSource != nil {
 		if projectType != projects.ProjectTypeSystemLearning {
@@ -127,6 +155,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		scope = &resolved
 	}
 	state, err := s.projectOperations().Create(slug, title, projects.ProjectInput{
+		ProviderID:    providerID,
 		SystemPrompt:  req.SystemPrompt,
 		LearningMode:  req.LearningMode,
 		ProjectType:   projectType,

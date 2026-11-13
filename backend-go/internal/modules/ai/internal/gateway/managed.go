@@ -23,7 +23,6 @@ func streamManaged(ctx context.Context, provider aiconfig.Provider, in Request, 
 	}
 	payload := struct {
 		Prompt           *promptpack.Reference `json:"prompt,omitempty"`
-		PromptExposureID string                `json:"promptExposureId,omitempty"`
 		Model            string                `json:"model"`
 		RequestID        string                `json:"requestId"`
 		System           string                `json:"system,omitempty"`
@@ -34,7 +33,7 @@ func streamManaged(ctx context.Context, provider aiconfig.Provider, in Request, 
 		ReasoningEffort  string                `json:"reasoningEffort,omitempty"`
 		ShowReasoning    *bool                 `json:"showReasoning,omitempty"`
 	}{
-		Model: provider.Model, RequestID: idgen.New("infer"), System: in.System, Prompt: in.Prompt, PromptExposureID: in.PromptExposureID,
+		Model: provider.Model, RequestID: idgen.New("infer"), System: in.System, Prompt: in.Prompt,
 		TurnInstructions: in.TurnInstructions, Messages: in.Messages, Tools: in.Tools,
 		MaxOutputTokens: maxOutput, ReasoningEffort: in.ReasoningEffort, ShowReasoning: in.ShowReasoning,
 	}

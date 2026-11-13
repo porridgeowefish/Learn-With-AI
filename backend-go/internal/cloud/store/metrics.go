@@ -37,7 +37,7 @@ type AttemptMetric struct {
 	CostNanos                    *int64
 }
 
-func (s *Store) RecordAttempts(ctx context.Context, accountID, requestID, model, revision string, at time.Time, attempts []AttemptMetric, experiment *ExperimentUse) error {
+func (s *Store) RecordAttempts(ctx context.Context, accountID, requestID, model, revision string, at time.Time, attempts []AttemptMetric) error {
 	if len(attempts) == 0 {
 		return nil
 	}
@@ -48,19 +48,12 @@ func (s *Store) RecordAttempts(ctx context.Context, accountID, requestID, model,
 				return err
 			}
 		}
-		var rateLimited int
 		for i, a := range attempts {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO inference_attempt VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 				ON CONFLICT(account_id,request_id,ordinal) DO NOTHING`, accountID, requestID, i, model, a.ConnectionID,
 				a.Status, at.Unix(), a.Elapsed.Milliseconds(), a.Input, a.Output, a.Read, a.Written, a.Currency, a.CostNanos); err != nil {
 				return err
 			}
-			if a.Status == "rate_limited" {
-				rateLimited++
-			}
-		}
-		if experiment != nil {
-			return recordExperimentUse(ctx, tx, accountID, requestID, at, *experiment, rateLimited)
 		}
 		return nil
 	})

@@ -51,7 +51,8 @@ type (
 // ErrQueueItemNotFound marks queue operations against an item that already
 // left the queue (promoted or discarded).
 var ErrQueueItemNotFound = conversation.ErrQueueItemNotFound
-var ErrLessonAlreadyRated = conversation.ErrLessonAlreadyRated
+var ErrFeedbackNotFound = conversation.ErrFeedbackNotFound
+var ErrComparisonPending = conversation.ErrComparisonPending
 
 func New(gateway ai.Gateway) *Service { return service.New(gateway) }
 

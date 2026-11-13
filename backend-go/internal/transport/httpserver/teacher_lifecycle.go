@@ -22,7 +22,7 @@ func (s *Server) teachingLifecycle() *teacher.Lifecycle {
 func writeTeacherError(w http.ResponseWriter, err error) {
 	status := 0
 	switch {
-	case errors.Is(err, teacher.ErrResponseActive), errors.Is(err, teacher.ErrNotLatestResponse):
+	case errors.Is(err, teacher.ErrResponseActive), errors.Is(err, teacher.ErrNotLatestResponse), errors.Is(err, teacher.ErrComparisonPending):
 		status = 409
 	case errors.Is(err, teacher.ErrResponseNotFound), errors.Is(err, teacher.ErrQueueItemNotFound):
 		status = 404

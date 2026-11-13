@@ -1,5 +1,5 @@
 {
-  "version": "0.10.9",
+  "version": "0.10.10",
   "schemaVersion": 1,
   "resources": [
     {
@@ -7,169 +7,164 @@
         "quote",
         "version"
       ],
-      "path": "learning-prompts/auxiliary/annotation.json",
-      "sha256": "98c9661399631ef81183f78e4315336552535d1e3bc694a2a6c8a3fdd26637be"
+      "sha256": "98c9661399631ef81183f78e4315336552535d1e3bc694a2a6c8a3fdd26637be",
+      "path": "learning-prompts/auxiliary/annotation.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/conversation-compaction.md",
-      "sha256": "f8db567861ff51a5df5e60677ba4a7a3b1aee883dd49dea5b691c1364e52ce5e"
+      "sha256": "f8db567861ff51a5df5e60677ba4a7a3b1aee883dd49dea5b691c1364e52ce5e",
+      "path": "learning-prompts/auxiliary/conversation-compaction.md"
     },
     {
       "variables": [
         "existing"
       ],
-      "path": "learning-prompts/auxiliary/memory-extraction.md",
-      "sha256": "b695f2e48d093ccc13e60daf179cf1130f73a62278f5fb6242c861a4a69aecb5"
+      "sha256": "b695f2e48d093ccc13e60daf179cf1130f73a62278f5fb6242c861a4a69aecb5",
+      "path": "learning-prompts/auxiliary/memory-extraction.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/notes.md",
-      "sha256": "1e8cdc65f364c80e7ddcdd89ed99150c069229fa785eb8e7a62d18932fc4c98a"
+      "sha256": "1e8cdc65f364c80e7ddcdd89ed99150c069229fa785eb8e7a62d18932fc4c98a",
+      "path": "learning-prompts/auxiliary/notes.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/ocr.md",
-      "sha256": "47ce020569a43543f254d9c759c19cece716f65af09c36f11e238e1daeba907e"
+      "sha256": "47ce020569a43543f254d9c759c19cece716f65af09c36f11e238e1daeba907e",
+      "path": "learning-prompts/auxiliary/ocr.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/project-advice.md",
-      "sha256": "76badb7a330abe435dd60f4493619430a62566a5623c8e6ac6dda10ce8d52aa1"
+      "sha256": "76badb7a330abe435dd60f4493619430a62566a5623c8e6ac6dda10ce8d52aa1",
+      "path": "learning-prompts/auxiliary/project-advice.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/provider-probe.md",
-      "sha256": "c6f101dd0c01d59ddb4988e09dec40a92052582f8f77f7966c5cd39b4383e78e"
+      "sha256": "c6f101dd0c01d59ddb4988e09dec40a92052582f8f77f7966c5cd39b4383e78e",
+      "path": "learning-prompts/auxiliary/provider-probe.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/section-summary.md",
-      "sha256": "bb35899d4b659da1381566d2219af7b60e29c336821f87b301be8c791b9277e9"
+      "sha256": "bb35899d4b659da1381566d2219af7b60e29c336821f87b301be8c791b9277e9",
+      "path": "learning-prompts/auxiliary/section-summary.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/auxiliary/tool-intent.md",
-      "sha256": "59db1d6f36d08d36961a95dc4a4363d780795e624e381f8576ac96f637115e95"
+      "sha256": "7c6e2ce43f64af3612e3053266d0fb73f62cfe4f24389f04223abe452a427f74",
+      "path": "learning-prompts/auxiliary/tool-intent.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/common.md",
-      "sha256": "2858d4a8a5d8cb8f527bb1c53ad7c732832f982444ffc74b229e68c5bb9cdd3c"
+      "sha256": "2858d4a8a5d8cb8f527bb1c53ad7c732832f982444ffc74b229e68c5bb9cdd3c",
+      "path": "learning-prompts/common.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/discipline-map.md",
-      "sha256": "e74897d6a9c319a5071d53cd59abd3ea70062936e65a49dd94e13922af1782c8"
+      "sha256": "e74897d6a9c319a5071d53cd59abd3ea70062936e65a49dd94e13922af1782c8",
+      "path": "learning-prompts/discipline-map.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/feynman/base.md",
-      "sha256": "d55779be39f2dbd35cfe4af56e3d8ac5e0516fc2730f880dbfdb2cd8001d820d"
+      "sha256": "d55779be39f2dbd35cfe4af56e3d8ac5e0516fc2730f880dbfdb2cd8001d820d",
+      "path": "learning-prompts/feynman/base.md"
     },
     {
       "variables": [
         "content"
       ],
-      "path": "learning-prompts/feynman/context.json",
-      "sha256": "c6a46915975290c3e26fffc2b3bc52111d50e25b1f760a9d742aa5d0f802f6b9"
+      "sha256": "c6a46915975290c3e26fffc2b3bc52111d50e25b1f760a9d742aa5d0f802f6b9",
+      "path": "learning-prompts/feynman/context.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/modes/book.md",
-      "sha256": "137951fda43328ee11a8aa7a0a4594670a5bf0e487dc44c19a9e5bdad3d55354"
+      "sha256": "137951fda43328ee11a8aa7a0a4594670a5bf0e487dc44c19a9e5bdad3d55354",
+      "path": "learning-prompts/modes/book.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/modes/concept.md",
-      "sha256": "45f708a65be8495186e431a868000abf35f7a11cc06ead82991c85d869231320"
+      "sha256": "45f708a65be8495186e431a868000abf35f7a11cc06ead82991c85d869231320",
+      "path": "learning-prompts/modes/concept.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/modes/general.md",
-      "sha256": "6ef2938a62c9a0bb219eb32b4b00a05b134391bcc2a68ef96cafe6afa1e55265"
+      "sha256": "6ef2938a62c9a0bb219eb32b4b00a05b134391bcc2a68ef96cafe6afa1e55265",
+      "path": "learning-prompts/modes/general.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/modes/history.md",
-      "sha256": "0351c38073d23a1adc4b60d248c68f852a7aee4e4a3b4190a0fd9017e272cd13"
+      "sha256": "0351c38073d23a1adc4b60d248c68f852a7aee4e4a3b4190a0fd9017e272cd13",
+      "path": "learning-prompts/modes/history.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/practice.md",
-      "sha256": "b36a498ced3e2d0a9313d2ea88ce6c52136b7fe8b023c7e41d092aec6298f9be"
+      "sha256": "b36a498ced3e2d0a9313d2ea88ce6c52136b7fe8b023c7e41d092aec6298f9be",
+      "path": "learning-prompts/practice.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/auxiliary/section-summary.json",
-      "sha256": "b9ef9aaf38e2adf31e9aa3e459383a046ef305492336b8365f703fd45501facb"
+      "sha256": "b9ef9aaf38e2adf31e9aa3e459383a046ef305492336b8365f703fd45501facb",
+      "path": "learning-prompts/profiles/auxiliary/section-summary.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/generation/discipline-map.json",
-      "sha256": "b2e41c78f4f0fd6e7edca46935adf1aed0d0258195a4c401c9bf7542adec36f9"
+      "sha256": "b2e41c78f4f0fd6e7edca46935adf1aed0d0258195a4c401c9bf7542adec36f9",
+      "path": "learning-prompts/profiles/generation/discipline-map.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/generation/practice.json",
-      "sha256": "529668b659db39dfff7938d33531329875cb31876154c11003945689ef62c4f5"
+      "sha256": "529668b659db39dfff7938d33531329875cb31876154c11003945689ef62c4f5",
+      "path": "learning-prompts/profiles/generation/practice.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/generation/review.json",
-      "sha256": "8cf44afdaff6fc8c18dd3d458aa845bbd27c491d7a9b8d392b27ef0ef3bc3878"
+      "sha256": "8cf44afdaff6fc8c18dd3d458aa845bbd27c491d7a9b8d392b27ef0ef3bc3878",
+      "path": "learning-prompts/profiles/generation/review.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/schema.json",
-      "sha256": "179e5a92546b18653da2563c875ac4649723980fd5e9637d1200b75f9157721e"
+      "sha256": "179e5a92546b18653da2563c875ac4649723980fd5e9637d1200b75f9157721e",
+      "path": "learning-prompts/profiles/schema.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/teacher/confirmed-end.json",
-      "sha256": "ec471ef6877275c4a8afd9a71ba43112097564180714877ac3c934d623074560"
+      "sha256": "a15539c520e2f1a289c704531aabec9db010f0b3563f09acb32fdfb3df8e7418",
+      "path": "learning-prompts/profiles/teacher/feynman.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/teacher/feynman.json",
-      "sha256": "a15539c520e2f1a289c704531aabec9db010f0b3563f09acb32fdfb3df8e7418"
+      "sha256": "0365df6af63985c23b69dbee7b1f235dc5b278fbbd313bf844c0fb5e96b328da",
+      "path": "learning-prompts/profiles/teacher/general.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/profiles/teacher/general.json",
-      "sha256": "0365df6af63985c23b69dbee7b1f235dc5b278fbbd313bf844c0fb5e96b328da"
+      "sha256": "5ba269a004189855c5ab7d3c50c5a0ba25a198139b6e8cc7081555936ddf468a",
+      "path": "learning-prompts/README.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/README.md",
-      "sha256": "5ba269a004189855c5ab7d3c50c5a0ba25a198139b6e8cc7081555936ddf468a"
-    },
-    {
-      "variables": [],
-      "path": "learning-prompts/review.md",
-      "sha256": "662fa71ade1d450ab51e39952e41e93b06bcf8fa14b03660758bae38a7f4859d"
+      "sha256": "662fa71ade1d450ab51e39952e41e93b06bcf8fa14b03660758bae38a7f4859d",
+      "path": "learning-prompts/review.md"
     },
     {
       "variables": [
         "content"
       ],
-      "path": "learning-prompts/teaching/context.json",
-      "sha256": "4946e48c88e9b55d033c4f58a13bc79818f59f6cec05f4b627300c41fb2c99c9"
+      "sha256": "4946e48c88e9b55d033c4f58a13bc79818f59f6cec05f4b627300c41fb2c99c9",
+      "path": "learning-prompts/teaching/context.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/teaching/formatting.md",
-      "sha256": "22f9d4b31f811d99a65fd59a961fd09a184e36ee85d05a60a6ea33344614eb98"
+      "sha256": "22f9d4b31f811d99a65fd59a961fd09a184e36ee85d05a60a6ea33344614eb98",
+      "path": "learning-prompts/teaching/formatting.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/teaching/interactive.md",
-      "sha256": "e6f10a6aef7e93e385214b1871a11f4f05d8bbb95e28cae15ec547ae8e299aea"
+      "sha256": "e6f10a6aef7e93e385214b1871a11f4f05d8bbb95e28cae15ec547ae8e299aea",
+      "path": "learning-prompts/teaching/interactive.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/teaching/response-length.json",
-      "sha256": "23f9ad22c03001f45968e4bf19d28cf4ad98ea6440592d3255dfaa93a9c4431c"
+      "sha256": "23f9ad22c03001f45968e4bf19d28cf4ad98ea6440592d3255dfaa93a9c4431c",
+      "path": "learning-prompts/teaching/response-length.json"
     },
     {
       "variables": [
@@ -177,33 +172,28 @@
         "tool",
         "tools"
       ],
-      "path": "learning-prompts/teaching/runtime.json",
-      "sha256": "483b16221bce1fe10dae624789ef65f2228b2d63f84cf9e40f1aa04eb8be70a4"
+      "sha256": "c781ca0af1519da668da50ca431140fac69e0bc42cb2bcd9271c08d3b8ef4000",
+      "path": "learning-prompts/teaching/runtime.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/teaching/teacher.md",
-      "sha256": "19320cb7c215e30b5fd230f9a78cd811a2c545ff7d5f58e707c9b3d2cb337132"
+      "sha256": "31f8572c871e386a4936f0a50b774ab9746342fb099cd98f2ba8137dcec0b79e",
+      "path": "learning-prompts/teaching/teacher.md"
     },
     {
       "variables": [],
-      "path": "learning-prompts/tools/sources.json",
-      "sha256": "a8db16103ddcd772f84141679312eb455adeb1bfcf041c47b32ef9538755ff9f"
+      "sha256": "a8db16103ddcd772f84141679312eb455adeb1bfcf041c47b32ef9538755ff9f",
+      "path": "learning-prompts/tools/sources.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/tools/summarize-taught-concepts.md",
-      "sha256": "46940552c588c2bbf57d6f863189ba5847595760581d5f2bfee2ca90ea0083ca"
+      "sha256": "ea15e23be9b4c40fa0bcc52b14972a597e408e56f4ff45fc383222510d7ece36",
+      "path": "learning-prompts/tools/visual.json"
     },
     {
       "variables": [],
-      "path": "learning-prompts/tools/visual.json",
-      "sha256": "ea15e23be9b4c40fa0bcc52b14972a597e408e56f4ff45fc383222510d7ece36"
-    },
-    {
-      "variables": [],
-      "path": "learning-prompts/tools/web-search.json",
-      "sha256": "3d533ae43c726ca78db133f8956aa415d42cf9c0853a96491c1cc4be65db9a24"
+      "sha256": "3d533ae43c726ca78db133f8956aa415d42cf9c0853a96491c1cc4be65db9a24",
+      "path": "learning-prompts/tools/web-search.json"
     }
   ]
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
@@ -217,7 +216,7 @@ func (s *Service) process(slug string) error {
 	if e == nil {
 		e = s.Gateway.Stream(ctx, ai.GatewayRequest{
 			BindingName: "section-summary", ProviderID: frozen.ProviderID, Model: frozen.Model, System: frozen.Prompt,
-			Prompt: frozen.PromptReference, PromptExposureID: frozen.ID,
+			Prompt:   frozen.PromptReference,
 			Messages: []ai.GatewayMessage{{Role: "user", Content: string(data)}},
 		}, func(ev ai.GatewayEvent) {
 			if ev.Type == "text-delta" {
@@ -325,7 +324,7 @@ func prepareSummary(ctx context.Context, slug string, job *Summary) error {
 	}
 	if job.Prompt == "" {
 		const scene = "auxiliary/section-summary"
-		promptCtx := ai.ManagedPromptContext(ctx, job.ProviderID, scene)
+		promptCtx := ai.CloudPromptContext(ctx, scene)
 		composed, err := ai.ComposePrompt(promptCtx, scene, nil, nil)
 		if err != nil {
 			return err
@@ -404,46 +403,4 @@ func parseSummary(raw string) (summaryOutput, error) {
 	out.Concepts = clean
 	out.Scenario = strings.TrimSpace(out.Scenario)
 	return out, nil
-}
-
-// EnqueueConfirmed executes the registered tool against a trusted bound scope.
-// Model arguments cannot choose a project, message, or summary range.
-func (s *Service) EnqueueConfirmed(ctx context.Context, slug, learnerID, ackID string, seq uint64, sourceProviderID ...string) (Summary, error) {
-	description, e := ai.RenderPrompt("tools/summarize-taught-concepts", nil)
-	if e != nil {
-		return Summary{}, e
-	}
-	var registry ai.ToolRegistry
-	e = registry.Register(ai.ToolSpec{Definition: ai.Tool{Name: "summarize_taught_concepts", Description: description, Schema: map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{}}}, Handle: func(ctx context.Context, _ map[string]any) (any, error) {
-		v, e := Confirm(slug, learnerID, ackID, seq, sourceProviderID...)
-		if e == nil {
-			s.Notify(slug)
-		}
-		return v, e
-	}})
-	if e != nil {
-		return Summary{}, e
-	}
-	composed, e := ai.ComposePrompt(ctx, "teacher/confirmed-end", nil, nil)
-	if e != nil {
-		return Summary{}, e
-	}
-	for _, name := range composed.Tools {
-		if name != "summarize_taught_concepts" {
-			return Summary{}, fmt.Errorf("unsupported confirmation tool %s", name)
-		}
-	}
-	bound, e := registry.Bind(composed.Tools)
-	if e != nil {
-		return Summary{}, e
-	}
-	value, e := bound.Execute(ctx, ai.ToolCall{CallID: "summary:" + learnerID, ToolName: "summarize_taught_concepts", Arguments: map[string]any{}})
-	if e != nil {
-		return Summary{}, e
-	}
-	v, ok := value.(Summary)
-	if !ok {
-		return Summary{}, fmt.Errorf("unexpected summary tool result")
-	}
-	return v, nil
 }

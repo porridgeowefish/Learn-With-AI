@@ -68,12 +68,11 @@ type Event struct {
 type CreditSettlement = llmcloud.CreditSettlement
 
 type Request struct {
-	Prompt           *promptpack.Reference
-	PromptExposureID string
-	ReasoningEffort  string
-	ShowReasoning    *bool
-	WebSearch        bool
-	System           string
+	Prompt          *promptpack.Reference
+	ReasoningEffort string
+	ShowReasoning   *bool
+	WebSearch       bool
+	System          string
 	// TurnInstructions are trusted, per-turn directives sent after fixed system rules.
 	TurnInstructions string
 	Messages         []Message
@@ -94,10 +93,15 @@ type Gateway interface {
 
 type Configured struct{}
 
+var ErrProviderNotConfigured = errors.New("teacher provider is not configured")
+
 func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) error {
 	cfg, err := askaiconfig.Load()
 	if err != nil {
 		return err
+	}
+	if cfg == nil && !askaiconfig.IsManagedProvider(in.ProviderID) {
+		return ErrProviderNotConfigured
 	}
 	binding := in.BindingName
 	if binding == "" {
@@ -117,7 +121,7 @@ func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) erro
 		p.Model = in.Model
 	}
 	if p == nil || (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || p.Model == "" {
-		return errors.New("teacher provider is not configured")
+		return ErrProviderNotConfigured
 	}
 	return StreamProvider(ctx, *p, in, emit)
 }

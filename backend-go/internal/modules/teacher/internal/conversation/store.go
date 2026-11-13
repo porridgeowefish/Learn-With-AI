@@ -31,22 +31,19 @@ type Block struct {
 }
 
 type Message struct {
-	ID                     string                   `json:"id"`
-	Role                   string                   `json:"role"`
-	Status                 string                   `json:"status"`
-	FailureCode            string                   `json:"failureCode,omitempty"`
-	Blocks                 []Block                  `json:"blocks"`
-	OperationID            string                   `json:"operationId,omitempty"`
-	CreatedAt              time.Time                `json:"createdAt"`
-	CompletedAt            time.Time                `json:"completedAt,omitempty"`
-	SourceCitations        []sources.SourceCitation `json:"sourceCitations,omitempty"`
-	ReadingCoverage        []ReadingCoverage        `json:"readingCoverage,omitempty"`
-	CreditUsage            *CreditUsage             `json:"creditUsage,omitempty"`
-	LessonEnded            bool                     `json:"lessonEnded,omitempty"`
-	LessonEndID            string                   `json:"lessonEndId,omitempty"`
-	TeachingExposureID     string                   `json:"teachingExposureId,omitempty"`
-	LessonRatingExposureID string                   `json:"lessonRatingExposureId,omitempty"`
-	LessonRating           *int                     `json:"lessonRating,omitempty"`
+	ID              string                   `json:"id"`
+	Role            string                   `json:"role"`
+	Status          string                   `json:"status"`
+	FailureCode     string                   `json:"failureCode,omitempty"`
+	Blocks          []Block                  `json:"blocks"`
+	OperationID     string                   `json:"operationId,omitempty"`
+	CreatedAt       time.Time                `json:"createdAt"`
+	CompletedAt     time.Time                `json:"completedAt,omitempty"`
+	SourceCitations []sources.SourceCitation `json:"sourceCitations,omitempty"`
+	ReadingCoverage []ReadingCoverage        `json:"readingCoverage,omitempty"`
+	CreditUsage     *CreditUsage             `json:"creditUsage,omitempty"`
+	Feedback        string                   `json:"feedback,omitempty"`
+	Comparison      *AnswerComparison        `json:"comparison,omitempty"`
 }
 
 type CreditUsage struct {
@@ -363,6 +360,7 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		return Projection{}, err
 	}
 	hidden := hiddenTeacherMessages(events)
+	feedback, votes := feedbackByMessage(events)
 	proj := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: meta.LatestSeq, Messages: []Message{}, TaskLinks: []TaskLink{}, Queue: replayQueue(events), QueuePaused: replayQueuePaused(events), LatestResponseID: replayResponses(events).latest}
 	for _, event := range events {
 		if event.Type != "message-recorded" {
@@ -390,6 +388,7 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		case "message-recorded":
 			var msg Message
 			if json.Unmarshal(event.Data, &msg) == nil && !(msg.Role == "teacher" && hidden[msg.ID]) {
+				applyAnswerFeedback(&msg, feedback, votes)
 				proj.Messages = append(proj.Messages, msg)
 			}
 		case "task-linked":
@@ -400,7 +399,6 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		}
 		count++
 	}
-	applyLessonRatings(events, proj.Messages)
 	return proj, nil
 }
 
@@ -425,6 +423,7 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 		message Message
 	}
 	hidden := hiddenTeacherMessages(events)
+	feedback, votes := feedbackByMessage(events)
 	messages := make([]sequenced, 0)
 	links := make([]TaskLink, 0)
 	for _, event := range events {
@@ -471,6 +470,7 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 			projection.PageFromSeq = item.seq
 		}
 		projection.PageThroughSeq = item.seq
+		applyAnswerFeedback(&item.message, feedback, votes)
 		projection.Messages = append(projection.Messages, item.message)
 		selected[item.message.ID] = true
 	}
@@ -481,7 +481,6 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 	}
 	// hasMore is retained as a compatibility alias for older clients.
 	projection.HasMore = projection.HasPrevious
-	applyLessonRatings(events, projection.Messages)
 	return projection, nil
 }
 
@@ -500,6 +499,7 @@ func (s *Store) SnapshotThrough(throughSeq uint64) (Projection, error) {
 	}
 	cutoff := sort.Search(len(events), func(i int) bool { return events[i].Seq > throughSeq })
 	hidden := hiddenTeacherMessages(events[:cutoff])
+	feedback, votes := feedbackByMessage(events[:cutoff])
 	projection := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: throughSeq, PageThroughSeq: throughSeq, Messages: []Message{}, TaskLinks: []TaskLink{}}
 	for _, event := range events {
 		if event.Seq > throughSeq {
@@ -509,6 +509,7 @@ func (s *Store) SnapshotThrough(throughSeq uint64) (Projection, error) {
 		case "message-recorded":
 			var message Message
 			if json.Unmarshal(event.Data, &message) == nil && !(message.Role == "teacher" && hidden[message.ID]) {
+				applyAnswerFeedback(&message, feedback, votes)
 				projection.Messages = append(projection.Messages, message)
 			}
 		case "task-linked":
@@ -615,6 +616,7 @@ func (s *Store) sequencedMessages(throughSeq *uint64) ([]SequencedMessage, error
 
 func visibleMessages(events []Event) []SequencedMessage {
 	hidden := hiddenTeacherMessages(events)
+	feedback, votes := feedbackByMessage(events)
 	var messages []SequencedMessage
 	for _, event := range events {
 		if event.Type != "message-recorded" {
@@ -622,6 +624,7 @@ func visibleMessages(events []Event) []SequencedMessage {
 		}
 		var message Message
 		if json.Unmarshal(event.Data, &message) == nil && !(message.Role == "teacher" && hidden[message.ID]) {
+			applyAnswerFeedback(&message, feedback, votes)
 			messages = append(messages, SequencedMessage{Seq: event.Seq, EventID: event.EventID, Message: message})
 		}
 	}

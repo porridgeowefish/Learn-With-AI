@@ -53,9 +53,9 @@ func (s *Store) ForgetCode(ctx context.Context, email, purpose string, digest []
 }
 
 type EmailVerification struct {
-	Email, Purpose, PasswordHash string
-	CodeDigest, SessionDigest    []byte
-	Now, SessionExpires          time.Time
+	Email, Purpose, Username, PasswordHash string
+	CodeDigest, SessionDigest              []byte
+	Now, SessionExpires                    time.Time
 }
 
 func checkEmailCode(ctx context.Context, tx *sql.Tx, email, purpose string, supplied []byte, now time.Time) (bool, error) {
@@ -85,7 +85,8 @@ func (s *Store) VerifyEmail(ctx context.Context, in EmailVerification) (Account,
 		if invalid = !match; err != nil || invalid {
 			return err
 		}
-		if in.Purpose == "reset" {
+		switch in.Purpose {
+		case "reset":
 			account.Email = in.Email
 			err = tx.QueryRowContext(ctx, `SELECT a.id,a.balance,a.username,
 				EXISTS(SELECT 1 FROM github_identity g WHERE g.account_id=a.id)
@@ -107,11 +108,17 @@ func (s *Store) VerifyEmail(ctx context.Context, in EmailVerification) (Account,
 				WHERE (email=? AND purpose IN ('login','register')) OR purpose=?`, account.Email, "bind:"+account.ID); err != nil {
 				return err
 			}
-		} else {
+		case "register":
 			account, err = accountForEmail(ctx, tx, in.Email, in.Now)
 			if err != nil {
 				return err
 			}
+			if err = setCredentials(ctx, tx, account.ID, in.Username, in.PasswordHash); err != nil {
+				return err
+			}
+			account.Name = in.Username
+		default:
+			return ErrCode
 		}
 		if _, err := tx.ExecContext(ctx, "UPDATE email_challenge SET used = 1 WHERE email = ? AND purpose = ?", in.Email, in.Purpose); err != nil {
 			return err

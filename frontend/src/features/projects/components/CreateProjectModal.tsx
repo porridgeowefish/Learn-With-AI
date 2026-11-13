@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
 import { useCreateProject } from '@/features/projects/api/projects';
+import { defaultProjectModel, ProjectModelSelect, useProjectModelOptions } from '@/features/settings';
 import { Modal } from '@/shared/primitive/Modal';
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
@@ -47,6 +48,8 @@ export function CreateProjectModal({
 }: CreateProjectModalProps) {
   const create = useCreateProject();
   const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [providerId, setProviderId] = useState(defaultProjectModel);
+  const modelOptions = useProjectModelOptions(open, providerId);
   const {
     register,
     handleSubmit,
@@ -68,6 +71,7 @@ export function CreateProjectModal({
   // Re-seed on open so a topic selected from the map is actually prefilled.
   useEffect(() => {
     if (open) {
+      setProviderId(defaultProjectModel);
       reset({
         title: initialTitle,
         projectType: fixedProjectType,
@@ -79,14 +83,16 @@ export function CreateProjectModal({
     }
   }, [fixedProjectType, initialTitle, open, reset]);
 
-  const onSubmit = handleSubmit(async (values) => {
+  const onSubmit = handleSubmit((values) => {
+    if (!modelOptions.canUse) return;
     const projectType = fromDisciplineMap ? 'system-learning' : values.projectType;
     const payload = projectType === 'discipline-map'
-      ? { title: values.title, projectType }
-      : { ...values, projectType, ...(initialScopeSource ? { scopeSource: initialScopeSource } : {}) };
-    const res = await create.mutateAsync(payload);
-    onOpenChange(false);
-    onCreated?.(res.project.slug);
+      ? { title: values.title, projectType, providerId }
+      : { ...values, projectType, providerId, ...(initialScopeSource ? { scopeSource: initialScopeSource } : {}) };
+    create.mutate(payload, { onSuccess: (res) => {
+      onOpenChange(false);
+      onCreated?.(res.project.slug);
+    } });
   });
 
   const selectedType = watch('projectType');
@@ -112,6 +118,7 @@ export function CreateProjectModal({
             form={formId}
             variant="primary"
             loading={isSubmitting || create.isPending}
+            disabled={!modelOptions.canUse}
           >
             {fromDisciplineMap ? '确认创建' : '创建项目'}
           </Button>
@@ -164,6 +171,10 @@ export function CreateProjectModal({
           {errors.title && <div className={s.error}>{errors.title.message}</div>}
         </div>
 
+        <div className={`${s.field} ${s.modelField}`}>
+          <ProjectModelSelect id={`${formId}-model`} value={providerId} onChange={setProviderId} options={modelOptions} />
+        </div>
+
         {selectedType === 'system-learning' && (
           <div className={s.field}>
             <label htmlFor="cp-learning-mode">学习方式</label>
@@ -184,7 +195,8 @@ export function CreateProjectModal({
         )}
 
         {create.error && (
-          <div className={s.error}>创建失败：{(create.error as Error).message}</div>
+          <div className={s.error} role="alert">{create.error.message === 'project_model_login_required' ? '请先登录，或选择自己的模型。'
+            : create.error.message === 'project_model_unavailable' ? '选中的模型当前不可用，请换一个模型。' : `创建失败：${create.error.message}`}</div>
         )}
 
       </form>

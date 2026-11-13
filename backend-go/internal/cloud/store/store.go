@@ -79,7 +79,7 @@ func (s *Store) initialize(ctx context.Context) error {
 		if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 			return err
 		}
-		if version > 18 {
+		if version > 19 {
 			return fmt.Errorf("unsupported cloud schema version %d", version)
 		}
 		if version == 0 {
@@ -104,11 +104,6 @@ func (s *Store) initialize(ctx context.Context) error {
 		}
 		if version < 5 {
 			if _, err := tx.ExecContext(ctx, adminSchema); err != nil {
-				return err
-			}
-		}
-		if version < 6 {
-			if _, err := tx.ExecContext(ctx, experimentSchema); err != nil {
 				return err
 			}
 		}
@@ -141,9 +136,6 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err := s.migrateGitHubFlows(ctx); err != nil {
 		return err
 	}
-	if err := s.migrateExperimentRequests(ctx); err != nil {
-		return err
-	}
 	if err := s.migrateInferenceRoutes(ctx); err != nil {
 		return err
 	}
@@ -153,10 +145,10 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err := s.migrateLoginMetrics(ctx); err != nil {
 		return err
 	}
-	if err := s.migrateTeachingRatings(ctx); err != nil {
+	if err := s.migrateGoogleIdentity(ctx); err != nil {
 		return err
 	}
-	return s.migrateGoogleIdentity(ctx)
+	return s.migrateAnswerComparison(ctx)
 }
 
 func (s *Store) transaction(ctx context.Context, run func(*sql.Tx) error) error {

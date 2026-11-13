@@ -67,10 +67,25 @@ func (s *Lifecycle) Turn(slug string, in TurnInput) (*ActiveResponse, error) {
 	if _, err = store.AttachmentBlocks(in.ConversationAttachmentIDs); err != nil {
 		return nil, ErrInvalidTurn
 	}
+	if pending, err := store.PendingComparison(); err != nil || pending {
+		if err != nil {
+			return nil, err
+		}
+		return nil, ErrComparisonPending
+	}
 	if paused, pauseErr := store.QueuePaused(); pauseErr != nil {
 		return nil, pauseErr
 	} else if paused {
-		return nil, ErrResponseActive
+		items, err := store.QueueItems()
+		if err != nil {
+			return nil, err
+		}
+		if len(items) > 0 {
+			return nil, ErrResponseActive
+		}
+		if err := store.SetQueuePaused(false); err != nil {
+			return nil, err
+		}
 	}
 	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(StreamFrame)) error {
 		return s.Service.StreamTurn(ctx, slug, in, emit)
@@ -161,6 +176,12 @@ func (s *Lifecycle) Steer(ctx context.Context, slug, id string) (*ActiveResponse
 	if err != nil {
 		return nil, err
 	}
+	if pending, err := store.PendingComparison(); err != nil || pending {
+		if err != nil {
+			return nil, err
+		}
+		return nil, ErrComparisonPending
+	}
 	if run := s.Responses.Project(slug); run != nil {
 		run.Stop()
 		timer := time.NewTimer(30 * time.Second)
@@ -196,6 +217,12 @@ func (s *Lifecycle) Regenerate(slug, id, provider string, options ...*learningpr
 	store, err := NewConversation(slug)
 	if err != nil {
 		return nil, err
+	}
+	if pending, err := store.PendingComparison(); err != nil || pending {
+		if err != nil {
+			return nil, err
+		}
+		return nil, ErrComparisonPending
 	}
 	info, found, err := store.ResponseByID(id)
 	if err != nil {
@@ -261,15 +288,7 @@ func (s *Lifecycle) Stop(slug, id string) error {
 	if run == nil || run != s.Responses.Project(slug) {
 		return ErrResponseNotFound
 	}
-	store, err := NewConversation(slug)
-	if err != nil {
-		return err
-	}
-	if err = store.SetQueuePaused(true); err != nil {
-		return err
-	}
 	run.Stop()
-	s.notify(slug)
 	return nil
 }
 
@@ -285,6 +304,25 @@ func (s *Lifecycle) ResumeQueue(slug string) error {
 		return err
 	}
 	if err = store.SetQueuePaused(false); err != nil {
+		return err
+	}
+	s.advanceQueueLocked(slug)
+	s.notify(slug)
+	return nil
+}
+
+func (s *Lifecycle) VoteComparison(slug, messageID, vote string, submit func(string) error) error {
+	lock := s.lock(slug)
+	lock.Lock()
+	defer lock.Unlock()
+	if !s.available(slug) {
+		return ErrLifecycleClosed
+	}
+	store, err := NewConversation(slug)
+	if err != nil {
+		return err
+	}
+	if err = store.SaveComparisonVote(messageID, vote, submit); err != nil {
 		return err
 	}
 	s.advanceQueueLocked(slug)
@@ -334,8 +372,12 @@ func (s *Lifecycle) startTeacherRunLocked(slug string, start func(ctx context.Co
 		defer release()
 		defer s.wg.Done()
 		responseID := ""
+		terminal := false
 		emit := func(frame StreamFrame) {
 			run.Append(frame)
+			if frame.Type == "message-completed" || frame.Type == "message-failed" {
+				terminal = true
+			}
 			if frame.Type == "message-started" {
 				s.notify(slug)
 			}
@@ -346,7 +388,7 @@ func (s *Lifecycle) startTeacherRunLocked(slug string, start func(ctx context.Co
 				}
 			}
 		}
-		if err := start(ctx, emit); err != nil {
+		if err := start(ctx, emit); err != nil && !terminal {
 			emit(StreamFrame{Type: "message-failed", Data: map[string]any{"code": "teacher_provider_unavailable", "partialPreserved": false}})
 		}
 		activeTeacher.Finish(slug, responseID, run)
@@ -376,6 +418,9 @@ func (s *Lifecycle) advanceQueueLocked(slug string) bool {
 		return false
 	}
 	if paused, err := store.QueuePaused(); err != nil || paused {
+		return false
+	}
+	if pending, err := store.PendingComparison(); err != nil || pending {
 		return false
 	}
 	promoted, ok, err := store.PromoteQueueHead("auto")

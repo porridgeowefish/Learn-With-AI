@@ -33,11 +33,16 @@ type config struct {
 	UpstreamHosts     []string
 	TrustedProxyCIDRs []string
 	Operators         map[string]struct{ Role, TOTPEnv string }
-	GitHub            struct{ ClientID, SecretEnv, Callback, TokenProxyURL string }
-	Google            struct{ ClientID, SecretEnv, ProxyURL string }
-	Prompts           struct {
+	GitHub            struct {
+		ClientID, SecretEnv, Callback, TokenProxyURL string
+		FallbackProxyURLs                            []string
+	}
+	Google struct {
+		ClientID, SecretEnv, ProxyURL string
+		FallbackProxyURLs             []string
+	}
+	Prompts struct {
 		Root, Version, KeyEnv string
-		Experiments           []promptcatalog.Experiment
 	}
 	SMTP struct {
 		Address, From, Username, PasswordEnv string
@@ -175,20 +180,20 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	if err := handler.TrustProxies(cfg.TrustedProxyCIDRs); err != nil {
 		return err
 	}
-	if cfg.GitHub.ClientID != "" || cfg.GitHub.SecretEnv != "" || cfg.GitHub.Callback != "" || cfg.GitHub.TokenProxyURL != "" {
+	if cfg.GitHub.ClientID != "" || cfg.GitHub.SecretEnv != "" || cfg.GitHub.Callback != "" || cfg.GitHub.TokenProxyURL != "" || len(cfg.GitHub.FallbackProxyURLs) > 0 {
 		github, err := auth.NewGitHub(db, cfg.GitHub.ClientID, envname.Value(cfg.GitHub.SecretEnv), cfg.GitHub.Callback)
 		if err != nil {
 			return err
 		}
-		if cfg.GitHub.TokenProxyURL != "" {
-			if err := github.SetTokenProxy(cfg.GitHub.TokenProxyURL); err != nil {
+		if cfg.GitHub.TokenProxyURL != "" || len(cfg.GitHub.FallbackProxyURLs) > 0 {
+			if err := github.SetTokenProxy(cfg.GitHub.TokenProxyURL, cfg.GitHub.FallbackProxyURLs...); err != nil {
 				return err
 			}
 		}
 		handler.EnableGitHub(github)
 	}
-	if cfg.Google.ClientID != "" || cfg.Google.SecretEnv != "" || cfg.Google.ProxyURL != "" {
-		google, err := auth.NewGoogle(db, cfg.Google.ClientID, envname.Value(cfg.Google.SecretEnv), cfg.Google.ProxyURL)
+	if cfg.Google.ClientID != "" || cfg.Google.SecretEnv != "" || cfg.Google.ProxyURL != "" || len(cfg.Google.FallbackProxyURLs) > 0 {
+		google, err := auth.NewGoogle(db, cfg.Google.ClientID, envname.Value(cfg.Google.SecretEnv), cfg.Google.ProxyURL, cfg.Google.FallbackProxyURLs...)
 		if err != nil {
 			return err
 		}
@@ -205,8 +210,16 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 		switch {
 		case err == nil:
 			err = json.Unmarshal(active.Config, &draft)
+			if err == nil && draft.Resources != nil && draft.Resources["review"] == "" {
+				var review string
+				review, err = promptcatalog.ReadResource(cfg.Prompts.Root, "review")
+				if err == nil {
+					err = db.FillMissingReviewPrompt(ctx, review)
+					draft.Resources["review"] = review
+				}
+			}
 		case errors.Is(err, store.ErrNotFound):
-			draft, err = promptcatalog.LoadDraft(cfg.Prompts.Root, cfg.Prompts.Version, cfg.Prompts.Experiments)
+			draft, err = promptcatalog.LoadDraft(cfg.Prompts.Root, cfg.Prompts.Version)
 		}
 		if err != nil {
 			return err
@@ -224,10 +237,7 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 				return err
 			}
 		}
-		handler.EnablePrompts(catalog)
-		if err := handler.RestorePromptExposureHistory(ctx, promptKey, time.Now()); err != nil {
-			return err
-		}
+		handler.EnablePrompts(catalog, key)
 	}
 	if len(cfg.Operators) > 0 {
 		operators := make(map[string]httpapi.Operator, len(cfg.Operators))

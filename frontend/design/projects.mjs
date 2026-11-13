@@ -80,13 +80,14 @@ export async function projects({url, path, method, request, state, json, emit}) 
     }
     const type = input.projectType || 'system-learning';
     if (!['discipline-map','system-learning'].includes(type)) return json({error:'项目类型无效'},400);
+    if (input.providerId?.startsWith('lwa-cloud:') && !state.cloud?.signedIn) return json({error:'project_model_login_required'},401);
     if (input.learningMode && !['general','history','book','concept'].includes(input.learningMode)) return json({error:'学习方式无效'},400);
     if (input.scopeSource && (type !== 'system-learning' || !input.scopeSource.topicId ||
       !state.projects.some(p => p.projectType === 'discipline-map' && p.slug === input.scopeSource.mapSlug))) {
       return json({error:'学习范围来源无效'},400);
     }
     if (state.projects.some(p=>p.slug === slug)) return json({error:'项目已存在'},409);
-    const project = makeProject(slug,title,type, { scopeSource:input.scopeSource, systemPrompt:input.systemPrompt, ...(type === 'system-learning' ? {learningMode: input.learningMode || 'general'} : {}) });
+    const project = makeProject(slug,title,type, { providerId:input.providerId, scopeSource:input.scopeSource, systemPrompt:input.systemPrompt, ...(type === 'system-learning' ? {learningMode: input.learningMode || 'general'} : {}) });
     state.projects.push(project);
     if (type === 'discipline-map') {
       const existing = state.folders.find(f => !f.mapProjectSlug && f.name === title);

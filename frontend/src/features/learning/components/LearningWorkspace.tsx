@@ -73,7 +73,7 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
       </header>
       <main className={`${s.content} ${s.withTreasure}`}>
         <div className={s.mainPane}>
-        {active === 'teacher' && <TeacherView key={project.slug} slug={project.slug} title={project.title} />}
+        {active === 'teacher' && <TeacherView key={project.slug} slug={project.slug} title={project.title} initialProviderId={project.providerId} />}
         {active === 'assets' && <AssetsView slug={project.slug} />}
         {active === 'sources' && <SourcesView slug={project.slug} />}
         </div><div className={s.treasureSlot} data-treasure-slot/>

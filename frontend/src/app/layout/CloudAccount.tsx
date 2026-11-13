@@ -76,7 +76,7 @@ export function CloudAccount() {
         setOpen(next);
         if (!next) { showIdentity(); setShowHistory(false); }
       }} size="sm" title={showEmailBinding ? '绑定邮箱' : unlinkProvider ? unlinkTitle : '我的账号'}
-        description={showEmailBinding ? '绑定后可以用邮箱验证码登录同一个账号。' :
+        description={showEmailBinding ? '绑定后可以通过邮箱找回密码。' :
           unlinkProvider ? unlinkDescription : name}>
           {showEmailBinding ? <EmailBindingForm busy={!!busy} perform={perform} onCancel={() => showIdentity()}
             onSent={() => setMessage('验证码已发送，请查收邮件。')} onBound={linked => {

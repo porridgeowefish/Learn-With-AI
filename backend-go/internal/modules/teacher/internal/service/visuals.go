@@ -20,19 +20,17 @@ var visualTool = ai.Tool{Name: "find_learning_visual", Description: promptText("
 
 var visualInstructions = promptText("tools/visual/instructions")
 
-func executeVisualTool(ctx context.Context, args map[string]any, room int, emit func(StreamFrame)) (string, string) {
+func executeVisualTool(ctx context.Context, args map[string]any, room int) (string, string) {
 	kind, _ := args["kind"].(string)
 	query, _ := args["query"].(string)
 	if len(args) != 2 || (kind != "diagram" && kind != "molecule" && kind != "manufacturing") || strings.TrimSpace(query) == "" || len([]rune(query)) > 120 {
 		return "", "invalid_arguments"
 	}
-	emit(StreamFrame{Type: "search-started", Data: map[string]any{"query": query, "source": "open-figures"}})
 	if kind == "manufacturing" {
-		return executeManufacturingVisual(ctx, query, room, emit)
+		return executeManufacturingVisual(ctx, query, room)
 	}
 	figures, err := searchFigures(ctx, kind, query)
 	if err != nil {
-		emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "source": "open-figures", "code": "visuals_unavailable"}})
 		return "", "visuals_unavailable"
 	}
 	if figures == nil {
@@ -41,7 +39,6 @@ func executeVisualTool(ctx context.Context, args map[string]any, room int, emit 
 	for {
 		raw, _ := json.Marshal(map[string]any{"figures": figures})
 		if ai.EstimateTextTokens(string(raw)) <= min(2200, room) {
-			emit(StreamFrame{Type: "search-completed", Data: map[string]any{"query": query, "source": "open-figures", "count": len(figures)}})
 			return string(raw), ""
 		}
 		if len(figures) == 0 {
@@ -51,10 +48,9 @@ func executeVisualTool(ctx context.Context, args map[string]any, room int, emit 
 	}
 }
 
-func executeManufacturingVisual(ctx context.Context, query string, room int, emit func(StreamFrame)) (string, string) {
+func executeManufacturingVisual(ctx context.Context, query string, room int) (string, string) {
 	result, err := searchManufacturing(ctx, query)
 	if err != nil {
-		emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "source": "open-figures", "code": "visuals_unavailable"}})
 		return "", "visuals_unavailable"
 	}
 	// Every slice belongs to this invocation, including when the search seam or
@@ -68,15 +64,6 @@ func executeManufacturingVisual(ctx context.Context, query string, room int, emi
 	for {
 		raw, _ := json.Marshal(result)
 		if ai.EstimateTextTokens(string(raw)) <= min(4000, room) {
-			count := 0
-			for _, group := range result.Groups {
-				count += len(group.Figures)
-			}
-			if count == 0 {
-				emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "source": "open-figures", "code": "no_verified_figures"}})
-			} else {
-				emit(StreamFrame{Type: "search-completed", Data: map[string]any{"query": query, "source": "open-figures", "count": count, "partial": len(result.Gaps) > 0}})
-			}
 			return string(raw), ""
 		}
 		if !trimmed {
@@ -98,7 +85,6 @@ func executeManufacturingVisual(ctx context.Context, query string, room int, emi
 			result.Groups = result.Groups[:len(result.Groups)-1]
 			continue
 		}
-		emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "source": "open-figures", "code": "budget_exhausted"}})
 		return "", "budget_exhausted"
 	}
 }

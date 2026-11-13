@@ -30,9 +30,10 @@ api /api/projects/{}/assets/review/annotations/{}/ask/summarize
 api /api/projects/{}/assets/{}
 api /api/projects/{}/conversation/attachments
 api /api/projects/{}/conversation/attachments/{}/file
+api /api/projects/{}/conversation/comparison-vote
 api /api/projects/{}/conversation/export.md
+api /api/projects/{}/conversation/feedback
 api /api/projects/{}/conversation/instructions
-api /api/projects/{}/conversation/lesson-rating
 api /api/projects/{}/conversation/opening
 api /api/projects/{}/conversation/queue/resume
 api /api/projects/{}/conversation/queue/{}/discard

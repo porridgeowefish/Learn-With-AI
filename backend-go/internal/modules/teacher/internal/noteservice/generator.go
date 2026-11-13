@@ -38,7 +38,7 @@ func Generate(ctx context.Context, provider, model string, turns []notestore.Not
 	if err != nil {
 		return "", notestore.NoteUsage{}, err
 	}
-	promptCtx := ai.ManagedPromptContext(ctx, provider, "auxiliary/notes")
+	promptCtx := ai.CloudPromptContext(ctx, "auxiliary/notes")
 	notePrompt, err := ai.RenderPromptContext(promptCtx, "auxiliary/notes", nil)
 	if err != nil {
 		return "", notestore.NoteUsage{}, err
@@ -46,9 +46,7 @@ func Generate(ctx context.Context, provider, model string, turns []notestore.Not
 	var content strings.Builder
 	reported := notestore.NoteUsage{}
 	request := ai.GatewayRequest{BindingName: "notes", ProviderID: provider, Model: model, System: notePrompt, Messages: []ai.GatewayMessage{{Role: "user", Content: string(data)}}}
-	if request.Prompt = ai.ManagedPromptReference(promptCtx); request.Prompt != nil {
-		request.PromptExposureID = notestore.BatchID(turns)
-	}
+	request.Prompt = ai.ManagedPromptReference(promptCtx)
 	err = (ai.Configured{}).Stream(ctx, request, func(e ai.GatewayEvent) {
 		if e.Type == "text-delta" {
 			content.WriteString(e.Delta)

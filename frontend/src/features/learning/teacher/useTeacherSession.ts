@@ -73,7 +73,7 @@ export function useTeacherSession(slug: string) {
       await request(next.signal, frame => {
         if (!owns()) return;
         received = true;
-        if (frame.type === 'text-delta' || frame.type === 'reasoning-summary-delta') {
+        if (frame.type === 'text-delta' || frame.type === 'reasoning-summary-delta' || frame.type === 'comparison-delta') {
           frames.current.push(frame);
           timer.current ??= setTimeout(() => { if (owns()) flush(); }, 64);
         } else {
@@ -138,7 +138,7 @@ export function useTeacherSession(slug: string) {
     };
     try {
       reportError('');
-      if (current.current.live || projection.current?.queuePaused) {
+      if (current.current.live || (projection.current?.queuePaused && projection.current.queue?.length)) {
         await queueTeacherTurn(slug, data);
         if (token !== generation.current) return false;
         accept();

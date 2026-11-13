@@ -122,6 +122,9 @@ func softScopeAppendix(slug string) string {
 func toProviderMessages(slug string, messages []conversationstore.SequencedMessage) []ai.GatewayMessage {
 	out := make([]ai.GatewayMessage, 0, len(messages))
 	for _, item := range messages {
+		if item.Message.Comparison != nil && item.Message.Comparison.Vote == "" {
+			continue
+		}
 		if item.Message.Role == "teacher" && item.Message.Status == "failed" {
 			continue
 		}

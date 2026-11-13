@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 )
 
@@ -55,7 +54,7 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 		token := rand.Text()
 		digest := sha256.Sum256([]byte(token))
 		baseDigest := sha256.Sum256([]byte(baseToken))
-		expires := now.Add(15 * time.Minute)
+		expires := now.Add(8 * time.Hour)
 		if err := s.db.PutAdminSession(r.Context(), user.ID, counter, baseDigest[:], digest[:], now, expires); err != nil {
 			authError(w, err)
 			return
@@ -118,6 +117,7 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 		return user, true
 	}
 	s.adminAuthorize = allow
+	s.registerComparisonAdmin(allow)
 	s.mux.HandleFunc("POST /v1/admin/logout", func(w http.ResponseWriter, r *http.Request) {
 		if token := bearer(r); token != "" {
 			digest := sha256.Sum256([]byte(token))
@@ -241,62 +241,6 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 		if err != nil {
 			fail(w, http.StatusInternalServerError, "account_search_unavailable")
 			return
-		}
-		respond(w, http.StatusOK, result)
-	})
-	s.mux.HandleFunc("GET /v1/admin/experiments", func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := allow(w, r, false); !ok {
-			return
-		}
-		result, err := s.db.ExperimentMetrics(r.Context(), time.Now().AddDate(0, 0, -90))
-		if err != nil {
-			fail(w, http.StatusInternalServerError, "metrics_unavailable")
-			return
-		}
-		respond(w, http.StatusOK, result)
-	})
-	s.mux.HandleFunc("GET /v1/admin/experiments/usage", func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := allow(w, r, false); !ok {
-			return
-		}
-		days, err := strconv.Atoi(r.URL.Query().Get("days"))
-		if err != nil {
-			days = 30
-		}
-		result, err := s.db.ExperimentDailyUsage(r.Context(), time.Now(), days)
-		if err != nil {
-			fail(w, http.StatusInternalServerError, "metrics_unavailable")
-			return
-		}
-		respond(w, http.StatusOK, result)
-	})
-	s.mux.HandleFunc("GET /v1/admin/experiments/cohorts", func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := allow(w, r, false); !ok {
-			return
-		}
-		type entry struct {
-			promptcatalog.ExperimentAllocation
-			store.ExperimentCohort
-			AllocationCheck allocationDiagnostic `json:"allocationCheck"`
-		}
-		result := []entry{}
-		if state := s.prompts.Load(); state != nil {
-			allocations := state.active.ExperimentAllocations()
-			if len(allocations) > 0 {
-				ids := make([]string, 0, len(allocations))
-				for _, item := range allocations {
-					ids = append(ids, item.ID)
-				}
-				counts, err := s.db.ExperimentCohorts(r.Context(), time.Now().AddDate(0, 0, -30), ids)
-				if err != nil {
-					fail(w, http.StatusInternalServerError, "metrics_unavailable")
-					return
-				}
-				for _, item := range allocations {
-					cohort := counts[item.ID]
-					result = append(result, entry{item, cohort, checkExperimentAllocation(item.TreatmentPercent, cohort)})
-				}
-			}
 		}
 		respond(w, http.StatusOK, result)
 	})

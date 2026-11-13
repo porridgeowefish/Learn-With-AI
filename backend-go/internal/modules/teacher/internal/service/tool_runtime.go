@@ -105,7 +105,7 @@ func (r *responseTools) visual(ctx context.Context, args map[string]any) (any, e
 	if r.room < 256 {
 		return toolOutcome{Code: "budget_exhausted", Final: true}, nil
 	}
-	text, code := executeVisualTool(ctx, args, r.room, r.emit)
+	text, code := executeVisualTool(ctx, args, r.room)
 	return toolOutcome{Text: text, Code: code}, nil
 }
 func (r *responseTools) web(ctx context.Context, args map[string]any) (any, error) {

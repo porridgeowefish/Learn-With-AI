@@ -75,7 +75,6 @@ func Build() *App {
 	if err := summaries.Start(context.Background()); err != nil {
 		println("summary startup:", err.Error())
 	}
-	teaching.Summaries = summaries
 	server.AttachSummaries(summaries)
 	teaching.OnCompleted = func(slug, responseID string) {
 		if store, err := teacher.NewConversation(slug); err == nil {

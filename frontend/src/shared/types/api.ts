@@ -29,6 +29,7 @@ export interface CreateProjectRequest {
 	 learningMode?: import('./learningMode').LearningMode;
   title: string;
   projectType: ProjectType;
+  providerId?: string;
   slug?: string;
   why?: string;
   current?: string;

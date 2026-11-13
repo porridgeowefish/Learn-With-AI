@@ -29,23 +29,32 @@ export async function cloud({path, request, method, state, json}) {
   };
   switch (path.slice('/api/cloud/'.length)) {
     case 'send-code':
-      if (!['login', 'reset'].includes(input.purpose)) return json({error:'invalid_account_input'}, 400);
-      if (input.purpose === 'reset') demo.resetEmail = input.email;
+      if (!['register', 'reset'].includes(input.purpose)) return json({error:'invalid_account_input'}, 400);
+      demo.emailChallenge = { email: input.email, purpose: input.purpose };
       return json({exampleCode:'123456'});
     case 'verify-email':
-      if (!['login', 'reset'].includes(input.purpose)) return json({error:'invalid_account_input'}, 400);
-      if (input.code !== '123456') return json({error:'invalid_credentials'}, 401);
+      if (!['register', 'reset'].includes(input.purpose)) return json({error:'invalid_account_input'}, 400);
+      if (input.code !== '123456' || demo.emailChallenge?.email !== input.email || demo.emailChallenge.purpose !== input.purpose) return json({error:'invalid_credentials'}, 401);
       if (input.purpose === 'reset') {
         const account = demo.account ?? {email:'learner@example.com', name:'learner'};
-        if (!account.name || input.email !== demo.resetEmail || account.email !== input.email || input.password?.length < 6 || !input.password) {
+        if (!account.name || account.email !== input.email || input.password?.length < 6 || !input.password) {
           return json({error:'invalid_credentials'}, 401);
         }
-        delete demo.resetEmail;
+        delete demo.emailChallenge;
         const result = signIn(account.email, account.name, account.githubLinked);
         demo.password = input.password;
         return result;
       }
-      return signIn(input.email);
+      {
+        const username = input.username?.trim().toLowerCase();
+        if (!/^[a-z0-9][a-z0-9_.-]{2,31}$/.test(username ?? '') || (input.password?.length ?? 0) < 6) return json({error:'invalid_account_input'}, 400);
+        if (username === 'learner' || input.email === 'learner@example.com' || demo.account?.name === username ||
+            (demo.account?.email === input.email && demo.account?.name)) return json({error:'account_conflict'}, 409);
+        delete demo.emailChallenge;
+        const result = signIn(input.email, username);
+        demo.password = input.password;
+        return result;
+      }
     case 'password': {
       const username = input.username?.trim().toLowerCase();
       if (demo.account?.name && demo.account.name === username && input.password === (demo.password ?? 'demo-pass')) {

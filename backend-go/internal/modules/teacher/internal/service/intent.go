@@ -14,9 +14,7 @@ import (
 var intentPrompt = promptText("auxiliary/tool-intent")
 
 type toolIntent struct {
-	EndDecision string `json:"endDecision"`
-	Evidence    string `json:"evidence"`
-	Required    []struct {
+	Required []struct {
 		Tool  string `json:"tool"`
 		Query string `json:"query"`
 		Kind  string `json:"kind"`
@@ -94,9 +92,6 @@ func parseToolIntent(raw string) (toolIntent, error) {
 	}
 	if plan.Required == nil || plan.Forbidden == nil || len(plan.Required) > 2 || len(plan.Forbidden) > 4 {
 		return toolIntent{}, errors.New("invalid tool intent")
-	}
-	if plan.EndDecision != "" && plan.EndDecision != "confirm_end" && plan.EndDecision != "continue" && plan.EndDecision != "unclear" {
-		return toolIntent{}, errors.New("invalid teaching end decision")
 	}
 	for _, kind := range plan.Forbidden {
 		if kind != "all" && kind != "web" && kind != "visual" && kind != "sources" {

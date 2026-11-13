@@ -52,6 +52,7 @@
 .textLink { background: transparent; border: 0; padding: 2px; color: var(--accent-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .dismissLink { justify-self: start; font-size: .9rem; }
 .recoveryLink { justify-self: end; font-size: .9rem; }
+.registerLink { margin: 0; color: var(--muted); font-size: .9rem; }
 .hint { margin: 0; color: var(--muted); font-size: .9rem; }
 .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .82rem; }
 .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--border); }

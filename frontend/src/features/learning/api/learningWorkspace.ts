@@ -22,12 +22,18 @@ export interface ConversationMessage {
   sourceCitations?: SourceCitation[];
   readingCoverage?: Array<{ sourceId: string; revisionId: string; contentHash: string; scope: string; completeWithinScope: boolean }>;
   creditUsage?: { units: number; pending: boolean };
-  lessonEnded?: boolean;
-  lessonRating?: number;
+  feedback?: 'up' | 'down';
+  comparison?: { id: string; a: string; b: string; vote?: ComparisonVote | 'skipped' };
 }
 
-export function rateLesson(slug: string, messageId: string, stars: number) {
-  return http.post<void>(`/api/projects/${encodeURIComponent(slug)}/conversation/lesson-rating`, { messageId, stars });
+export type ComparisonVote = 'a' | 'b' | 'tie';
+
+export function saveAnswerFeedback(slug: string, messageId: string, value: 'up' | 'down') {
+  return http.post<void>(`/api/projects/${encodeURIComponent(slug)}/conversation/feedback`, { messageId, value });
+}
+
+export function saveComparisonVote(slug: string, messageId: string, value: ComparisonVote | 'skipped') {
+  return http.post<void>(`/api/projects/${encodeURIComponent(slug)}/conversation/comparison-vote`, { messageId, value });
 }
 
 export interface SourceCitation {

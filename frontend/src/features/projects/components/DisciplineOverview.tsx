@@ -26,6 +26,7 @@ import { CreateProjectModal } from './CreateProjectModal';
 import s from './DisciplineOverview.module.css';
 
 interface DisciplineOverviewProps {
+  providerId?: string;
   slug: string;
   title: string;
 }
@@ -102,7 +103,7 @@ function cleanHeading(value: string): string {
   return value.replace(/[*_`]/g, '').trim();
 }
 
-export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
+export function DisciplineOverview({ slug, title, providerId }: DisciplineOverviewProps) {
   const navigate = useNavigate();
   const projection = useDisciplineMap(slug);
   const courseSummaries = useCourseSummaries(slug, projection.data?.mapVersionId);
@@ -274,7 +275,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
             <span><b className={`${s.priority} ${s.priorityII}`}>Ⅱ</b>中等深度</span>
             <span><b className={`${s.priority} ${s.priorityIII}`}>Ⅲ</b>深入选学</span>
           </div>}
-          <div className={s.actions}><GenerationControl slug={slug} kind="discipline-map"/><SourceImportControl slug={slug}/></div>
+          <div className={s.actions}><GenerationControl slug={slug} kind="discipline-map" initialProviderId={providerId}/><SourceImportControl slug={slug}/></div>
         </div>
       </header>
 
@@ -304,7 +305,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
             <Icon name="book" size={28} />
             <h2>还没有学科总览</h2>
             <p>生成地图后，这里会成为该学科统一的总览入口。</p>
-            <GenerationControl slug={slug} kind="discipline-map"/>
+            <GenerationControl slug={slug} kind="discipline-map" initialProviderId={providerId}/>
           </section>
         ) : (
           <article ref={articleRef} className={s.paper}>
