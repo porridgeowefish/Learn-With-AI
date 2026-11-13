@@ -51,10 +51,12 @@ type Binding struct {
 }
 
 type AI struct {
-	DefaultProvider string             `json:"defaultProvider"`
-	SearchEngine    string             `json:"searchEngine"` // "google" | "bing"
-	Providers       []Provider         `json:"providers"`
-	Bindings        map[string]Binding `json:"bindings,omitempty"`
+	ForegroundConcurrency int                `json:"foregroundConcurrency,omitempty"`
+	BackgroundConcurrency int                `json:"backgroundConcurrency,omitempty"`
+	DefaultProvider       string             `json:"defaultProvider"`
+	SearchEngine          string             `json:"searchEngine"` // "google" | "bing"
+	Providers             []Provider         `json:"providers"`
+	Bindings              map[string]Binding `json:"bindings,omitempty"`
 }
 
 type UI struct {
@@ -206,13 +208,16 @@ type diskShape struct {
 
 // legacyAI mirrors ai.Config.
 type legacyAI struct {
-	Default      string             `json:"default"`
-	SearchEngine string             `json:"searchEngine"`
-	Providers    []legacyProvider   `json:"providers"`
-	Bindings     map[string]Binding `json:"bindings"`
+	ForegroundConcurrency int                `json:"foregroundConcurrency"`
+	BackgroundConcurrency int                `json:"backgroundConcurrency"`
+	Default               string             `json:"default"`
+	SearchEngine          string             `json:"searchEngine"`
+	Providers             []legacyProvider   `json:"providers"`
+	Bindings              map[string]Binding `json:"bindings"`
 }
 
 type legacyProvider struct {
+	MaxConcurrency      int    `json:"maxConcurrency,omitempty"`
 	ID                  string `json:"id"`
 	Kind                string `json:"kind"`
 	Name                string `json:"name"`
@@ -311,9 +316,9 @@ func applyDisk(cfg *Config, disk *diskShape, prov Provenance) {
 	if disk.AskAiProviders != nil && disk.AI == nil {
 		var legacy legacyAI
 		if err := json.Unmarshal(*disk.AskAiProviders, &legacy); err == nil {
-			ai := AI{DefaultProvider: legacy.Default, SearchEngine: legacy.SearchEngine, Bindings: legacy.Bindings}
+			ai := AI{ForegroundConcurrency: legacy.ForegroundConcurrency, BackgroundConcurrency: legacy.BackgroundConcurrency, DefaultProvider: legacy.Default, SearchEngine: legacy.SearchEngine, Bindings: legacy.Bindings}
 			for _, p := range legacy.Providers {
-				ai.Providers = append(ai.Providers, Provider{ID: p.ID, Kind: p.Kind, Name: p.Name, BaseURL: p.BaseURL, APIKey: p.APIKey, Model: p.Model, ContextWindowTokens: p.ContextWindowTokens, Reasoning: p.Reasoning, Thinking: p.Thinking})
+				ai.Providers = append(ai.Providers, Provider{MaxConcurrency: p.MaxConcurrency, ID: p.ID, Kind: p.Kind, Name: p.Name, BaseURL: p.BaseURL, APIKey: p.APIKey, Model: p.Model, ContextWindowTokens: p.ContextWindowTokens, Reasoning: p.Reasoning, Thinking: p.Thinking})
 			}
 			mergeAI(cfg, ai)
 			mark("ai")
@@ -324,6 +329,8 @@ func applyDisk(cfg *Config, disk *diskShape, prov Provenance) {
 }
 
 func mergeAI(cfg *Config, ai AI) {
+	cfg.AI.ForegroundConcurrency = ai.ForegroundConcurrency
+	cfg.AI.BackgroundConcurrency = ai.BackgroundConcurrency
 	if ai.DefaultProvider != "" {
 		cfg.AI.DefaultProvider = ai.DefaultProvider
 	}

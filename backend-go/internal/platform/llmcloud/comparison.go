@@ -14,7 +14,7 @@ func (c *Client) StartComparison(ctx context.Context, operation string) (string,
 	}
 	var result struct{ ID string }
 	token, _ := c.promptSubject()
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	status, err := c.json(ctx, http.MethodPost, "v1/answer-comparison/start", token, map[string]string{"operation": operation}, &result)
 	if err != nil || status == http.StatusNoContent {

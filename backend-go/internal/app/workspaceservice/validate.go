@@ -127,10 +127,11 @@ func validateProjectFiles(ctx context.Context, base string) error {
 				}
 			}
 		case a[0] == "assets" && file == "asset.json":
-			if val("key") != a[1] || val("assetId") == "" {
+			key, extension := assetTransferFormat(a[1])
+			if val("key") != key || val("assetId") == "" {
 				return errors.New("asset identity mismatch")
 			}
-			for _, n := range []string{"version.json", "content.md"} {
+			for _, n := range []string{"version.json", "content" + extension} {
 				if e = require("assets/" + a[1] + "/versions/" + val("currentVersionId") + "/" + n); e != nil {
 					return e
 				}
@@ -139,7 +140,8 @@ func validateProjectFiles(ctx context.Context, base string) error {
 			if val("versionId") != a[len(a)-2] {
 				return errors.New("asset version identity mismatch")
 			}
-			return require(strings.Join(a[:len(a)-1], "/") + "/content.md")
+			_, extension := assetTransferFormat(a[1])
+			return require(strings.Join(a[:len(a)-1], "/") + "/content" + extension)
 		case a[0] == "map" && file == "topics.json":
 			var cat projects.Catalog
 			if e = loadJSON(p, &cat); e != nil {
@@ -260,4 +262,11 @@ func filterCitations(p string, visible map[string]bool) error {
 		return filesystem.AtomicWriteFile(p, out.Bytes(), 0600)
 	}
 	return nil
+}
+
+func assetTransferFormat(directory string) (key, extension string) {
+	if directory == "review-html" {
+		return "review", ".html"
+	}
+	return directory, ".md"
 }

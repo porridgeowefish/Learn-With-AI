@@ -14,8 +14,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 )
 
 const defaultZhipuBaseURL = "https://open.bigmodel.cn"
@@ -46,6 +44,14 @@ type Searcher interface {
 func Configured() Searcher {
 	profile, err := learningprofile.Read()
 	if err != nil || !profile.Settings.Search.Enabled {
+		return nil
+	}
+	return FromSettings(profile.Settings.Search)
+}
+
+func ConfiguredYuanbao() Searcher {
+	profile, err := learningprofile.Read()
+	if err != nil || !profile.Settings.Search.Enabled || profile.Settings.Search.Provider != "yuanbao" {
 		return nil
 	}
 	return FromSettings(profile.Settings.Search)
@@ -97,22 +103,6 @@ func (s chatgpt) Search(ctx context.Context, query string) ([]Result, error) {
 		return nil, e
 	}
 	return []Result{{Title: "联网检索结果", Snippet: out.String()}}, nil
-}
-
-// Retained reader for legacy installations; the explicit new opt-in owns access.
-func legacyConfigured() Searcher {
-	settings, ok, err := platformconfig.LoadWebSearch()
-	if err != nil || !ok || strings.TrimSpace(settings.APIKey) == "" {
-		return nil
-	}
-	if settings.Provider != "" && settings.Provider != "zhipu" {
-		return nil
-	}
-	engine := strings.TrimSpace(settings.Engine)
-	if engine == "" {
-		engine = "search_std"
-	}
-	return zhipu{apiKey: strings.TrimSpace(settings.APIKey), engine: engine}
 }
 
 type zhipu struct {

@@ -109,6 +109,13 @@ func skipOperational(p string) bool {
 	case "workspace.json", "config.local.json", "webview2", "browser-cache", "tmp", ".learn-with-ai.window", ".learn-with-ai.lock", ".workspace-moved", "visual-plugins.json":
 		return true
 	}
+	parts := strings.SplitN(p, "/", 5)
+	if len(parts) >= 4 && parts[0] == "projects" && parts[2] == "assets" {
+		// Retired review assets are neither read nor included in new archives.
+		if parts[3] == "review" || parts[3] == "body" {
+			return true
+		}
+	}
 	return strings.Contains(p, "/derived/retrieval/")
 }
 func attachment(p string) bool {

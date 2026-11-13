@@ -42,10 +42,11 @@ func (s *Store) BudgetUsage(ctx context.Context, currency string, now time.Time)
 
 func budgetUsage(ctx context.Context, db queryer, currency string, now time.Time) (BudgetUsage, error) {
 	u := BudgetUsage{Month: now.In(shanghai).Format("2006-01"), Currency: currency}
-	err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(CASE WHEN settled IS NULL THEN estimated ELSE 0 END),0),
+	err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(reserved),0),
 		COALESCE(SUM(settled),0) FROM (
-		SELECT estimated,settled FROM cost_budget WHERE currency=? AND month=?
-		UNION ALL SELECT estimated,settled FROM answer_comparison_arm WHERE currency=? AND month=?
+		SELECT CASE WHEN settled IS NULL THEN estimated ELSE 0 END AS reserved,settled FROM cost_budget WHERE currency=? AND month=?
+		UNION ALL SELECT CASE WHEN settled IS NULL THEN MAX(estimated-known_cost_floor,0) ELSE 0 END,COALESCE(settled,known_cost_floor)
+		FROM answer_comparison_arm WHERE currency=? AND month=?
 		)`, currency, u.Month, currency, u.Month).Scan(&u.Reserved, &u.Settled)
 	return u, err
 }

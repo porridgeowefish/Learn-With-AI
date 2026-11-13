@@ -1,6 +1,5 @@
 import { normalizeManagedProviderId } from '@/features/cloud-account';
-
-export const conversationModelKey = (slug: string) => `lll.teacher.provider.${slug}`;
+import { conversationModelKey } from '@/shared/lib/projectStorage';
 
 export function readConversationModel(slug: string) {
   return normalizeManagedProviderId(localStorage.getItem(conversationModelKey(slug)) ?? '');

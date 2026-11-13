@@ -55,6 +55,7 @@ type Coverage struct {
 }
 type Job struct {
 	Checkpoint         *Checkpoint         `json:"checkpoint,omitempty"`
+	ReviewFormat       string              `json:"reviewFormat,omitempty"`
 	SchemaVersion      int                 `json:"schemaVersion"`
 	ID                 string              `json:"id"`
 	RootJobID          string              `json:"rootJobId"`
@@ -244,7 +245,9 @@ func loadJobs(root string) ([]Job, error) {
 		if e = readJSON(filepath.Join(jobDir(root), entry.Name()), &j); e != nil {
 			return nil, e
 		}
-		out = append(out, j)
+		if j.Kind != "review" || j.ReviewFormat == "html" {
+			out = append(out, j)
+		}
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].CreatedAt.Equal(out[j].CreatedAt) {
@@ -296,7 +299,7 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 }
 func prompt(ctx context.Context, kind string) (ai.ComposedPrompt, *promptpack.Reference, error) {
 	scene := "generation/" + kind
-	if kind == "review" || kind == "practice" {
+	if kind == "practice" {
 		ctx = ai.CloudPromptContext(ctx, scene)
 	}
 	composed, err := ai.ComposePrompt(ctx, scene, nil, nil)
@@ -473,21 +476,6 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 		if in.Kind != "review" {
 			payload["review"] = review.Content
 		}
-		annotations, err := assets.NewAnnotations(slug)
-		if err != nil {
-			return Job{}, err
-		}
-		allAnnotations, err := annotations.List(false)
-		if err != nil {
-			return Job{}, err
-		}
-		confusions := []map[string]string{}
-		for _, a := range allAnnotations {
-			if a.Status == assets.StateOpen || a.Status == assets.StateAsked {
-				confusions = append(confusions, map[string]string{"quote": a.QuoteSnapshot, "question": a.Note})
-			}
-		}
-		payload["unresolvedConfusions"] = confusions
 		notes, err := teacher.NewNoteStore(slug)
 		if err != nil {
 			return Job{}, err
@@ -560,7 +548,7 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	if len(f.Sources) > 0 {
 		req.Tools = sources.Tools()
 	}
-	f.WebSearchEnabled = teacher.ConfiguredWebSearch() != nil
+	f.WebSearchEnabled = generationSearcher(in.Kind) != nil
 	if f.WebSearchEnabled {
 		req.Tools = append(req.Tools, webSearchTool())
 	}
@@ -589,6 +577,9 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	now := time.Now().UTC()
 	id := idgen.New("gen")
 	j := Job{SchemaVersion: 1, ID: id, RootJobID: id, Attempt: 1, OperationID: in.OperationID, Kind: in.Kind, Status: "queued", Phase: "waiting", ProviderID: p.ID, Model: p.Model, QuestionCount: in.QuestionCount, MapMode: in.MapMode, Progress: Progress{Indeterminate: true}, Coverage: Coverage{Sources: f.Sources, ReadRanges: append([]sources.SourceCitation{}, f.InitialReadRanges...)}, ResultRefs: []string{}, CreatedAt: now, UpdatedAt: now, Intent: in}
+	if in.Kind == "review" {
+		j.ReviewFormat = "html"
+	}
 	if in.Kind == "discipline-map" && in.MapMode == "sources" {
 		j.Coverage.Gap = "地图依据当前已提取文字与有限阅读整理；章节可由正文归纳，不表示已读完整份原件。未识别页和公式仍需核对。"
 	}
@@ -641,6 +632,9 @@ func getJob(slug, id string) (Job, error) {
 	}
 	var j Job
 	e = readJSON(filepath.Join(jobDir(r), id+".json"), &j)
+	if e == nil && j.Kind == "review" && j.ReviewFormat != "html" {
+		return Job{}, os.ErrNotExist
+	}
 	return j, e
 }
 func safeID(id string) bool {

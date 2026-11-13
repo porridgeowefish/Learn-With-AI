@@ -1,7 +1,11 @@
-// Browser-only project data is not covered by the server-side directory
-// deletion. Clear every known per-project draft after the DELETE succeeds.
+import { assetViewKey, conversationEffortKey, conversationModelKey } from '@/shared/lib/projectStorage';
+
+// Project-local browser preferences and drafts outlive the server directory.
 export function clearDeletedProjectClientData(slug: string): void {
   try {
+    localStorage.removeItem(assetViewKey(slug));
+    localStorage.removeItem(conversationModelKey(slug));
+    localStorage.removeItem(conversationEffortKey(slug));
     localStorage.removeItem(`lll.draft.practice.${slug}`);
     localStorage.removeItem(`lll.practice.${slug}.lastAttempt`);
     const markdownDraftPrefix = `lll.draft.${slug}.`;

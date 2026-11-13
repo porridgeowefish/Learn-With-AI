@@ -16,7 +16,7 @@
 | 生成任务共同边界 | common.md |
 | 工具使用及描述 | tools/sources.json、web-search.json、visual.json |
 | 教学结束归纳工具 | tools/summarize-taught-concepts.md |
-| 摘要、笔记、OCR、意图识别等独立任务 | auxiliary/ 下对应 Markdown；批注短模板在 annotation.json |
+| 摘要、笔记、OCR、意图识别等独立任务 | auxiliary/ 下对应 Markdown |
 | 场景组装 | profiles/ |
 
 Markdown 用于完整任务提示。JSON 的 prompts 对象集中保存同类短文本，每个键对应一个独立条目。例如 teaching/response-length/short 只读取 response-length.json 的 short，不注入其它档位。每条独立替换变量；其它条目的变量无需提供。

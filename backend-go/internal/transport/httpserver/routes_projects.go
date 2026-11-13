@@ -6,10 +6,10 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
+	"log"
 
 	"net/http"
 
-	"regexp"
 	"strings"
 	"time"
 
@@ -32,23 +32,24 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	result := map[string]any{"deleted": true, "projectId": slug}
 	if err := s.projectOperations().Delete(slug); err != nil {
-		if errors.Is(err, teacher.ErrResponseActive) || errors.Is(err, teacher.ErrNotesProjectBusy) {
+		var cleanup *projectservice.FolderCleanupError
+		if errors.As(err, &cleanup) {
+			log.Printf("delete project %s: %v", slug, cleanup)
+			result["warning"] = "folder_cleanup_failed"
+		} else if errors.Is(err, teacher.ErrResponseActive) || errors.Is(err, teacher.ErrNotesProjectBusy) {
 			httpx.Error(w, 409, err.Error())
 			return
+		} else {
+			learningWorkspaceError(w, err)
+			return
 		}
-		learningWorkspaceError(w, err)
-		return
 	}
 
 	s.cache.Invalidate(slug)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"deleted": true, "projectId": slug})
+	httpx.WriteJSON(w, http.StatusOK, result)
 }
-
-// validEditableFilename limits learner-owned zone writes to safe filenames.
-var validEditableFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
-
-// cache is the package-global project index. Populated on startup and on writes.
 
 // createProjectRequest is the body of POST /api/projects.
 // Legacy questionnaire fields are accepted for older clients.

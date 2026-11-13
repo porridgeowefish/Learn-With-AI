@@ -27,10 +27,12 @@ func (s *Server) handleGetAskAiSettings(w http.ResponseWriter, r *http.Request) 
 		cfg = &ai.Config{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"default":      cfg.Default,
-		"searchEngine": cfg.SearchEngine,
-		"providers":    cfg.Providers,
-		"bindings":     cfg.Bindings,
+		"default":               cfg.Default,
+		"searchEngine":          cfg.SearchEngine,
+		"providers":             cfg.Providers,
+		"bindings":              cfg.Bindings,
+		"foregroundConcurrency": cfg.ForegroundConcurrency,
+		"backgroundConcurrency": cfg.BackgroundConcurrency,
 	})
 }
 
@@ -39,21 +41,33 @@ func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	var in ai.Config
-	if err := httpx.ReadJSON(r, &in); err != nil {
+	var request struct {
+		ai.Config
+		ForegroundConcurrency *int `json:"foregroundConcurrency"`
+		BackgroundConcurrency *int `json:"backgroundConcurrency"`
+	}
+	if err := httpx.ReadJSON(r, &request); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	// Preserve service bindings when an older configuration editor omits them.
+	in := request.Config
 	old, loadErr := ai.LoadConfig()
 	if loadErr != nil {
 		httpx.Error(w, http.StatusInternalServerError, "unable to load existing AI settings")
 		return
 	}
 	if old != nil {
+		in.ForegroundConcurrency = old.ForegroundConcurrency
+		in.BackgroundConcurrency = old.BackgroundConcurrency
 		if in.Bindings == nil {
 			in.Bindings = old.Bindings
 		}
+	}
+	if request.ForegroundConcurrency != nil {
+		in.ForegroundConcurrency = *request.ForegroundConcurrency
+	}
+	if request.BackgroundConcurrency != nil {
+		in.BackgroundConcurrency = *request.BackgroundConcurrency
 	}
 	if err := ai.SaveConfig(in); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())

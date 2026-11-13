@@ -8,13 +8,11 @@ const confirmedBindings = new Set();
 const id = () => crypto.randomUUID();
 const reply =
   '向量加法表示连续发生的位移。把第二个向量的起点移到第一个向量的终点，再连接最初的起点和最后的终点，就得到合位移。';
-const review =
-  '# 向量与坐标\n\n## 核心概念\n\n向量同时具有大小和方向。用一对坐标表示它，可以分别计算两个方向上的变化。\n\n## 一个例子\n\n向东走三步，再向北走四步，位移的大小为五步。';
+const review = '<article><h1>向量与坐标</h1><p>向量用大小和方向描述变化。用坐标相加，就能合并连续的位移。</p><h2>一个例子</h2><p>向东走三步，再向北走四步，位移的大小为五步。</p></article>';
 const seedSlugs = new Set(['math', 'physics', 'math-map']);
 const physicsReply =
   '先选定小球和地球作为系统。忽略空气阻力时，小球下落减少的重力势能转化成动能，两者之和保持不变。';
-const physicsReview =
-  '# 机械能守恒\n\n## 系统与条件\n\n只有重力或弹簧弹力做功时，系统的动能与势能之和保持不变。\n\n## 一个例子\n\n忽略空气阻力，自由落体的重力势能转化成动能。';
+const physicsReview = '<article><h1>机械能守恒</h1><p>只有重力或弹簧弹力做功时，系统的动能与势能之和保持不变。</p><h2>自由落体</h2><p>忽略空气阻力时，小球减少的重力势能转化成动能。</p></article>';
 // Simulate the teacher's per-turn footer using the same wire format as production.
 function previewAnswer(physics, question = '') {
   if (/芯片|智能制造|制造组图/.test(question)) return previewManufacturingAnswer;
@@ -85,7 +83,7 @@ function asset(key, content) {
       updatedAt: now(),
     },
     content,
-    contentKind: 'markdown',
+    contentKind: key === 'review' ? 'html' : 'markdown',
   };
 }
 function source(name, file, parsedText = '') {
@@ -524,12 +522,30 @@ async function sources(ctx, s, parts, b) {
       s.sources.forEach(advanceSourceOCR);
       return json({ sources: s.sources.map((x) => x.source) });
     }
+    const operationId = typeof b.operationId === 'string' ? b.operationId.trim() : '';
+    if (!operationId || new TextEncoder().encode(operationId).length > 128 || !(b.file instanceof Blob)) {
+      return json({ error: '需要有效的上传操作和文件' }, 400);
+    }
+    if (b.file.size > 100 * 1024 * 1024) return json({ error: '单文件不能超过 100 MiB' }, 413);
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await b.file.arrayBuffer())), byte => byte.toString(16).padStart(2, '0')).join('');
+    const displayName = b.displayName || b.file.name;
+    const existing = s.sources.find(row => row.operationId === operationId);
+    if (existing) {
+      const original = existing.revision.original;
+      if (existing.source.displayName !== displayName || original.filename !== b.file.name || original.mediaType !== b.file.type || original.sha256 !== digest) {
+        return json({ error: '该上传操作已用于另一份资料' }, 409);
+      }
+      return json({ source: existing.source, revision: existing.revision, parseDisposition: existing.source.status, parseReason: '' });
+    }
     const text =
       /\.(md|txt|csv|markdown)$/i.test(b.file.name) ||
       b.file.type.startsWith('text/')
         ? await b.file.text()
         : '';
-    const row = source(b.displayName || b.file.name, b.file, text);
+    const row = source(b.file.name, b.file, text);
+    row.operationId = operationId;
+    row.source.displayName = displayName;
+    row.revision.original.sha256 = digest;
     if (/\.pdf$/i.test(row.source.displayName)) startSourceOCR(row);
     s.sources.push(row);
     return json({
@@ -537,7 +553,7 @@ async function sources(ctx, s, parts, b) {
       revision: row.revision,
       parseDisposition: row.source.status,
       parseReason: '',
-    });
+    }, 201);
   }
   const row = s.sources.find((x) => x.source.sourceId === key);
   if (!row) return json({ error: '资料不存在' }, 404);
@@ -555,19 +571,6 @@ async function sources(ctx, s, parts, b) {
     const job = startSourceOCR(row, b.providerId || 'preview-vision', false);
     return json({ job });
   }
-  if (action === 'revisions' && parts[2] === row.revision.revisionId) {
-    if (parts[4] === 'content' && row.parsedText)
-      return new Response(row.parsedText, {
-        headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-      });
-    if (parts[4] === 'original' && row.file) return new Response(row.file);
-    return json({ error: '文件不可用' }, 404);
-  }
-  if (action === 'evidence')
-    return json({
-      quote: row.parsedText || row.source.displayName,
-      displayRange: '第 1 行',
-    });
   if (method === 'DELETE' || action === 'permanent-delete') {
     s.sources = s.sources.filter((x) => x !== row);
     return json({ deleted: true });
@@ -577,7 +580,7 @@ async function sources(ctx, s, parts, b) {
 }
 function assets(ctx, s, parts, b) {
   const { json, method } = ctx;
-  const [key, action, entry, op] = parts;
+  const [key, action, entry] = parts;
   if (!key) return json({ assets: Object.values(s.assets).map((a) => a.meta) });
   if (action === 'rounds') return json({ rounds: s.rounds });
   if (action === 'results') {
@@ -609,29 +612,18 @@ function assets(ctx, s, parts, b) {
     }
     const annotation = s.annotations.find((a) => a.annotationId === entry);
     if (!annotation) return json({ error: '批注不存在' }, 404);
-    annotation.ask ??= { messages: [] };
-    if (op === 'ask-stream') {
-      for (const [role, content] of [
-        ['learner', b.content],
-        ['assistant', reply],
-      ])
-        annotation.ask.messages.push({
-          id: id(),
-          role,
-          content,
-          status: 'completed',
-          createdAt: now(),
-        });
-      annotation.status = 'asked';
-      return answerStream(reply);
-    }
-    annotation.ask.summary = reply;
-    annotation.ask.summaryState = 'done';
-    return json({});
+    if (method !== 'PATCH') return json({ error: '操作不可用' }, 404);
+    if (b.note !== undefined) annotation.note = b.note;
+    if (b.status !== undefined) annotation.status = b.status;
+    return json({ annotation });
+  }
+  if (key === 'review' && action === 'search' && method === 'POST') {
+    return json({ results: [{ title: '元宝搜索 · 预览结果', snippet: b.query, url: '', media: '设计预览' }] });
   }
   const item = s.assets[key];
   if (!item) return;
   if (method === 'PUT') {
+    if (key !== 'practice') return json({ error: '操作不可用' }, 404);
     if (item.meta.editRevision !== b.baseEditRevision)
       return json(
         {

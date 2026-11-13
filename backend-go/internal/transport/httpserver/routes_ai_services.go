@@ -47,7 +47,7 @@ func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
 			}
 			resource.Providers = append(resource.Providers, aiServiceProvider{ID: provider.ID, Kind: kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv})
 		}
-		for _, name := range []string{"teacher", "annotationAskAI", "notes", "ocr", "documentStructure", "review", "practice", "disciplineMap"} {
+		for _, name := range []string{"teacher", "notes", "ocr", "documentStructure", "review", "practice", "disciplineMap"} {
 			if binding, ok := cfg.Bindings[name]; ok {
 				resource.Bindings[name] = aiServiceBinding{ProviderID: binding.ProviderID, Model: binding.Model}
 				continue
@@ -79,7 +79,9 @@ func (s *Server) handlePutAIServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	oldByID := map[string]ai.ProviderConfig{}
+	var config ai.Config
 	if old != nil {
+		config = *old
 		for _, provider := range old.Providers {
 			oldByID[provider.ID] = provider
 		}
@@ -87,27 +89,31 @@ func (s *Server) handlePutAIServices(w http.ResponseWriter, r *http.Request) {
 	teacherBinding := in.Bindings["teacher"]
 	providers := make([]ai.ProviderConfig, 0, len(in.Providers))
 	for _, provider := range in.Providers {
+		id := strings.TrimSpace(provider.ID)
 		kind := provider.Kind
 		if kind == "openai-compatible" {
 			kind = "openai"
 		}
-		model := oldByID[provider.ID].Model
-		if model == "" {
+		saved := oldByID[id]
+		if saved.Model == "" {
 			for _, binding := range in.Bindings {
-				if binding.ProviderID == provider.ID && binding.Model != "" {
-					model = binding.Model
+				if binding.ProviderID == id && binding.Model != "" {
+					saved.Model = strings.TrimSpace(binding.Model)
 					break
 				}
 			}
 		}
-		apiKey := provider.APIKey
-		providers = append(providers, ai.ProviderConfig{ID: strings.TrimSpace(provider.ID), Kind: kind, Name: provider.Name, BaseURL: strings.TrimSpace(provider.BaseURL), APIKey: strings.TrimSpace(apiKey), APIKeyEnv: provider.APIKeyEnv, Model: strings.TrimSpace(model)})
+		saved.ID, saved.Kind, saved.Name = id, kind, provider.Name
+		saved.BaseURL = strings.TrimSpace(provider.BaseURL)
+		saved.APIKey, saved.APIKeyEnv = strings.TrimSpace(provider.APIKey), provider.APIKeyEnv
+		providers = append(providers, saved)
 	}
 	bindings := map[string]ai.Binding{}
 	for name, binding := range in.Bindings {
 		bindings[name] = ai.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
-	if err := ai.SaveConfig(ai.Config{Default: teacherBinding.ProviderID, Providers: providers, Bindings: bindings}); err != nil {
+	config.Default, config.Providers, config.Bindings = teacherBinding.ProviderID, providers, bindings
+	if err := ai.SaveConfig(config); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "unable to save AI services")
 		return
 	}

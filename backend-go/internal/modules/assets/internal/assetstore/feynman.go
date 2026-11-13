@@ -32,6 +32,7 @@ type FeynmanMessage struct {
 }
 
 var ErrFeynmanSessionNotFound = errors.New("feynman session not found")
+var ErrFeynmanReviewUnavailable = errors.New("此轮关联的复习稿已退役。请生成新复习稿后开始新一轮。")
 
 const (
 	maxFeynmanMessages      = 400
@@ -154,24 +155,18 @@ func (s *Store) AppendFeynmanMessage(id string, message FeynmanMessage) (Feynman
 	return session, nil
 }
 
-// ReviewContentForFeynman returns the review text a round was pinned to. When
-// that version is missing (older data), the current review is used instead
-// and reported through the returned version ID.
+// ReviewContentForFeynman returns the HTML version this round was pinned to.
 func (s *Store) ReviewContentForFeynman(session FeynmanSession) (string, string, error) {
 	if session.ReviewVersionID != "" && validPracticeVersionID(session.ReviewVersionID) {
 		s.mu.Lock()
-		dir := filepath.Join(s.root, "assets", "review", "versions", session.ReviewVersionID)
+		dir := filepath.Join(s.assetDir("review"), "versions", session.ReviewVersionID)
 		var version Version
 		versionErr := readJSON(filepath.Join(dir, "version.json"), &version)
-		content, contentErr := os.ReadFile(filepath.Join(dir, "content.md"))
+		content, contentErr := os.ReadFile(filepath.Join(dir, "content.html"))
 		s.mu.Unlock()
 		if versionErr == nil && contentErr == nil && contentHash(string(content)) == version.ContentHash {
 			return string(content), session.ReviewVersionID, nil
 		}
 	}
-	review, err := s.Get("review")
-	if err != nil {
-		return "", "", err
-	}
-	return review.Content, review.Meta.CurrentVersionID, nil
+	return "", "", ErrFeynmanReviewUnavailable
 }

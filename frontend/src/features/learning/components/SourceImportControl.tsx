@@ -31,7 +31,7 @@ export function SourceImportControl({ slug, compact = false, onBusyChange }: { s
         result = { name: file.name, failed: true, message: '文件超过 100 MiB，请拆分后导入' };
       } else {
         try {
-          const response = await upload.mutateAsync({ file });
+          const response = await upload.mutateAsync({ file, operationId: crypto.randomUUID() });
           result = { name: file.name, failed: false, message: response.source.status === 'ready' ? '已保存，文字已可读取；扫描页会继续自动识别' : '已保存，正在后台解析整份资料' };
         } catch (error) {
           result = { name: file.name, failed: true, message: error instanceof Error ? error.message : '导入失败，请重试' };

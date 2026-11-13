@@ -67,7 +67,8 @@ func (c ManagedConnection) target() connectionTarget {
 }
 
 func (c ManagedConnection) requiresCacheUsage(rate Rate) bool {
-	return c.Cost.RequiresCacheUsage() || rate.Input != rate.Cached
+	prices := rate.prices()
+	return c.Cost.RequiresCacheUsage() || prices.Input != prices.Cached
 }
 
 func modelIndex(models []Model) (map[string]Model, error) {

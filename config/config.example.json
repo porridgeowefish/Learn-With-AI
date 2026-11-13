@@ -28,20 +28,11 @@
         "providerId": "primary",
         "model": ""
       },
-      "annotationAskAI": {
-        "providerId": "primary",
-        "model": ""
-      },
       "ocr": {
         "providerId": "primary",
         "model": ""
       }
     }
-  },
-  "webSearch": {
-    "provider": "zhipu",
-    "apiKeyEnv": "LWA_WEB_SEARCH_API_KEY",
-    "engine": "search_std"
   },
   "ui": {
     "theme": "lychee-paper"

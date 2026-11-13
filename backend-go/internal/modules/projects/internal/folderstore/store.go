@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"os"
 	"path/filepath"
@@ -40,10 +41,12 @@ type Layout struct {
 
 // Store is a file-backed, workspace-global folder store.
 type Store struct {
-	mu       sync.Mutex
+	mu       *sync.Mutex
 	filePath string
 	data     Layout
 }
+
+var ledgerLocks sync.Map
 
 // New opens (or creates) the workspace folder store. The canonical location
 // is <projects root>/folders.json, resolved through the workspace module so
@@ -55,17 +58,20 @@ func New() (*Store, error) {
 	projectsDir := workspace.ProjectsRoot()
 	newPath := filepath.Join(projectsDir, "folders.json")
 	legacyPath := filepath.Join(filesystem.WORKSPACE, "folders.json")
-	if _, err := os.Stat(newPath); err != nil {
+	lock, _ := ledgerLocks.LoadOrStore(newPath, &sync.Mutex{})
+	s := &Store{filePath: newPath, mu: lock.(*sync.Mutex)}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := os.Stat(newPath); errors.Is(err, os.ErrNotExist) {
 		if data, readErr := os.ReadFile(legacyPath); readErr == nil && len(data) > 0 {
 			if err := os.MkdirAll(projectsDir, 0o755); err != nil {
 				return nil, err
 			}
-			if err := os.WriteFile(newPath, data, 0o644); err != nil {
+			if err := filesystem.AtomicWriteFile(newPath, data, 0o644); err != nil {
 				return nil, err
 			}
 		}
 	}
-	s := &Store{filePath: newPath}
 	if err := s.load(); err != nil {
 		return nil, err
 	}
@@ -178,6 +184,9 @@ func (s *Store) Replace(in Layout) (Layout, error) {
 func (s *Store) RemoveProject(slug string) (Layout, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.load(); err != nil {
+		return Layout{}, err
+	}
 
 	for i := range s.data.Folders {
 		if s.data.Folders[i].MapProjectSlug == slug {
@@ -199,11 +208,14 @@ func (s *Store) RemoveProject(slug string) (Layout, error) {
 
 // SyncMapFolders makes discipline maps first-class sidebar folders. Existing
 // same-name folders are promoted in place so the learner's current
-// classification is reused instead of duplicated. Stale map bindings become
-// ordinary folders and are never deleted with learner-owned membership.
+// classification is reused, including the folder name. Stale map bindings
+// become ordinary folders and keep their learner-owned membership.
 func (s *Store) SyncMapFolders(specs []MapFolderSpec) (Layout, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.load(); err != nil {
+		return Layout{}, err
+	}
 
 	valid := make([]MapFolderSpec, 0, len(specs))
 	active := map[string]bool{}
@@ -245,7 +257,6 @@ func (s *Store) SyncMapFolders(specs []MapFolderSpec) (Layout, error) {
 			})
 			continue
 		}
-		s.data.Folders[index].Name = spec.Title
 		s.data.Folders[index].MapProjectSlug = spec.Slug
 	}
 

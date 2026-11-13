@@ -10,7 +10,6 @@ const (
 	SchemaVersion = assetstore.SchemaVersion
 
 	StateOpen     = annotationstore.StateOpen
-	StateAsked    = annotationstore.StateAsked
 	StateResolved = annotationstore.StateResolved
 	StateDeleted  = annotationstore.StateDeleted
 )
@@ -31,8 +30,6 @@ type (
 
 	State           = annotationstore.State
 	Anchors         = annotationstore.Anchors
-	Message         = annotationstore.Message
-	Ask             = annotationstore.Ask
 	Annotation      = annotationstore.Annotation
 	CreateInput     = annotationstore.CreateInput
 	Event           = annotationstore.Event
@@ -40,9 +37,10 @@ type (
 )
 
 var (
-	ErrInvalidPracticeResult  = assetstore.ErrInvalidPracticeResult
-	ErrPracticeRoundNotFound  = assetstore.ErrPracticeRoundNotFound
-	ErrFeynmanSessionNotFound = assetstore.ErrFeynmanSessionNotFound
+	ErrInvalidPracticeResult    = assetstore.ErrInvalidPracticeResult
+	ErrPracticeRoundNotFound    = assetstore.ErrPracticeRoundNotFound
+	ErrFeynmanSessionNotFound   = assetstore.ErrFeynmanSessionNotFound
+	ErrFeynmanReviewUnavailable = assetstore.ErrFeynmanReviewUnavailable
 )
 
 func New(slug string) (*Store, error) { return assetstore.New(slug) }

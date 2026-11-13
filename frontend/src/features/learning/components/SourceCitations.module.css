@@ -1,8 +1,2 @@
-.sources { margin-top: 10px; min-width: 0; }
-.links { display: flex; flex-wrap: wrap; gap: 6px; }
-.links button, .preview button { font: inherit; font-size: 0.76rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--accent-ink); padding: 5px 8px; cursor: pointer; overflow-wrap: anywhere; }
-.links button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); }
-.preview { margin-top: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-translucent); max-height: 420px; overflow: auto; font-size: 0.84rem; }
-.preview header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.preview header strong { min-width: 0; font-size: 0.78rem; overflow-wrap: anywhere; }
-.preview footer { display: flex; gap: 8px; margin-top: 12px; }
+.sources { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.sources li { padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.76rem; overflow-wrap: anywhere; }

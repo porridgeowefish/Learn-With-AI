@@ -41,7 +41,7 @@ export function LearningSettings() {
         }} />
       </header>
       {cfg.search.enabled && !searchDraft && <div className={style.row}><span className={s.hint}>{({chatgpt:'ChatGPT 原生搜索', 'zhipu-plan':'智谱 Plan · 自动复用模型连接', zhipu:'智谱普通 API', deepseek:'DeepSeek 搜索', yuanbao:'元宝搜索'} as Record<string,string>)[cfg.search.provider]}</span><Button variant="ghost" size="sm" onClick={() => setSearchDraft({ ...cfg.search })}>修改配置</Button></div>}
-      <p className={s.hint}>配置智谱 Coding Plan 后自动接入套餐搜索；手动选择的搜索服务优先。DeepSeek 与元宝使用各自的搜索额度。</p>
+      <p className={s.hint}>默认使用元宝搜索。复习稿生成与划词搜索使用元宝服务，需要在此启用元宝并填写服务 API Key。</p>
       {searchDraft && <div className={style.configuration}>
         <p className={s.hint}>完成配置并验证后，开关才会保持开启。验证会执行一次搜索。</p>
         <label className={s.field}>搜索来源<select aria-label="搜索来源" className={s.input} value={searchDraft.provider} disabled={save.isPending} onChange={e => setSearchDraft({ ...searchDraft, provider: e.target.value, providerId: '', apiKey: '', hasKey: false })}>

@@ -750,83 +750,47 @@ func (r *Reader) evidence(ctx context.Context, d Document, ix *index, body strin
 	err := r.store.PublishRetrieval(d.SourceID, d.RevisionID, d.ContentHash, citation.EvidenceID+".json", encoded)
 	return citation, err
 }
-func (r *Reader) Preview(ctx context.Context, sourceID, evidenceID string) (EvidencePreview, error) {
+func (r *Reader) readCitation(ctx context.Context, sourceID, evidenceID string) (Citation, error) {
 	if err := ctx.Err(); err != nil {
-		return EvidencePreview{}, err
+		return Citation{}, err
 	}
 	source, revision, err := r.store.Get(sourceID)
 	if err != nil {
-		return EvidencePreview{}, err
+		return Citation{}, err
 	}
 	if source.Status == "deleted" || source.Status == "tombstoned" {
-		return EvidencePreview{}, store.ErrSourceDeleted
+		return Citation{}, store.ErrSourceDeleted
 	}
 	if !strings.HasPrefix(evidenceID, "evidence_") || len(evidenceID) != 45 {
-		return EvidencePreview{}, os.ErrNotExist
+		return Citation{}, os.ErrNotExist
 	}
 	raw, err := r.store.ReadRetrieval(sourceID, revision.RevisionID, "", evidenceID+".json")
 	if err != nil {
-		return EvidencePreview{}, err
+		return Citation{}, err
 	}
 	var citation Citation
 	if json.Unmarshal(raw, &citation) != nil || citation.EvidenceID != evidenceID || citation.SourceID != sourceID {
-		return EvidencePreview{}, os.ErrNotExist
+		return Citation{}, os.ErrNotExist
 	}
 	_, _, body, err := r.store.ReadDerivedRevision(sourceID, citation.RevisionID, citation.DerivedVersionID, citation.ContentHash, citation.StructureHash)
 	if err != nil {
-		return EvidencePreview{}, err
+		return Citation{}, err
 	}
 	text := string(body)
 	if !validRange(text, citation.StartByte, citation.EndByte) || hashText(text[citation.StartByte:citation.EndByte]) != citation.QuoteHash {
-		return EvidencePreview{}, store.ErrRevisionChanged
+		return Citation{}, store.ErrRevisionChanged
 	}
-	d := Document{SourceID: sourceID, RevisionID: citation.RevisionID, ContentHash: citation.ContentHash, DerivedVersionID: citation.DerivedVersionID, StructureHash: citation.StructureHash}
-	previous, next := r.adjacent(d, text, 0, len(text), citation.StartByte, citation.EndByte, 1000)
-	return EvidencePreview{Citation: citation, Quote: text[citation.StartByte:citation.EndByte], Previous: previous, Next: next}, nil
+	return citation, nil
 }
 func (r *Reader) ValidateCitation(ctx context.Context, citation Citation) error {
-	preview, err := r.Preview(ctx, citation.SourceID, citation.EvidenceID)
+	saved, err := r.readCitation(ctx, citation.SourceID, citation.EvidenceID)
 	if err != nil {
 		return err
 	}
-	expected, _ := json.Marshal(preview.Citation)
+	expected, _ := json.Marshal(saved)
 	provided, _ := json.Marshal(citation)
 	if !hmac.Equal(expected, provided) {
 		return fail("invalid_locator").Error
 	}
 	return nil
-}
-func (r *Reader) PreviewAdjacent(ctx context.Context, sourceID, evidenceID, direction string) (EvidencePreview, error) {
-	preview, err := r.Preview(ctx, sourceID, evidenceID)
-	if err != nil {
-		return EvidencePreview{}, err
-	}
-	cursor := preview.Next
-	if direction == "previous" {
-		cursor = preview.Previous
-	} else if direction != "next" {
-		return EvidencePreview{}, fail("invalid_arguments").Error
-	}
-	if cursor == "" {
-		return EvidencePreview{}, os.ErrNotExist
-	}
-	snapshot, err := r.Snapshot(ctx)
-	if err != nil {
-		return EvidencePreview{}, err
-	}
-	for i := range snapshot {
-		if snapshot[i].SourceID == sourceID {
-			snapshot[i].RevisionID = preview.RevisionID
-			snapshot[i].ContentHash = preview.ContentHash
-			snapshot[i].DerivedVersionID = preview.DerivedVersionID
-			snapshot[i].StructureHash = preview.StructureHash
-			snapshot[i].Readable = true
-		}
-	}
-	result := r.Read(ctx, snapshot, ReadArgs{SourceID: sourceID, RevisionID: preview.RevisionID, Cursor: cursor, MaxTokens: 1000})
-	if result.Error != nil {
-		return EvidencePreview{}, result.Error
-	}
-	data := result.Data.(ReadData)
-	return r.Preview(ctx, sourceID, data.EvidenceID)
 }

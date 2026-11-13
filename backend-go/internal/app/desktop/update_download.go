@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
+	"github.com/xmz14/lll/backend-go/internal/transport/httpserver"
 )
 
 const maxUpdateBytes int64 = 512 << 20
@@ -390,13 +391,20 @@ func (u *updater) applyMode(ctx context.Context, automatic bool) error {
 func UpdateHandler(version string, shutdown func()) (http.Handler, func()) {
 	u := newUpdater(version)
 	u.shutdown = shutdown
-	return u.handler(), func() {
-		u.mu.Lock()
-		u.closed = true
-		if u.downloadCancel != nil {
-			u.downloadCancel()
+	handler := u.handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if httpserver.IsHTMLPreviewHost(r.Host) {
+				http.NotFound(w, r)
+				return
+			}
+			handler.ServeHTTP(w, r)
+		}), func() {
+			u.mu.Lock()
+			u.closed = true
+			if u.downloadCancel != nil {
+				u.downloadCancel()
+			}
+			u.mu.Unlock()
+			u.downloads.Wait()
 		}
-		u.mu.Unlock()
-		u.downloads.Wait()
-	}
 }

@@ -92,6 +92,10 @@ func (s *Server) EnablePromptAdmin(key ed25519.PrivateKey) {
 
 		publishedAt := time.Now()
 		version, err := s.db.PublishPromptConfig(r.Context(), in.BaseVersion, admin.ID, body, publishedAt)
+		if errors.Is(err, store.ErrComparisonExperimentChanged) {
+			respond(w, http.StatusConflict, map[string]string{"error": "comparison_experiment_immutable", "detail": "Create a new experiment to change the model or prompt variants."})
+			return
+		}
 		if errors.Is(err, store.ErrConflict) {
 			fail(w, http.StatusConflict, "prompt_configuration_changed")
 			return

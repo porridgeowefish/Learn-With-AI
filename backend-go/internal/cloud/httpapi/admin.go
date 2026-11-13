@@ -260,14 +260,15 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 			return
 		}
 		query := r.URL.Query()
-		account, request := query.Get("accountId"), query.Get("requestId")
+		account, request, comparison := query.Get("accountId"), query.Get("requestId"), query.Get("comparisonId")
 		offset, err := strconv.Atoi(query.Get("offset"))
 		if (query.Has("offset") && err != nil) || offset < 0 || offset > 1_000_000 ||
-			(account != "" && !identifier.MatchString(account)) || (request != "" && !identifier.MatchString(request)) {
+			(account != "" && !identifier.MatchString(account)) || (request != "" && !identifier.MatchString(request)) ||
+			(comparison != "" && (!identifier.MatchString(comparison) || account != "" || request != "")) {
 			fail(w, http.StatusBadRequest, "invalid_reconciliation_search")
 			return
 		}
-		result, err := s.db.ReconciliationHistory(r.Context(), account, request, offset)
+		result, err := s.db.ReconciliationHistory(r.Context(), account, request, comparison, offset)
 		if err != nil {
 			fail(w, http.StatusInternalServerError, "reconciliation_unavailable")
 			return
@@ -280,19 +281,31 @@ func (s *Server) EnableAdmin(operators map[string]Operator) error {
 			return
 		}
 		var in struct {
-			AccountID, RequestID, Reason string
-			Units, CostNanos             *int64
+			AccountID, RequestID, ComparisonID, Arm, Reason string
+			Units, CostNanos                                *int64
 		}
 		if !decode(w, r, &in, 8192) {
 			return
 		}
-		if !identifier.MatchString(in.AccountID) || !identifier.MatchString(in.RequestID) ||
-			in.Units == nil || in.CostNanos == nil || *in.Units < 0 || *in.CostNanos < 0 ||
-			strings.TrimSpace(in.Reason) == "" || len(in.Reason) > 512 {
+		in.Reason = strings.TrimSpace(in.Reason)
+		if in.CostNanos == nil || *in.CostNanos < 0 || in.Reason == "" || len(in.Reason) > 512 {
 			fail(w, http.StatusBadRequest, "invalid_reconciliation")
 			return
 		}
-		err := s.db.ReconcileInference(r.Context(), actor.ID, in.AccountID, in.RequestID, in.Reason, *in.Units, *in.CostNanos, time.Now())
+		var err error
+		if in.ComparisonID != "" || in.Arm != "" {
+			if !identifier.MatchString(in.ComparisonID) || (in.Arm != "a" && in.Arm != "b") || in.AccountID != "" || in.RequestID != "" || in.Units != nil {
+				fail(w, http.StatusBadRequest, "invalid_reconciliation")
+				return
+			}
+			err = s.db.ReconcileComparisonCost(r.Context(), actor.ID, in.ComparisonID, in.Arm, in.Reason, *in.CostNanos, time.Now())
+		} else {
+			if !identifier.MatchString(in.AccountID) || !identifier.MatchString(in.RequestID) || in.Units == nil || *in.Units < 0 {
+				fail(w, http.StatusBadRequest, "invalid_reconciliation")
+				return
+			}
+			err = s.db.ReconcileInference(r.Context(), actor.ID, in.AccountID, in.RequestID, in.Reason, *in.Units, *in.CostNanos, time.Now())
+		}
 		switch {
 		case errors.Is(err, store.ErrConflict), errors.Is(err, store.ErrBalance):
 			fail(w, http.StatusConflict, "reconciliation_conflict")

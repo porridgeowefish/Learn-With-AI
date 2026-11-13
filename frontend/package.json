@@ -1,11 +1,11 @@
 {
   "name": "learn-with-ai-frontend",
   "private": true,
-  "version": "0.10.10",
+  "version": "0.10.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",

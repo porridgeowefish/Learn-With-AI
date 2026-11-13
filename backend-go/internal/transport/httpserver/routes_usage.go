@@ -24,14 +24,11 @@ func (s *Server) handleListTeacherUsage(w http.ResponseWriter, r *http.Request) 
 		learningWorkspaceError(w, err)
 		return
 	}
-	start := (page - 1) * pageSize
-	if start > len(rows) {
-		start = len(rows)
+	start := len(rows)
+	if page-1 <= len(rows)/pageSize {
+		start = (page - 1) * pageSize
 	}
-	end := start + pageSize
-	if end > len(rows) {
-		end = len(rows)
-	}
+	end := start + min(pageSize, len(rows)-start)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"page": page, "pageSize": pageSize, "total": len(rows), "conversations": rows[start:end]})
 }
 

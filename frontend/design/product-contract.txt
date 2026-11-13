@@ -25,8 +25,7 @@ api /api/projects/{}/assets/practice/results
 api /api/projects/{}/assets/practice/rounds
 api /api/projects/{}/assets/review/annotations
 api /api/projects/{}/assets/review/annotations/{}
-api /api/projects/{}/assets/review/annotations/{}/ask-stream
-api /api/projects/{}/assets/review/annotations/{}/ask/summarize
+api /api/projects/{}/assets/review/search
 api /api/projects/{}/assets/{}
 api /api/projects/{}/conversation/attachments
 api /api/projects/{}/conversation/attachments/{}/file
@@ -57,10 +56,8 @@ api /api/projects/{}/notes
 api /api/projects/{}/notes/jobs/{}/retry
 api /api/projects/{}/sources
 api /api/projects/{}/sources/{}
-api /api/projects/{}/sources/{}/evidence/{}{}
 api /api/projects/{}/sources/{}/permanent-delete
 api /api/projects/{}/sources/{}/retry
-api /api/projects/{}/sources/{}/revisions/{}/files/{}
 api /api/projects/{}/sources/{}/structure-jobs
 api /api/projects/{}/teaching-summaries/{}/retry
 api /api/settings/appearance

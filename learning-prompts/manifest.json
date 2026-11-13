@@ -3,14 +3,6 @@
   "schemaVersion": 1,
   "resources": [
     {
-      "variables": [
-        "quote",
-        "version"
-      ],
-      "sha256": "98c9661399631ef81183f78e4315336552535d1e3bc694a2a6c8a3fdd26637be",
-      "path": "learning-prompts/auxiliary/annotation.json"
-    },
-    {
       "variables": [],
       "sha256": "f8db567861ff51a5df5e60677ba4a7a3b1aee883dd49dea5b691c1364e52ce5e",
       "path": "learning-prompts/auxiliary/conversation-compaction.md"
@@ -136,12 +128,12 @@
     },
     {
       "variables": [],
-      "sha256": "5ba269a004189855c5ab7d3c50c5a0ba25a198139b6e8cc7081555936ddf468a",
+      "sha256": "4bb4f4deb1798a1ee2a9f8193ff06fd311a0e6514c7ca0aba101407ec55fcec2",
       "path": "learning-prompts/README.md"
     },
     {
       "variables": [],
-      "sha256": "662fa71ade1d450ab51e39952e41e93b06bcf8fa14b03660758bae38a7f4859d",
+      "sha256": "a975dfb014c2f946a16c078abc5e085d4b23451ae795c6a7b4857a157b7cfdee",
       "path": "learning-prompts/review.md"
     },
     {

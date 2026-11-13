@@ -100,9 +100,7 @@ func Read() (State, error) {
 	defer mu.Unlock()
 	st, err := read()
 	if err == nil && st.Settings.Search.Provider == "" {
-		if p := PlanProvider(""); p != nil {
-			st.Settings.Search = SearchSettings{Enabled: true, Provider: "zhipu-plan", ProviderID: p.ID, HasKey: true}
-		}
+		st.Settings.Search.Provider = "yuanbao"
 	}
 	return st, err
 }
@@ -300,19 +298,6 @@ func Context(slug string) string {
 	}
 	return "\n\n" + text
 }
-func LengthPrompt(length string) string {
-	if length != "short" && length != "medium" && length != "long" {
-		length = "medium"
-	}
-	text, err := ai.RenderPrompt("teaching/response-length/"+length, nil)
-	if err != nil {
-		panic(err)
-	}
-	return "\n\n" + text
-}
-
-// Observe only receives the just-completed learner statement, never old history
-// or the teacher's own claims. Opt-out/edit/delete invalidates in-flight results.
 func Observe(slug, message, text, providerID string, gateway ai.Gateway) {
 	st, e := Read()
 	if e != nil || !st.Settings.MemoryEnabled || st.Processed[slug+"/"+message] || strings.TrimSpace(text) == "" {

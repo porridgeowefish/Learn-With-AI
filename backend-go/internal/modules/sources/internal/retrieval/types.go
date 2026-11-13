@@ -136,9 +136,3 @@ type ReadData struct {
 	EvidenceID  string   `json:"evidenceId"`
 	Citation    Citation `json:"citation"`
 }
-type EvidencePreview struct {
-	Citation
-	Quote    string `json:"quote"`
-	Previous string `json:"previous,omitempty"`
-	Next     string `json:"next,omitempty"`
-}

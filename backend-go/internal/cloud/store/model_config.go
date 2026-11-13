@@ -59,6 +59,8 @@ func (s *Store) PublishPromptConfig(ctx context.Context, base int64, actor strin
 	return s.publishConfig(ctx, "prompt_config_version", base, actor, content, now)
 }
 
+var ErrComparisonExperimentChanged = errors.New("published comparison model and variants are immutable")
+
 func (s *Store) FillMissingReviewPrompt(ctx context.Context, text string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE prompt_config_version
 		SET content=json_insert(content,'$.resources.review',?)
@@ -78,6 +80,21 @@ func (s *Store) publishConfig(ctx context.Context, table string, base int64, act
 		}
 		if current != base {
 			return ErrConflict
+		}
+		if table == "prompt_config_version" {
+			var changed bool
+			err := tx.QueryRowContext(ctx, `WITH proposed(data) AS (VALUES(?))
+				SELECT EXISTS(SELECT 1 FROM prompt_config_version,proposed
+				WHERE json_extract(content,'$.comparison.id')=json_extract(data,'$.comparison.id')
+				AND (json_extract(content,'$.comparison.model') IS NOT json_extract(data,'$.comparison.model')
+				 OR json_extract(content,'$.comparison.a') IS NOT json_extract(data,'$.comparison.a')
+				 OR json_extract(content,'$.comparison.b') IS NOT json_extract(data,'$.comparison.b')))`, string(content)).Scan(&changed)
+			if err != nil {
+				return err
+			}
+			if changed {
+				return ErrComparisonExperimentChanged
+			}
 		}
 		row, err := tx.ExecContext(ctx, "INSERT INTO "+table+"(actor,content,created_at) VALUES(?,?,?)", actor, string(content), now.Unix())
 		if err != nil {

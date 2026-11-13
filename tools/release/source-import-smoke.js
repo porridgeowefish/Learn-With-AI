@@ -33,6 +33,18 @@ async function main(binary){
    const form=new FormData();form.set('operationId',crypto.randomUUID());form.set('file',new Blob([bytes]),name);
    return fetch(url,{method:'POST',body:form});
   }
+  async function sourceText(project, sourceID) {
+   const response=await fetch(base+'/api/projects/'+project+'/sources/'+sourceID);
+   assert.equal(response.status,200);
+   const {revision}=await response.json();
+   const file=revision.derivedFiles.find(item=>item.key==='content');
+   assert(file,'canonical source content missing from revision metadata');
+   const dir=path.resolve(workspace,'projects',project,'sources',sourceID,'revisions',revision.revisionId);
+   const target=path.resolve(dir,file.path);
+   const relative=path.relative(dir,target);
+   assert(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative),'source content escaped the isolated workspace');
+   return fs.readFileSync(target,'utf8');
+  }
   async function parsed(name,bytes,status='ready',failure){
    const response=await upload(name,bytes);assert.equal(response.status,201,name);
    const {source}=await response.json();let current;
@@ -41,7 +53,7 @@ async function main(binary){
    assert.equal(current.status,status,name);if(failure)assert.equal(current.failureCode,failure,name);
    if(status==='ready'){
     assert(current.extractedBytes>0&&current.parser,name);
-    const text=await (await fetch(url+'/'+source.sourceId+'/revisions/'+source.currentRevisionId+'/content')).text();assert(text.trim().length>0,name);
+    const text=await sourceText('parser-smoke',source.sourceId);assert(text.trim().length>0,name);
    }
    return current;
   }
@@ -57,7 +69,7 @@ async function main(binary){
   // The runtime runs outside the repository: these calls prove its shipped
   // prompt resources and embedded PDF renderer are usable after installation.
   const promptRoot=path.resolve(__dirname,'../../learning-prompts');
-  const review='# Packaged review\n## Concepts\nLexical environments retain captured bindings.\n';
+  const review='<article><h1>Packaged review</h1><p>Lexical environments retain captured bindings.</p></article>';
   const practice='## 第1题\n题型：single-choice · 难度：1/5\nA callback runs after its outer function returns. What happens to a captured binding?\nA. The callback retains its lexical environment.\nB. The binding disappears when the outer call returns.\n### 参考答案\n答案：A\n### 解析\nA is correct because the captured binding outlives the outer call. B confuses the outer call lifetime with the retained lexical environment.\n';
   const map={overviewMarkdown:'# Test discipline\n## 这门学科研究什么\nObjects and evidence.\n## 学科边界\nA bounded discipline.\n## 主要研究领域与知识架构\n',topics:{schemaVersion:1,topics:[]}};
   for(let chapter=1;chapter<=4;chapter++){
@@ -122,7 +134,9 @@ async function main(binary){
    assert.equal(job.providerId,provider.id);assert.equal(job.model,'smoke-'+kind);
    const done=await completed(endpoint+'/'+job.id);assert.equal(done.resultRefs.length,1);
    const assetResponse=await fetch(base+'/api/projects/parser-smoke/assets/'+kind);assert.equal(assetResponse.status,200);
-   assert((await assetResponse.text()).includes(kind==='review'?'Packaged review':'captured binding'),'generation did not publish asset');
+   const asset=await assetResponse.json();
+   assert.equal(asset.contentKind,kind==='review'?'html':'markdown');
+   assert(asset.content.includes(kind==='review'?'Packaged review':'captured binding'),'generation did not publish asset');
   }
   await json('/api/projects',{slug:'map-smoke',title:'Map smoke',projectType:'discipline-map'},'POST',201);
   const mapEndpoint='/api/projects/map-smoke/generation-jobs';
@@ -136,7 +150,7 @@ async function main(binary){
   const {job:structureJob}=await json(structureEndpoint,{operationId:crypto.randomUUID(),revisionId:revision.revisionId,baseDerivedVersionId:revision.derivedVersionId,pages:[1]});
   const structureDone=await completed(structureEndpoint+'/'+structureJob.id);
   assert(structureDone.resultDerivedVersionId&&structureDone.resultDerivedVersionId!==revision.derivedVersionId,'enhancement did not publish a new derived version');
-  const enhanced=await (await fetch(url+'/'+pdf.sourceId+'/revisions/'+revision.revisionId+'/content')).text();
+  const enhanced=await sourceText('parser-smoke',pdf.sourceId);
   assert(enhanced.includes('Installed vision result'),'rendered page recognition was not published');
   // Plain OCR-like text does not have a chapter heading tree. It must still
   // seed a source-based map with frozen citations in the installed runtime.
@@ -168,8 +182,7 @@ async function main(binary){
     assert(native,'automatic native OCR was not created');
     const nativeDone=await completed(nativeEndpoint+'/'+native.id);
     assert.equal(nativeDone.providerId,capability.providerId);assert(nativeDone.resultDerivedVersionId,'native OCR published no result');assert.equal((nativeDone.emptyPages??[]).length,0,'readable Chinese page treated as blank');
-    const current=(await (await fetch(url+'/'+nativeSource.sourceId)).json()).source;
-    const nativeText=await (await fetch(url+'/'+nativeSource.sourceId+'/revisions/'+current.currentRevisionId+'/content')).text();
+    const nativeText=await sourceText('parser-smoke',nativeSource.sourceId);
     assert(nativeText.length>20&&/中文|学习/.test(nativeText)&&/函数|方程/.test(nativeText)&&!nativeText.includes('Installed vision result'),'native OCR failed to recognize genuine Chinese: '+nativeText);
 
   }

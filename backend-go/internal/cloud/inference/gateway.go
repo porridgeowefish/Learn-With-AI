@@ -140,7 +140,7 @@ func New(upstreams []Upstream, groups map[string]routing.Limits) (*Gateway, erro
 	return &Gateway{pool: pool, providers: providers, waiting: make(chan struct{}, 32)}, nil
 }
 
-func (g *Gateway) acquire(ctx context.Context, model string, estimatedTokens int, preferred string, needsTools bool, tried []string) (*routing.Lease, error) {
+func (g *Gateway) acquire(ctx context.Context, model string, estimatedTokens int, preferred string, needsTools bool, tried []string, wait time.Duration) (*routing.Lease, error) {
 	lease, err := g.pool.Acquire(model, estimatedTokens, preferred, needsTools, tried...)
 	if !errors.Is(err, routing.ErrCapacity) || len(tried) > 0 {
 		return lease, err
@@ -151,7 +151,7 @@ func (g *Gateway) acquire(ctx context.Context, model string, estimatedTokens int
 	default:
 		return nil, err
 	}
-	deadline := time.NewTimer(1500 * time.Millisecond)
+	deadline := time.NewTimer(wait)
 	defer deadline.Stop()
 	recheck := time.NewTicker(75 * time.Millisecond)
 	defer recheck.Stop()
@@ -173,6 +173,16 @@ func (g *Gateway) acquire(ctx context.Context, model string, estimatedTokens int
 // Stream keeps the selected model fixed. The caller supplies an authorized
 // request, an estimated input/output budget and a deadline.
 func (g *Gateway) Stream(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent)) ([]Attempt, error) {
+	return g.stream(ctx, model, estimatedTokens, preferred, request, emit, 1500*time.Millisecond)
+}
+
+// StreamComparison allows the second arm to wait for a shared connection to
+// finish the first arm. It uses the same finite wait slots as ordinary traffic.
+func (g *Gateway) StreamComparison(ctx context.Context, model string, estimatedTokens int, request ai.GatewayRequest, emit func(ai.GatewayEvent)) ([]Attempt, error) {
+	return g.stream(ctx, model, estimatedTokens, "", request, emit, 12*time.Second)
+}
+
+func (g *Gateway) stream(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent), wait time.Duration) ([]Attempt, error) {
 	needsTools := RequiresTools(request.Tools, request.Messages)
 	if needsTools && !g.SupportsTools(model) {
 		return nil, ErrTools
@@ -185,7 +195,7 @@ func (g *Gateway) Stream(ctx context.Context, model string, estimatedTokens int,
 		if err := ctx.Err(); err != nil {
 			return attempts, err
 		}
-		lease, err := g.acquire(ctx, model, estimatedTokens, preferred, needsTools, tried)
+		lease, err := g.acquire(ctx, model, estimatedTokens, preferred, needsTools, tried, wait)
 		if err != nil {
 			if errors.Is(err, routing.ErrCapacity) && authRejected && !rateLimited {
 				return attempts, ErrUpstream

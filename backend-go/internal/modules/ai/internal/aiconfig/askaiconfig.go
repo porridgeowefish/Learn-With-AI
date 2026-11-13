@@ -209,6 +209,9 @@ func Load() (*Config, error) {
 	cfg.managed = managed
 	cfg.cloud = cloudSession
 	for name, binding := range settings.Bindings {
+		if name == "annotationAskAI" {
+			continue
+		}
 		cfg.Bindings[name] = Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
 	for _, provider := range settings.Providers {
@@ -249,6 +252,9 @@ func Save(cfg Config) error {
 	}
 	settings := platformconfig.AISettings{ForegroundConcurrency: cfg.ForegroundConcurrency, BackgroundConcurrency: cfg.BackgroundConcurrency, Default: cfg.Default, SearchEngine: cfg.SearchEngine, Bindings: make(map[string]platformconfig.Binding, len(cfg.Bindings))}
 	for name, binding := range cfg.Bindings {
+		if name == "annotationAskAI" {
+			continue
+		}
 		settings.Bindings[name] = platformconfig.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
 	for _, provider := range cfg.Providers {

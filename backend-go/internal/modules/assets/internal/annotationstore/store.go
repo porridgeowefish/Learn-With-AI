@@ -1,4 +1,4 @@
-// Package annotationstore owns append-only annotations and Ask-AI threads for
+// Package annotationstore owns append-only annotations for
 // the canonical review asset. The JSONL event log is authoritative; projections
 // are rebuilt on every store open and can be discarded safely.
 package annotationstore
@@ -26,7 +26,6 @@ type State string
 
 const (
 	StateOpen     State = "open"
-	StateAsked    State = "asked"
 	StateResolved State = "resolved"
 	StateDeleted  State = "deleted"
 )
@@ -38,51 +37,27 @@ type Anchors struct {
 	Suffix string `json:"suffix,omitempty"`
 }
 
-type Message struct {
-	ID        string    `json:"id"`
-	Role      string    `json:"role"` // learner | assistant
-	Content   string    `json:"content"`
-	Status    string    `json:"status,omitempty"` // completed | interrupted | failed
-	CreatedAt time.Time `json:"createdAt"`
-}
-
-type Ask struct {
-	Messages     []Message `json:"messages,omitempty"`
-	Summary      string    `json:"summary,omitempty"`
-	SummaryState string    `json:"summaryState,omitempty"`
-	ProviderID   string    `json:"providerId,omitempty"`
-	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
-}
-
 type Annotation struct {
-	SchemaVersion    int       `json:"schemaVersion"`
-	AnnotationID     string    `json:"annotationId"`
-	AssetID          string    `json:"assetId"`
-	AssetVersionID   string    `json:"assetVersionId"`
-	QuoteSnapshot    string    `json:"quoteSnapshot"`
-	Anchors          Anchors   `json:"anchors"`
-	Note             string    `json:"note,omitempty"`
-	Status           State     `json:"status"`
-	Detached         bool      `json:"detached,omitempty"`
-	LegacySource     bool      `json:"legacySource,omitempty"`
-	LegacyExternalID string    `json:"legacyExternalId,omitempty"`
-	SourceArtifactID string    `json:"sourceArtifactId,omitempty"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-	Ask              *Ask      `json:"ask,omitempty"`
+	SchemaVersion  int       `json:"schemaVersion"`
+	AnnotationID   string    `json:"annotationId"`
+	AssetID        string    `json:"assetId"`
+	AssetVersionID string    `json:"assetVersionId"`
+	QuoteSnapshot  string    `json:"quoteSnapshot"`
+	Anchors        Anchors   `json:"anchors"`
+	Note           string    `json:"note,omitempty"`
+	Status         State     `json:"status"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 type CreateInput struct {
-	AnnotationID     string
-	AssetVersionID   string
-	QuoteSnapshot    string
-	Anchors          Anchors
-	Note             string
-	LegacyExternalID string
-	SourceArtifactID string
-	Status           State
-	CreatedAt        time.Time
-	Ask              *Ask
+	AnnotationID   string
+	AssetVersionID string
+	QuoteSnapshot  string
+	Anchors        Anchors
+	Note           string
+	Status         State
+	CreatedAt      time.Time
 }
 
 type Event struct {
@@ -112,7 +87,7 @@ func New(slug string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(root, "assets", "review", "annotations.jsonl")
+	path := filepath.Join(root, "assets", assetstore.ReviewDirectory, "annotations.jsonl")
 	v, _ := locks.LoadOrStore(path, &sync.Mutex{})
 	s := &Store{slug: slug, root: root, path: path, mu: v.(*sync.Mutex)}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -183,8 +158,8 @@ func (s *Store) Create(in CreateInput) (Annotation, error) {
 		return Annotation{}, err
 	}
 	versionID := strings.TrimSpace(in.AssetVersionID)
-	if versionID == "" {
-		versionID = body.Meta.CurrentVersionID
+	if versionID != body.Meta.CurrentVersionID || body.Content == "" {
+		return Annotation{}, errors.New("review version is no longer current")
 	}
 	now := in.CreatedAt.UTC()
 	if now.IsZero() {
@@ -194,7 +169,7 @@ func (s *Store) Create(in CreateInput) (Annotation, error) {
 	if state == "" {
 		state = StateOpen
 	}
-	annotation := Annotation{SchemaVersion: SchemaVersion, AnnotationID: id, AssetID: body.Meta.AssetID, AssetVersionID: versionID, QuoteSnapshot: strings.TrimSpace(in.QuoteSnapshot), Anchors: in.Anchors, Note: in.Note, Status: state, LegacyExternalID: in.LegacyExternalID, SourceArtifactID: in.SourceArtifactID, CreatedAt: now, UpdatedAt: now, Ask: normalizeAsk(in.Ask)}
+	annotation := Annotation{SchemaVersion: SchemaVersion, AnnotationID: id, AssetID: body.Meta.AssetID, AssetVersionID: versionID, QuoteSnapshot: strings.TrimSpace(in.QuoteSnapshot), Anchors: in.Anchors, Note: in.Note, Status: state, CreatedAt: now, UpdatedAt: now}
 	if err := s.appendLocked(Event{SchemaVersion: SchemaVersion, Seq: seq + 1, EventID: idgen.New("aevt"), Type: "annotation-created", AnnotationID: id, At: now, Annotation: &annotation}); err != nil {
 		return Annotation{}, err
 	}
@@ -208,7 +183,7 @@ func (s *Store) Update(id string, note *string, state *State) (Annotation, error
 		}
 		if state != nil {
 			switch *state {
-			case StateOpen, StateAsked, StateResolved, StateDeleted:
+			case StateOpen, StateResolved, StateDeleted:
 				annotation.Status = *state
 			default:
 				return errors.New("invalid annotation status")
@@ -222,51 +197,6 @@ func (s *Store) Delete(id string) error {
 	state := StateDeleted
 	_, err := s.Update(id, nil, &state)
 	return err
-}
-
-func (s *Store) AppendMessage(id string, message Message) (Annotation, error) {
-	return s.mutate(id, "annotation-message-recorded", func(annotation *Annotation) error {
-		if message.Role == "user" {
-			message.Role = "learner"
-		}
-		if message.Role != "learner" && message.Role != "assistant" {
-			return errors.New("invalid annotation message role")
-		}
-		if strings.TrimSpace(message.Content) == "" {
-			return errors.New("annotation message content is required")
-		}
-		if message.ID == "" {
-			message.ID = idgen.New("amsg")
-		}
-		if message.CreatedAt.IsZero() {
-			message.CreatedAt = time.Now().UTC()
-		}
-		if message.Status == "" {
-			message.Status = "completed"
-		}
-		if annotation.Ask == nil {
-			annotation.Ask = &Ask{}
-		}
-		annotation.Ask.Messages = append(annotation.Ask.Messages, message)
-		annotation.Ask.SummaryState = "idle"
-		annotation.Ask.UpdatedAt = time.Now().UTC()
-		return nil
-	})
-}
-
-func (s *Store) SetAskSummary(id, summary, state string) (Annotation, error) {
-	return s.mutate(id, "annotation-summary-updated", func(annotation *Annotation) error {
-		if annotation.Ask == nil {
-			annotation.Ask = &Ask{}
-		}
-		annotation.Ask.Summary = summary
-		annotation.Ask.SummaryState = state
-		annotation.Ask.UpdatedAt = time.Now().UTC()
-		if state == "done" {
-			annotation.Status = StateAsked
-		}
-		return nil
-	})
 }
 
 func (s *Store) mutate(id, eventType string, fn func(*Annotation) error) (Annotation, error) {
@@ -344,27 +274,4 @@ func (s *Store) appendLocked(event Event) error {
 		return err
 	}
 	return closeErr
-}
-
-func normalizeAsk(ask *Ask) *Ask {
-	if ask == nil {
-		return nil
-	}
-	copyAsk := *ask
-	copyAsk.Messages = append([]Message(nil), ask.Messages...)
-	for i := range copyAsk.Messages {
-		if copyAsk.Messages[i].Role == "user" {
-			copyAsk.Messages[i].Role = "learner"
-		}
-		if copyAsk.Messages[i].ID == "" {
-			copyAsk.Messages[i].ID = idgen.New("amsg")
-		}
-		if copyAsk.Messages[i].CreatedAt.IsZero() {
-			copyAsk.Messages[i].CreatedAt = time.Now().UTC()
-		}
-		if copyAsk.Messages[i].Status == "" {
-			copyAsk.Messages[i].Status = "completed"
-		}
-	}
-	return &copyAsk
 }

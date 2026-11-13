@@ -11,7 +11,7 @@ import s from './ModelsPage.module.css';
 const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: config.providers.map(p => ({ ...p })),
   bindings: Object.fromEntries(Object.entries(config.bindings ?? {}).map(([key, value]) => [key, { ...value }])),
 });
-const PURPOSES = [ ['teacher', '教师'], ['annotationAskAI', 'Ask AI'], ['review', '复习稿'], ['practice', '练习'],
+const PURPOSES = [ ['teacher', '教师'], ['review', '复习稿'], ['practice', '练习'],
   ['disciplineMap', '学科地图'], ['documentStructure', '文档公式识别'] ] as const;
 const API_SOURCES = [
   { id: 'tencent-tokenhub', label: '腾讯云 TokenHub' },
@@ -146,7 +146,7 @@ export function ModelsPage() {
       <Button variant="ghost" size="sm" aria-pressed={mode === 'login'} onClick={() => setMode('login')}>ChatGPT 登录</Button>
     </div>}
     {mode === 'login' && <SIWCConnection config={draft} save={next => persist(next)} />}
-    <div className={s.bindings}><label>当前学习模型<select disabled={!!editor} value={draft.bindings?.teacher?.providerId || draft.default} onChange={event => setBinding('teacher', event.target.value)}><option value="">选择连接</option>{options}</select></label><p className={s.saveStatus}>教师、Ask AI、复习稿与练习默认使用此连接。</p></div>
+    <div className={s.bindings}><label>当前学习模型<select disabled={!!editor} value={draft.bindings?.teacher?.providerId || draft.default} onChange={event => setBinding('teacher', event.target.value)}><option value="">选择连接</option>{options}</select></label><p className={s.saveStatus}>教师、复习稿与练习默认使用此连接。</p></div>
     <div className={s.apiMode} hidden={mode !== 'api'}>
     <div className={s.apiSetup}><div><h3>{'已保存的 API 连接'}</h3><p>{'选择服务商后填写 API Key，即可检测并保存连接。'}</p></div><Button size="sm" variant={'primary'} disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加 API 连接</Button></div>
     <div className={s.list} aria-label="已配置模型">
@@ -170,7 +170,6 @@ export function ModelsPage() {
           {missing && <option value={value}>连接已移除，请重新选择</option>}{options}
         </select></label>{binding?.providerId && <label className={s.modelOverride}>模型覆盖<ModelSelect key={binding.providerId} label={`${label}模型覆盖`} value={binding.model ?? ''} models={bindingModels} disabled={!!editor} onChange={model => setBinding(key, binding.providerId, model)} /></label>}</div>;
       })}
-      <label>搜索引擎<select value={draft.searchEngine} disabled={!!editor} onChange={event => editConfig(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
     </div></details>
     <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="选择来源、模型，填写 API Key。" className={s.connectionModal}
       footer={<><Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => closeEditor(true)}>取消</Button><Button size="sm" variant="primary" loading={save.isPending} disabled={editor?.needsProtocol || !editor?.provider.model.trim() || !editor.provider.baseURL.trim()} onClick={saveEditor}>保存连接</Button></>}>

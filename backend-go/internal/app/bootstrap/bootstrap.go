@@ -57,9 +57,6 @@ func Build() *App {
 	tools.OnFeynmanCompleted = func(slug, sessionID, messageID, content string) {
 		grantTreasure(rewards, broadcaster, slug, "feynman", sessionID, messageID, content)
 	}
-	tools.OnAnnotationUpdated = func(slug, action, id string) {
-		broadcaster.Emit("annotation-updated", map[string]any{"projectSlug": slug, "action": action, "id": id})
-	}
 	server := httpserver.New(httpserver.Dependencies{Lifecycle: lifecycle, Tools: tools, Teacher: teaching, Generation: jobs, SourceProcessor: processor, Broadcaster: broadcaster, Cache: projects.NewIndex(), Treasures: rewards})
 	notes := teacher.NewNoteService(nil)
 	notes.OnInitializationFailure = func(slug string, err error) { println("notes initialization:", slug, err.Error()) }

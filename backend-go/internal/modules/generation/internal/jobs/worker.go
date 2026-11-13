@@ -308,7 +308,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	}
 	var searcher teacher.WebSearcher
 	if f.WebSearchEnabled {
-		searcher = teacher.ConfiguredWebSearch()
+		searcher = generationSearcher(j.Kind)
 		if searcher != nil {
 			req.Tools = append(req.Tools, webSearchTool())
 		}
@@ -514,9 +514,12 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			return
 		}
 	}
-	if j.Kind == "review" && !strings.Contains(text, "\n## ") && !strings.HasPrefix(text, "## ") {
-		s.fail(slug, j, "invalid-review-output")
-		return
+	if j.Kind == "review" {
+		text, e = reviewHTML(text)
+		if e != nil {
+			s.fail(slug, j, "invalid-review-output")
+			return
+		}
 	}
 	var mapOutput MapProjection
 	if j.Kind == "discipline-map" {

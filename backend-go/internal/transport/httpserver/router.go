@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -150,12 +151,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/conversation/export.md", s.handleExportConversation)
 	mux.HandleFunc("GET /api/projects/{id}/assets", s.handleListLearningAssets)
 	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}", s.handleGetLearningAsset)
-	mux.HandleFunc("PUT /api/projects/{id}/assets/{assetKey}", s.handlePutLearningAsset)
+	mux.HandleFunc("PUT /api/projects/{id}/assets/practice", s.handlePutLearningAsset)
 	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}/versions", s.handleListLearningAssetVersions)
 	mux.HandleFunc("GET /api/projects/{id}/feynman/sessions", s.handleListFeynmanSessions)
 	mux.HandleFunc("POST /api/projects/{id}/feynman/sessions", s.handleCreateFeynmanSession)
 	mux.HandleFunc("POST /api/projects/{id}/feynman/sessions/{sessionId}/stream", s.handleFeynmanStream)
-	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/files/{fileKey}", s.handleReadSourceFile)
 	mux.HandleFunc("GET /api/projects/{id}/assets/practice/rounds", s.handlePracticeRounds)
 	mux.HandleFunc("GET /api/projects/{id}/assets/practice/results", s.handleListPracticeResults)
 	mux.HandleFunc("PUT /api/projects/{id}/assets/practice/results/{versionId}", s.handlePutPracticeResult)
@@ -168,19 +168,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/structure-jobs/{jobId}", s.handleGetStructure)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/structure-jobs/{jobId}/cancel", s.handleCancelStructure)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)
-	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/evidence/{evidenceId}", s.handleSourceEvidence)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/retrieval", s.handleSourceRetrievalStatus)
 	mux.HandleFunc("DELETE /api/projects/{id}/sources/{sourceId}", s.handleDeleteSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/permanent-delete", s.handlePermanentDeleteSource)
-	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/content", s.handleReadSourceContent)
 	mux.HandleFunc("GET /api/preferences", s.handleGetPreferences)
 	mux.HandleFunc("PUT /api/preferences", s.handlePutPreferences)
+	mux.HandleFunc("POST /api/projects/{id}/assets/review/search", s.handleReviewSearch)
 	mux.HandleFunc("GET /api/projects/{id}/assets/review/annotations", s.handleListAnnotations)
 	mux.HandleFunc("POST /api/projects/{id}/assets/review/annotations", s.handleCreateAnnotation)
 	mux.HandleFunc("PATCH /api/projects/{id}/assets/review/annotations/{annotationId}", s.handleUpdateAnnotation)
 	mux.HandleFunc("DELETE /api/projects/{id}/assets/review/annotations/{annotationId}", s.handleDeleteAnnotation)
-	mux.HandleFunc("POST /api/projects/{id}/assets/review/annotations/{annotationId}/ask-stream", s.handleAnnotationAskAiStream)
-	mux.HandleFunc("POST /api/projects/{id}/assets/review/annotations/{annotationId}/ask/summarize", s.handleAnnotationAskAiSummarize)
 	mux.HandleFunc("GET /api/folders", s.handleGetFolders)
 	mux.HandleFunc("PUT /api/folders", s.handlePutFolders)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +186,22 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("GET /api/events", s.broadcaster.SSEHandler(map[string]any{}))
 	mux.Handle("/", withStarterLanding(spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX)))
+	previewFiles := http.FileServer(http.Dir(paths.FRONTEND_ROOT))
 	return logging(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if IsHTMLPreviewHost(r.Host) {
+			asset := strings.HasPrefix(r.URL.Path, "/assets/") && r.URL.Path == "/assets/"+path.Base(r.URL.Path) && strings.Contains(path.Base(r.URL.Path), ".")
+			if r.Method != http.MethodGet && r.Method != http.MethodHead || (r.URL.Path != "/html-preview.html" && !asset) {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			previewFiles.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == "/html-preview.html" {
+			http.NotFound(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/events" && !strings.HasPrefix(r.URL.Path, "/api/workspace/") {
 			release, err := workspacegate.Enter()
 			if err != nil {
@@ -214,6 +226,18 @@ func (s *Server) Handler() http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	}))
+}
+
+// IsHTMLPreviewHost identifies the private static site before application routing.
+func IsHTMLPreviewHost(authority string) bool {
+	host, _, err := net.SplitHostPort(authority)
+	if err != nil {
+		host = authority
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	label, ok := strings.CutSuffix(host, ".localhost")
+	id, prefix := strings.CutPrefix(label, "lll-preview-")
+	return ok && prefix && len(id) == 32 && strings.Trim(id, "0123456789abcdef") == ""
 }
 func (s *Server) SetShutdownFunc(fn func())                         { s.mu.Lock(); s.shutdown = fn; s.mu.Unlock() }
 func (s *Server) AttachNotes(notes *teacher.NoteService)            { s.notes = notes }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -110,7 +111,19 @@ func RunWindow(engine *Engine, smokeResult string) error {
 	if height > uint(screenHeight)-64 {
 		height = uint(screenHeight) - 64
 	}
+	// The preview hostname is a separate site. Require its own renderer even
+	// when WebView2 would otherwise relax site isolation under memory pressure.
+	const webViewArgs = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+	previousArgs, hasArgs := os.LookupEnv(webViewArgs)
+	if err := os.Setenv(webViewArgs, strings.TrimSpace(previousArgs+" --site-per-process")); err != nil {
+		return fmt.Errorf("enable WebView2 renderer isolation: %w", err)
+	}
 	view := webview.NewWithOptions(webview.WebViewOptions{AutoFocus: true, DataPath: filepath.Join(engine.Workspace, "webview2"), WindowOptions: webview.WindowOptions{Title: "Learn-With-AI", Width: width, Height: height, IconId: 1, Center: true}})
+	if hasArgs {
+		_ = os.Setenv(webViewArgs, previousArgs)
+	} else {
+		_ = os.Unsetenv(webViewArgs)
+	}
 	if view == nil {
 		return errors.New("Microsoft Edge WebView2 Runtime is required. Install the Evergreen Runtime from https://developer.microsoft.com/microsoft-edge/webview2/ and start Learn-With-AI again.")
 	}
@@ -170,7 +183,7 @@ func RunWindow(engine *Engine, smokeResult string) error {
 	}
 	// Untrusted links never receive a filesystem or arbitrary process bridge.
 	origin, _ := json.Marshal(engine.URL)
-	view.Init(fmt.Sprintf(`(()=>{const origin=%s;document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(!a)return;let u;try{u=new URL(a.href,location.href)}catch{return}if(u.origin!==origin){event.preventDefault();event.stopImmediatePropagation();if(u.protocol==='https:'||u.protocol==='http:')window.lllOpenExternal(u.href).catch(()=>{});}else if(a.target==='_blank'&&!a.download){event.preventDefault();location.href=u.href}},true);window.open=(url)=>{const u=new URL(url,location.href);if(u.origin===origin){location.href=u.href}else if(u.protocol==='https:'||u.protocol==='http:'){window.lllOpenExternal(u.href).catch(()=>{})}return null}})();`, origin))
+	view.Init(fmt.Sprintf(`(()=>{const origin=%s;if(window!==window.top||location.origin!==origin)return;document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(!a)return;let u;try{u=new URL(a.href,location.href)}catch{return}if(u.origin!==origin){event.preventDefault();event.stopImmediatePropagation();if(u.protocol==='https:'||u.protocol==='http:')window.lllOpenExternal(u.href).catch(()=>{});}else if(a.target==='_blank'&&!a.download){event.preventDefault();location.href=u.href}},true);window.open=(url)=>{const u=new URL(url,location.href);if(u.origin===origin){location.href=u.href}else if(u.protocol==='https:'||u.protocol==='http:'){window.lllOpenExternal(u.href).catch(()=>{})}return null}})();`, origin))
 	var smokeErr error
 	var smokeOnce sync.Once
 	timer := time.NewTimer(45 * time.Second)

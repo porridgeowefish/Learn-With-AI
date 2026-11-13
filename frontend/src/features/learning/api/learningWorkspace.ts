@@ -85,20 +85,12 @@ export interface AssetMeta {
 export interface LearningAsset {
   meta: AssetMeta;
   content: string;
-  contentKind: 'markdown';
+  contentKind: 'html' | 'markdown';
 }
 
 export interface PracticeRound { versionId:string; content:string; createdAt:string }
 export function usePracticeRounds(slug:string,enabled=true){
  return useQuery({queryKey:['learning-workspace',slug,'assets','practice','rounds'],queryFn:async()=>(await http.get<{rounds:PracticeRound[]}>(`/api/projects/${encodeURIComponent(slug)}/assets/practice/rounds`)).rounds,enabled:enabled&&Boolean(slug)});
-}
-
-export interface BodyAnnotationMessage {
-  id: string;
-  role: 'learner' | 'assistant';
-  content: string;
-  status: 'completed' | 'interrupted' | 'failed';
-  createdAt: string;
 }
 
 export interface BodyAnnotation {
@@ -109,11 +101,21 @@ export interface BodyAnnotation {
   quoteSnapshot: string;
   anchors: { start: number; end: number; prefix?: string; suffix?: string };
   note?: string;
-  status: 'open' | 'asked' | 'resolved';
-  detached?: boolean;
   createdAt: string;
   updatedAt: string;
-  ask?: { messages: BodyAnnotationMessage[]; summary?: string; summaryState?: string };
+}
+
+interface ReviewSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  media?: string;
+}
+
+export function useReviewSearch(slug: string) {
+  return useMutation({
+    mutationFn: (query: string) => http.post<{ results: ReviewSearchResult[] }>(`/api/projects/${encodeURIComponent(slug)}/assets/review/search`, { query }),
+  });
 }
 
 export interface LearningSource {
@@ -263,26 +265,28 @@ export function useSource(slug: string, sourceId: string) {
   });
 }
 
-export function sourceFileURL(slug: string, sourceId: string, revisionId: string, fileKey: string) {
-  return `/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}/revisions/${encodeURIComponent(revisionId)}/files/${encodeURIComponent(fileKey)}`;
-}
-
 export const MAX_SOURCE_FILE_BYTES = 100 * 1024 * 1024;
 
 export function useUploadSource(slug: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file }: { file: File }) => {
-      if (file.size > MAX_SOURCE_FILE_BYTES) throw new Error('单文件不能超过 100MiB');
+    mutationFn: async ({ file, operationId }: { file: File; operationId: string }) => {
+      if (file.size > MAX_SOURCE_FILE_BYTES) throw new Error('单文件不能超过 100 MiB');
       const form = new FormData();
-      form.set('operationId', crypto.randomUUID());
+      form.set('operationId', operationId);
       form.set('displayName', file.name);
       form.set('file', file);
       const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/sources`, { method: 'POST', body: form });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new ApiError(response.status, response.status === 413 ? '单文件不能超过 50MB' : '资料上传失败', payload);
+      if (!response.ok) {
+        const message = response.status === 413 ? (typeof payload?.error === 'string' ? '单文件不能超过 100 MiB' : '项目资料超出存储限额')
+          : response.status === 409 ? '这次上传与已保存的资料冲突，请重新选择文件' : '资料上传失败';
+        throw new ApiError(response.status, message, payload);
+      }
+      if (!payload?.source) throw new TypeError('上传结果未收到，请重试');
       return payload as { source: LearningSource; revision: SourceRevision; parseDisposition: string; parseReason: string };
     },
+    retry: (failureCount, error) => failureCount === 0 && error instanceof TypeError,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: keys.sources(slug) });
     },

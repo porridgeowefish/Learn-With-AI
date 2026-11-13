@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/xmz14/lll/backend-go/internal/platform/envname"
 )
 
 // pathOverride lets tests redirect the file location.
@@ -71,6 +69,8 @@ func SaveAI(settings AISettings) error {
 			section = map[string]any{}
 		}
 		section["defaultProvider"], section["searchEngine"], section["providers"], section["bindings"] = settings.Default, settings.SearchEngine, settings.Providers, settings.Bindings
+		section["foregroundConcurrency"] = settings.ForegroundConcurrency
+		section["backgroundConcurrency"] = settings.BackgroundConcurrency
 		raw["ai"] = section
 		delete(raw, "askAiProviders")
 	} else {
@@ -99,7 +99,7 @@ func LoadAI() (AISettings, bool, error) {
 		if err := json.Unmarshal(section, &ai); err != nil {
 			return out, false, err
 		}
-		out = AISettings{Default: ai.DefaultProvider, SearchEngine: ai.SearchEngine, Providers: ai.Providers, Bindings: ai.Bindings}
+		out = AISettings{ForegroundConcurrency: ai.ForegroundConcurrency, BackgroundConcurrency: ai.BackgroundConcurrency, Default: ai.DefaultProvider, SearchEngine: ai.SearchEngine, Providers: ai.Providers, Bindings: ai.Bindings}
 		return out, true, nil
 	}
 	if section, ok := raw["askAiProviders"]; ok {
@@ -109,55 +109,6 @@ func LoadAI() (AISettings, bool, error) {
 		return out, true, nil
 	}
 	return out, false, nil
-}
-
-// WebSearchSettings is the optional webSearch section backing the teacher's
-// search_web tool. An absent section or empty resolved key leaves the tool
-// unregistered, so teacher behavior is unchanged.
-type WebSearchSettings struct {
-	Provider  string `json:"provider"` // "zhipu"
-	APIKey    string `json:"apiKey,omitempty"`
-	APIKeyEnv string `json:"apiKeyEnv,omitempty"`
-	Engine    string `json:"engine,omitempty"` // zhipu engine, e.g. "search_std"
-}
-
-// LoadWebSearch reads the webSearch section. ok=false when absent.
-func LoadWebSearch() (WebSearchSettings, bool, error) {
-	var out WebSearchSettings
-	data, err := os.ReadFile(activePath(""))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return out, false, nil
-		}
-		return out, false, err
-	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return out, false, err
-	}
-	section, ok := raw["webSearch"]
-	if !ok {
-		return out, false, nil
-	}
-	if err := json.Unmarshal(section, &out); err != nil {
-		return out, false, err
-	}
-	if out.APIKey == "" && out.APIKeyEnv != "" {
-		out.APIKey = strings.TrimSpace(envname.Value(out.APIKeyEnv))
-	}
-	return out, true, nil
-}
-
-// SaveWebSearch writes the webSearch section, preserving other keys.
-func SaveWebSearch(settings WebSearchSettings) error {
-	saveMu.Lock()
-	defer saveMu.Unlock()
-	raw, err := readRaw(activePath(""))
-	if err != nil {
-		return err
-	}
-	raw["webSearch"] = settings
-	return writeRaw(activePath(""), raw)
 }
 
 func readRaw(path string) (map[string]any, error) {

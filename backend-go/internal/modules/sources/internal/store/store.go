@@ -27,6 +27,8 @@ const (
 	DefaultUnitByteLimit = int64(1 << 30)
 )
 
+var ErrUploadConflict = errors.New("source upload operation conflicts with an earlier upload")
+
 type Source struct {
 	OriginalUnavailable bool             `json:"originalUnavailable,omitempty"`
 	Coverage            *TextCoverage    `json:"coverage,omitempty"`
@@ -179,12 +181,26 @@ func New(slug string) (*Store, error) {
 func (s *Store) SetLimitsForTest(file, unit int64) { s.fileLimit, s.unitByteLimit = file, unit }
 
 func (s *Store) Add(displayName, filename, mediaType string, size int64, r io.Reader, cloudAccepted bool) (Source, Revision, error) {
+	source, revision, _, err := s.add("", displayName, filename, mediaType, size, r, cloudAccepted)
+	return source, revision, err
+}
+
+// Upload starts at the final initial processing status and keys the source by
+// the project-scoped operation. Only a committed source can be replayed.
+func (s *Store) Upload(operationID, displayName, filename, mediaType string, size int64, r io.Reader) (Source, Revision, bool, error) {
+	if strings.TrimSpace(operationID) == "" || len(operationID) > 128 {
+		return Source{}, Revision{}, false, errors.New("invalid source upload operation")
+	}
+	return s.add(operationID, displayName, filename, mediaType, size, r, false)
+}
+
+func (s *Store) add(operationID, displayName, filename, mediaType string, size int64, r io.Reader, cloudAccepted bool) (Source, Revision, bool, error) {
 	if size < 0 || size > s.fileLimit {
-		return Source{}, Revision{}, fmt.Errorf("source exceeds %d byte limit", s.fileLimit)
+		return Source{}, Revision{}, false, fmt.Errorf("source exceeds %d byte limit", s.fileLimit)
 	}
 	filename = sanitizeFilename(filename)
 	if filename == "" {
-		return Source{}, Revision{}, errors.New("invalid source filename")
+		return Source{}, Revision{}, false, errors.New("invalid source filename")
 	}
 	if mediaType == "" {
 		mediaType = mime.TypeByExtension(filepath.Ext(filename))
@@ -192,25 +208,54 @@ func (s *Store) Add(displayName, filename, mediaType string, size int64, r io.Re
 	if mediaType == "" {
 		mediaType = "application/octet-stream"
 	}
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = filename
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	sourceID := idgen.New("source")
+	status, failure := "stored", ""
+	if operationID != "" {
+		key := sha256.Sum256([]byte(operationID))
+		sourceID = "source_upload_" + hex.EncodeToString(key[:])
+		root := filepath.Join(s.root, sourceID)
+		var previous Source
+		err := readJSON(filepath.Join(root, "source.json"), &previous)
+		if err == nil {
+			revision, err := s.replayUpload(previous, displayName, filename, mediaType, size, r)
+			return previous, revision, false, err
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return Source{}, Revision{}, false, err
+		}
+		// A restart may leave an uncommitted original at this operation's path.
+		if err := os.RemoveAll(root); err != nil {
+			return Source{}, Revision{}, false, err
+		}
+		if disposition, reason := ParseDisposition(filename, mediaType); disposition == "parse" {
+			status = "processing"
+		} else {
+			status, failure = "opaque", reason
+		}
+	}
 	used, err := s.bytesLocked()
 	if err != nil {
-		return Source{}, Revision{}, err
+		return Source{}, Revision{}, false, err
 	}
 	if used+size > s.unitByteLimit {
-		return Source{}, Revision{}, fmt.Errorf("unit source storage exceeds %d byte limit", s.unitByteLimit)
+		return Source{}, Revision{}, false, fmt.Errorf("unit source storage exceeds %d byte limit", s.unitByteLimit)
 	}
 
-	sourceID, revisionID := idgen.New("source"), idgen.New("srev")
+	revisionID := idgen.New("srev")
 	dir := filepath.Join(s.root, sourceID, "revisions", revisionID)
 	originalDir := filepath.Join(dir, "original")
 	if err := os.MkdirAll(originalDir, 0o755); err != nil {
-		return Source{}, Revision{}, err
+		return Source{}, Revision{}, false, err
 	}
 	tmp, err := os.CreateTemp(originalDir, ".upload-*")
 	if err != nil {
-		return Source{}, Revision{}, err
+		return Source{}, Revision{}, false, err
 	}
 	tmpName := tmp.Name()
 	ok := false
@@ -229,14 +274,14 @@ func (s *Store) Add(displayName, filename, mediaType string, size int64, r io.Re
 		copyErr = closeErr
 	}
 	if copyErr != nil {
-		return Source{}, Revision{}, copyErr
+		return Source{}, Revision{}, false, copyErr
 	}
 	if n != size || n > s.fileLimit {
-		return Source{}, Revision{}, errors.New("source byte count differs from declared size")
+		return Source{}, Revision{}, false, errors.New("source byte count differs from declared size")
 	}
 	target := filepath.Join(originalDir, filename)
 	if err := os.Rename(tmpName, target); err != nil {
-		return Source{}, Revision{}, err
+		return Source{}, Revision{}, false, err
 	}
 	now := time.Now().UTC()
 	var acceptedAt *time.Time
@@ -244,18 +289,38 @@ func (s *Store) Add(displayName, filename, mediaType string, size int64, r io.Re
 		acceptedAt = &now
 	}
 	revision := Revision{SchemaVersion: SchemaVersion, RevisionID: revisionID, SourceID: sourceID, Original: FileRef{Path: filepath.ToSlash(filepath.Join("original", filename)), Filename: filename, MediaType: mediaType, Bytes: n, SHA256: "sha256:" + hex.EncodeToString(h.Sum(nil))}, Privacy: Privacy{CloudDisclosureAccepted: cloudAccepted, AcceptedAt: acceptedAt}, CreatedAt: now}
-	source := Source{SchemaVersion: SchemaVersion, SourceID: sourceID, DisplayName: strings.TrimSpace(displayName), Status: "stored", CurrentRevisionID: revisionID, CreatedAt: now, UpdatedAt: now}
-	if source.DisplayName == "" {
-		source.DisplayName = filename
-	}
+	source := Source{SchemaVersion: SchemaVersion, SourceID: sourceID, DisplayName: displayName, Status: status, FailureCode: failure, CurrentRevisionID: revisionID, CreatedAt: now, UpdatedAt: now}
 	if err := writeJSON(filepath.Join(dir, "revision.json"), revision); err != nil {
-		return Source{}, Revision{}, err
+		return Source{}, Revision{}, false, err
 	}
 	if err := writeJSON(filepath.Join(s.root, sourceID, "source.json"), source); err != nil {
-		return Source{}, Revision{}, err
+		return Source{}, Revision{}, false, err
 	}
 	ok = true
-	return source, revision, nil
+	return source, revision, true, nil
+}
+
+func (s *Store) replayUpload(source Source, displayName, filename, mediaType string, size int64, r io.Reader) (Revision, error) {
+	if source.Status == "deleted" || source.Status == "tombstoned" || source.DisplayName != displayName {
+		return Revision{}, ErrUploadConflict
+	}
+	var revision Revision
+	if err := readJSON(filepath.Join(s.root, source.SourceID, "revisions", source.CurrentRevisionID, "revision.json"), &revision); err != nil {
+		return Revision{}, err
+	}
+	original := revision.Original
+	if original.Filename != filename || original.MediaType != mediaType || original.Bytes != size {
+		return Revision{}, ErrUploadConflict
+	}
+	hash := sha256.New()
+	n, err := io.Copy(hash, io.LimitReader(r, s.fileLimit+1))
+	if err != nil {
+		return Revision{}, err
+	}
+	if n != size || original.SHA256 != "sha256:"+hex.EncodeToString(hash.Sum(nil)) {
+		return Revision{}, ErrUploadConflict
+	}
+	return revision, nil
 }
 
 func (s *Store) List() ([]Source, error) {

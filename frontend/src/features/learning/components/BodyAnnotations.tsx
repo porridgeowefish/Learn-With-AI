@@ -1,174 +1,85 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TrashIcon } from '@radix-ui/react-icons';
-
-import { useAskAiSettings } from '@/features/settings';
-import {
-  type BodyAnnotation,
-  useBodyAnnotations,
-  useCreateBodyAnnotation,
-  useDeleteBodyAnnotation,
-} from '@/features/learning/api/learningWorkspace';
-import { AskAiPanel } from '@/features/learning/components/AskAiPanel';
 import { Modal } from '@/shared/primitive/Modal';
-import { MarkdownView } from '@/shared/primitive/MarkdownView';
-import { selectionEndpointRect, type SelectionRect } from '@/shared/lib/selectionGeometry';
-import { applyHighlights, selectionToTextAnchor } from '@/shared/lib/summaryHighlights';
-import { useAskAiStore } from '@/shared/store/slices/askAi';
-
+import type { PreviewSelection } from '@/shared/preview/protocol';
+import { useBodyAnnotations, useCreateBodyAnnotation, useDeleteBodyAnnotation, useReviewSearch } from '../api/learningWorkspace';
+import { ReviewDocument } from './ReviewDocument';
 import s from './BodyAnnotations.module.css';
 
-interface SelectionState {
-  text: string;
-  start: number;
-  end: number;
-  prefix: string;
-  suffix: string;
-  rect: SelectionRect;
-}
-
-export function BodyAnnotations({ slug, content, assetVersionId, pageIndex }: { slug: string; content: string; assetVersionId: string; pageIndex?: number }) {
-  const markdownRef = useRef<HTMLDivElement>(null);
-  const [selection, setSelection] = useState<SelectionState | null>(null);
+export function BodyAnnotations({ slug, content, assetVersionId }: { slug: string; content: string; assetVersionId: string }) {
+  const [selection, setSelection] = useState<PreviewSelection | null>(null);
+  const [clearSelection, setClearSelection] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const annotations = useBodyAnnotations(slug);
   const create = useCreateBodyAnnotation(slug);
   const remove = useDeleteBodyAnnotation(slug);
-  const askAi = useAskAiStore();
-  const settings = useAskAiSettings();
+  const search = useReviewSearch(slug);
+  const saved = annotations.data ?? [];
 
-  useLayoutEffect(() => {
-    const root = markdownRef.current;
-    if (!root || pageIndex === undefined) return;
-    const children = Array.from(root.children) as HTMLElement[];
-    const hasPages = children.some((child) => child.tagName === 'H2');
-    if (!hasPages) {
-      for (const child of children) child.hidden = false;
-      return;
-    }
-    let section = -1;
-    for (const child of children) {
-      if (child.tagName === 'H2') section += 1;
-      child.hidden = section === pageIndex || (section < 0 && pageIndex === 0) ? false : true;
-    }
-  }, [content, pageIndex]);
-
-  useEffect(() => {
-    if (!markdownRef.current) return;
-    applyHighlights(markdownRef.current, (annotations.data ?? []).map((item) => ({
+  const highlights = useMemo(() => (annotations.data ?? []).filter(item => item.assetVersionId === assetVersionId).map(item => ({
       id: item.annotationId,
       charStart: item.anchors.start,
       charEnd: item.anchors.end,
       quoteSnapshot: item.quoteSnapshot,
-    })));
-  }, [annotations.data, content]);
+  })), [annotations.data, assetVersionId]);
 
-  const captureSelection = useCallback((event?: PointerEvent) => {
-    const selected = window.getSelection();
-    const root = markdownRef.current;
-    if (!selected || selected.isCollapsed || !root || selected.rangeCount === 0) {
-      setSelection(null);
-      return;
-    }
-    const range = selected.getRangeAt(0);
-    const anchor = selectionToTextAnchor(root, range);
-    const rect = selectionEndpointRect(range, event ? { x: event.clientX, y: event.clientY } : undefined);
-    if (!anchor || !rect) {
-      setSelection(null);
-      return;
-    }
-    const full = root.textContent ?? '';
-    setSelection({
-      ...anchor,
-      prefix: full.slice(Math.max(0, anchor.start - 40), anchor.start),
-      suffix: full.slice(anchor.end, anchor.end + 40),
-      rect,
+  const mark = () => {
+    if (!selection) return;
+    const { start, end, text, prefix, suffix } = selection;
+    create.mutate({ assetVersionId, quoteSnapshot: text, anchors: { start, end, prefix, suffix } }, {
+      onSuccess: () => {
+        setClearSelection(count => count + 1);
+        setSelection(null);
+      },
     });
-  }, []);
+  };
 
-  useEffect(() => {
-    const root = markdownRef.current;
-    if (!root) return;
-    const onPointerUp = (event: PointerEvent) => {
-      if (root.contains(event.target as Node)) captureSelection(event);
-    };
-    root.addEventListener('pointerup', onPointerUp);
-    return () => root.removeEventListener('pointerup', onPointerUp);
-  }, [captureSelection, content]);
-
-  const createFromSelection = async (): Promise<BodyAnnotation | null> => {
-    if (!selection) return null;
-    const response = await create.mutateAsync({
-      assetVersionId,
-      quoteSnapshot: selection.text.slice(0, 1000),
-      anchors: { start: selection.start, end: selection.end, prefix: selection.prefix, suffix: selection.suffix },
-    });
-    window.getSelection()?.removeAllRanges();
+  const find = () => {
+    if (!selection) return;
+    const query = selection.text.replace(/\s+/g, ' ');
+    setSearchQuery(query);
     setSelection(null);
-    return response.annotation;
+    setClearSelection(count => count + 1);
+    search.mutate(query);
   };
 
-  const openQuestion = async () => {
-	const currentSelection = selection;
-    const annotation = await createFromSelection();
-	if (!annotation || !currentSelection) return;
-    askAi.openActive({
-      projectSlug: slug,
-      confusionId: annotation.annotationId,
-      quote: annotation.quoteSnapshot,
-	  anchor: currentSelection.rect,
-      providerId: settings.data?.default ?? '',
-      initialInput: `请解释「${annotation.quoteSnapshot.slice(0, 120)}」`,
-    });
-  };
-
-  return (
-    <>
-      <MarkdownView ref={markdownRef} source={content} className={s.markdown} />
-      {selection && createPortal(
-        <div className={s.selectionBar} style={{ top: selection.rect.bottom + 8, left: selection.rect.left + selection.rect.width / 2 }} role="toolbar" aria-label="选中文本操作">
-          <button type="button" onClick={() => void createFromSelection()} disabled={create.isPending}>保存批注</button>
-          <button type="button" onClick={() => void openQuestion()} disabled={create.isPending}>问 AI</button>
-        </div>,
-        document.body,
-      )}
-      <button type="button" className={s.drawerButton} onClick={()=>setDrawerOpen(true)}>批注 · {annotations.data?.length ?? 0}</button>
-      <Modal open={drawerOpen} onOpenChange={setDrawerOpen} title="正文批注">
+  return <section aria-label="复习稿正文">
+    <div className={s.readerActions}>
+      <button type="button" onClick={() => setDrawerOpen(true)}>批注 · {saved.length}</button>
+    </div>
+    <ReviewDocument content={content} highlights={highlights} clearSelection={clearSelection} onSelection={setSelection} />
+    {create.isError && <p role="alert">批注保存失败。请刷新复习稿后重试。</p>}
+    {selection && createPortal(
+      <div className={s.selectionBar} style={{ top: Math.min(selection.rect.bottom + 8, window.innerHeight - 44), left: Math.max(95, Math.min(window.innerWidth - 95, selection.rect.left + selection.rect.width / 2)) }} role="toolbar" aria-label="选中文本操作">
+        <button type="button" onClick={mark} disabled={create.isPending || Array.from(selection.text).length > 1000}>保存批注</button>
+        <button type="button" onClick={find} disabled={Array.from(selection.text).length > 256}>元宝搜索</button>
+      </div>, document.body,
+    )}
+    <Modal open={drawerOpen} onOpenChange={setDrawerOpen} title="正文批注">
       <aside className={s.panel} aria-label="正文批注">
-        <header><h3>批注</h3><span>{annotations.data?.length ?? 0}</span></header>
-        <p className={s.hint}>选中正文即可保存，或就原文向 AI 提问。</p>
-        <div className={s.list}>
-          {annotations.isLoading && <p className={s.empty}>加载中…</p>}
-          {!annotations.isLoading && !annotations.data?.length && <p className={s.empty}>还没有批注。</p>}
-          {(annotations.data ?? []).map((annotation) => (
-            <article key={annotation.annotationId} className={s.item}>
-              <blockquote>{annotation.quoteSnapshot}</blockquote>
-              <div>
-                {annotation.ask?.messages?.length ? (
-                  <button type="button" onClick={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    askAi.openReview({
-                      projectSlug: slug,
-                      confusionId: annotation.annotationId,
-                      quote: annotation.quoteSnapshot,
-                      anchor: rect,
-                      messages: annotation.ask!.messages.map((message) => ({
-						id: message.id,
-						role: message.role === 'learner' ? 'user' as const : 'assistant' as const,
-						content: message.content,
-						createdAt: message.createdAt,
-					  })),
-                    });
-                  }}>查看答疑</button>
-                ) : <span>正文批注</span>}
-                <button type="button" aria-label="删除批注" title="删除批注" onClick={() => remove.mutate(annotation.annotationId)}><TrashIcon /></button>
-              </div>
-            </article>
-          ))}
-        </div>
+        <p className={s.hint}>选中复习稿正文即可保存批注。</p>
+        {annotations.isLoading && <p role="status">加载中…</p>}
+        {annotations.isError && <p role="alert">批注读取失败。</p>}
+        {remove.isError && <p role="alert">批注删除失败。</p>}
+        {annotations.isSuccess && saved.length === 0 && <p className={s.empty}>还没有批注。</p>}
+        {saved.map(item => <article key={item.annotationId} className={s.item}>
+          <blockquote>{item.quoteSnapshot}</blockquote>
+          {item.assetVersionId !== assetVersionId && <span className={s.hint}>来自旧版复习稿</span>}
+          <button type="button" aria-label="删除批注" onClick={() => remove.mutate(item.annotationId)}><TrashIcon /></button>
+        </article>)}
       </aside>
-      </Modal>
-      <AskAiPanel />
-    </>
-  );
+    </Modal>
+    <Modal open={Boolean(searchQuery)} onOpenChange={open => { if (!open) setSearchQuery(''); }} title="元宝搜索" description={searchQuery}>
+      {search.isPending && <p role="status">正在搜索…</p>}
+      {search.isError && <p role="alert">{search.error.message}</p>}
+      {search.isSuccess && !search.data.results?.length && <p>没有找到相关结果。</p>}
+      <ul className={s.searchResults}>{search.data?.results?.map((item, index) => <li key={index}>
+        {/^https?:\/\//i.test(item.url) ? <a href={item.url} target="_blank" rel="noreferrer">{item.title || item.url}</a> : <strong>{item.title}</strong>}
+        {item.media && <small>{item.media}</small>}
+        {item.snippet && <p>{item.snippet}</p>}
+      </li>)}</ul>
+    </Modal>
+  </section>;
 }

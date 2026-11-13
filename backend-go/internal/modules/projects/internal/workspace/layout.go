@@ -66,7 +66,7 @@ func checkLayout(root string, state *ProjectState) error {
 			}
 			return nil
 		}
-		for _, key := range []string{"review", "practice"} {
+		for _, key := range []string{"review-html", "practice"} {
 			meta, present, err := read("assets/" + key + "/asset.json")
 			if err != nil {
 				return err

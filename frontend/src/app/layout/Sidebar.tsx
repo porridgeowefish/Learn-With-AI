@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { useProjectStore, useUiStore } from '@/shared/store';
 import { ChevronDownIcon, PlusIcon } from '@radix-ui/react-icons';
 
@@ -60,6 +60,7 @@ export function Sidebar() {
   const [draftName, setDraftName] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const composingFolderName = useRef(false);
   const [menuSlug, setMenuSlug] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<
     | { kind: 'folder'; id: string; title: string }
@@ -70,6 +71,7 @@ export function Sidebar() {
   const commit = (next: FolderLayout) => save.mutate(next);
 
   const submitCreate = () => {
+    composingFolderName.current = false;
     const name = draftName.trim();
     if (name) commit(createFolder(layout, name));
     setDraftName('');
@@ -77,6 +79,7 @@ export function Sidebar() {
   };
 
   const submitRename = () => {
+    composingFolderName.current = false;
     if (renamingId) commit(renameFolder(layout, renamingId, renameValue));
     setRenamingId(null);
     setRenameValue('');
@@ -112,7 +115,7 @@ export function Sidebar() {
         if (selectedProjectId === slug) {
           selectProject(null);
         }
-        if (location.pathname.startsWith(`/project/${slug}`)) navigate('/');
+        if (matchPath('/project/:slug/*', location.pathname)?.params.slug === slug) navigate('/');
       },
     });
   };
@@ -199,8 +202,11 @@ export function Sidebar() {
                     autoFocus
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
+                    onCompositionStart={() => { composingFolderName.current = true; }}
+                    onCompositionEnd={() => { composingFolderName.current = false; }}
                     onBlur={submitRename}
                     onKeyDown={(e) => {
+                      if (composingFolderName.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                       if (e.key === 'Enter') submitRename();
                       if (e.key === 'Escape') {
                         setRenamingId(null);
@@ -273,8 +279,11 @@ export function Sidebar() {
             placeholder="文件夹名称，回车创建"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
+            onCompositionStart={() => { composingFolderName.current = true; }}
+            onCompositionEnd={() => { composingFolderName.current = false; }}
             onBlur={submitCreate}
             onKeyDown={(e) => {
+              if (composingFolderName.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
               if (e.key === 'Enter') submitCreate();
               if (e.key === 'Escape') {
                 setCreating(false);

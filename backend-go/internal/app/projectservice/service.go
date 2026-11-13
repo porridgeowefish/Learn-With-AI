@@ -2,10 +2,18 @@
 package projectservice
 
 import (
+	"fmt"
+
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
+
+type FolderCleanupError struct{ Cause error }
+
+func (err *FolderCleanupError) Error() string {
+	return fmt.Sprintf("project deleted; folder reference cleanup failed: %v", err.Cause)
+}
 
 type Generation interface {
 	DeleteProject(string) error
@@ -74,8 +82,10 @@ func (s *Service) Delete(slug string) error {
 	}
 	folders, err := projects.NewFolderStore()
 	if err != nil {
-		return err
+		return &FolderCleanupError{Cause: err}
 	}
-	_, err = folders.RemoveProject(slug)
-	return err
+	if _, err = folders.RemoveProject(slug); err != nil {
+		return &FolderCleanupError{Cause: err}
+	}
+	return nil
 }

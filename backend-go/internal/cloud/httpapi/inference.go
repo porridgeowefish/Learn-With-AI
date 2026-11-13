@@ -18,10 +18,16 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
-// Rate uses legacy thousandths per token unless TokensPerPoint sets the input exchange rate.
+// CreditPrices stores thousandths of a point per million tokens.
+type CreditPrices struct {
+	Input, Cached, Write, Output int64
+}
+
+// Rate also reads previously published credit rates and in-flight snapshots.
 type Rate struct {
 	Input, Cached, Write, Output int64
-	TokensPerPoint               int64 `json:",omitempty"`
+	TokensPerPoint               int64         `json:",omitempty"`
+	PerMillion                   *CreditPrices `json:",omitempty"`
 }
 
 type Model struct {
@@ -36,20 +42,42 @@ var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 
 func (m Model) valid() bool {
 	const maxTokens = 4_000_000
-	const maxRate = 10_000
-	r := m.Rate
 	return identifier.MatchString(m.ID) && m.Name != "" && m.MaxInput > 0 && m.MaxInput <= maxTokens &&
-		m.MaxOutput > 0 && m.MaxOutput <= maxTokens && r.Input > 0 && r.Input <= maxRate &&
+		m.MaxOutput > 0 && m.MaxOutput <= maxTokens && m.Rate.valid()
+}
+
+func (r Rate) valid() bool {
+	const maxTokens = 4_000_000
+	const maxRate = 10_000
+	if p := r.PerMillion; p != nil {
+		const maxPrice = 10_000_000_000
+		return r.Input == 0 && r.Cached == 0 && r.Write == 0 && r.Output == 0 && r.TokensPerPoint == 0 &&
+			p.Input > 0 && p.Input <= maxPrice && p.Cached >= 0 && p.Cached <= maxPrice &&
+			p.Write >= 0 && p.Write <= maxPrice && p.Output > 0 && p.Output <= maxPrice
+	}
+	return r.Input > 0 && r.Input <= maxRate &&
 		r.Cached >= 0 && r.Cached <= maxRate && r.Write >= 0 && r.Write <= maxRate && r.Output > 0 && r.Output <= maxRate &&
 		r.TokensPerPoint >= 0 && r.TokensPerPoint <= maxTokens
 }
 
 func (rate Rate) charge(usage map[string]int) (int64, bool) {
-	weighted, known := inference.ChargeTokens(usage, rate.Input, rate.Cached, rate.Write, rate.Output)
+	prices := rate.prices()
+	weighted, known := inference.ChargeTokens(usage, prices.Input, prices.Cached, prices.Write, prices.Output)
 	return rate.creditUnits(weighted), known
 }
 
+func (rate Rate) prices() CreditPrices {
+	if rate.PerMillion != nil {
+		return *rate.PerMillion
+	}
+	return CreditPrices{rate.Input, rate.Cached, rate.Write, rate.Output}
+}
+
 func (rate Rate) creditUnits(weighted int64) int64 {
+	if rate.PerMillion != nil {
+		const million = 1_000_000
+		return (weighted + million - 1) / million
+	}
 	if rate.TokensPerPoint == 0 {
 		return weighted
 	}
@@ -114,7 +142,8 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	digest := sha256.Sum256(encoded)
-	weighted := int64(estimated)*max(model.Rate.Input, model.Rate.Cached, model.Rate.Write) + int64(in.MaxOutputTokens)*model.Rate.Output
+	prices := model.Rate.prices()
+	weighted := int64(estimated)*max(prices.Input, prices.Cached, prices.Write) + int64(in.MaxOutputTokens)*prices.Output
 	units := model.Rate.creditUnits(weighted)
 	budget := store.BudgetHold{Currency: s.budget.Currency, Limit: s.budget.MonthlyNanos}
 	if budget.Limit > 0 {

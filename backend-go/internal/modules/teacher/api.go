@@ -69,6 +69,8 @@ type WebSearchResult = websearch.Result
 
 func ConfiguredWebSearch() WebSearcher { return websearch.Configured() }
 
+func ConfiguredYuanbaoSearch() WebSearcher { return websearch.ConfiguredYuanbao() }
+
 var SearchFromSettings = websearch.FromSettings
 
 func NewActiveResponses() *ActiveResponses { return service.NewActiveResponses() }

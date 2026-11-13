@@ -42,12 +42,12 @@ func Aggregate(projectSlug string, weeks int, now time.Time) (ActivitySummary, e
 	loc := now.Location()
 	end := dayStart(now.In(loc))
 	weekdayFromMonday := (int(end.Weekday()) + 6) % 7
-	start := end.AddDate(0, 0, -((weeks-1)*7 + weekdayFromMonday))
-	dayCount := int(end.Sub(start).Hours()/24) + 1
+	daysBeforeEnd := (weeks-1)*7 + weekdayFromMonday
+	start := end.AddDate(0, 0, -daysBeforeEnd)
 	out := ActivitySummary{
 		RangeStart: start.Format("2006-01-02"),
 		RangeEnd:   end.Format("2006-01-02"),
-		Days:       make([]ActivityDay, dayCount),
+		Days:       make([]ActivityDay, daysBeforeEnd+1),
 	}
 	byDate := make(map[string]*ActivityDay, len(out.Days))
 	for i := range out.Days {

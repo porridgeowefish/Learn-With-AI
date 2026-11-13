@@ -121,14 +121,6 @@ func (s *Server) handleDeleteAnnotation(w http.ResponseWriter, r *http.Request) 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) handleAnnotationAskAiStream(w http.ResponseWriter, r *http.Request) {
-	s.handleAskAiStream(w, r)
-}
-
-func (s *Server) handleAnnotationAskAiSummarize(w http.ResponseWriter, r *http.Request) {
-	s.handleAskAiSummarize(w, r)
-}
-
 func (s *Server) emitAnnotationUpdated(slug, action, id string) {
 	if s.broadcaster != nil {
 		payload := map[string]any{"projectSlug": slug, "action": action, "id": id}

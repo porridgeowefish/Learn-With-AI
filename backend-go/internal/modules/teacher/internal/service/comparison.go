@@ -3,6 +3,8 @@ package teacherservice
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -26,11 +28,28 @@ func compareFirstAnswer(ctx context.Context, conversation *conversationstore.Sto
 		return false, nil
 	}
 	comparisonID, err := client.StartComparison(ctx, learner.OperationID)
-	if err != nil || comparisonID == "" {
+	if err != nil {
+		if ctx.Err() == nil {
+			var remote *llmcloud.RemoteError
+			switch {
+			case errors.Is(err, context.DeadlineExceeded):
+				log.Print("teacher comparison assignment timed out")
+			case errors.As(err, &remote):
+				log.Printf("teacher comparison assignment failed (HTTP %d)", remote.Status)
+			default:
+				log.Print("teacher comparison assignment request failed")
+			}
+		}
 		return false, nil
 	}
+	if comparisonID == "" {
+		return false, nil
+	}
+	return true, streamComparison(ctx, client, conversation, comparisonID, messageText(learner), responseID, messageID, emit)
+}
+
+func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, comparisonID, question, responseID, messageID string, emit func(StreamFrame)) error {
 	emit(StreamFrame{Type: "comparison-started", Data: map[string]any{"comparisonId": comparisonID}})
-	question := messageText(learner)
 	type arm struct {
 		id       string
 		text     string
@@ -85,15 +104,15 @@ func compareFirstAnswer(ctx context.Context, conversation *conversationstore.Sto
 	}
 	event, err := conversation.RecordMessageWithEvidence(responseID, message)
 	if err != nil {
-		return true, err
+		return err
 	}
 	if _, err = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": messageID, "status": message.Status}); err != nil {
-		return true, err
+		return err
 	}
 	if message.Status == "completed" {
 		emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": messageID, "latestSeq": event.Seq}})
 	} else {
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": messageID, "code": message.FailureCode, "partialPreserved": len(message.Blocks) > 0}})
 	}
-	return true, nil
+	return nil
 }

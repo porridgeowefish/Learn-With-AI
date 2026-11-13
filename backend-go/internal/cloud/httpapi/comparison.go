@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/cloud/inference"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
@@ -56,7 +57,11 @@ func (s *Server) servePrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if scene == "teacher/general" {
-		raw, err := s.db.SelectedComparisonPrompt(r.Context(), subject)
+		experiment := ""
+		if catalog.Comparison != nil {
+			experiment = catalog.Comparison.ID
+		}
+		raw, err := s.db.SelectedComparisonPrompt(r.Context(), subject, experiment)
 		if err == nil && len(raw) > 0 {
 			var selected promptpack.Pack
 			if err = json.Unmarshal(raw, &selected); err == nil {
@@ -94,9 +99,9 @@ func (s *Server) startComparison(w http.ResponseWriter, r *http.Request) {
 	}
 	catalog := s.prompts.Load().active
 	next := store.Comparison{Audience: audience, Decision: "disabled"}
-	if config := catalog.Comparison; config != nil && config.Percent > 0 {
+	if config := catalog.Comparison; config != nil {
 		next.Experiment, next.Model, next.Decision = config.ID, config.Model, "not_sampled"
-		hash := sha256.Sum256([]byte(config.ID + "\x00" + subject))
+		hash := sha256.Sum256([]byte(config.ID + "\x00" + subject + "\x00" + input.Operation))
 		if binary.BigEndian.Uint64(hash[:8])%100 < uint64(config.Percent) {
 			next.Decision = "sampled"
 			next.PackA, _ = json.Marshal(catalog.A)
@@ -202,14 +207,24 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	}
 	var hasText bool
 	hidden := false
-	attempts, streamErr := s.gateway.Stream(ctx, model.ID, estimated+maxOutput, "", ai.GatewayRequest{
+	request := ai.GatewayRequest{
 		System: system, Messages: []ai.GatewayMessage{{Role: "user", Content: input.Question}}, MaxOutputTokens: maxOutput, ShowReasoning: &hidden,
-	}, func(event ai.GatewayEvent) {
+	}
+	forwardText := func(event ai.GatewayEvent) {
 		if event.Type == "text-delta" {
 			hasText = hasText || strings.TrimSpace(event.Delta) != ""
 			emit(event)
 		}
-	})
+	}
+	var attempts []inference.Attempt
+	var streamErr error
+	if gateway, ok := s.gateway.(interface {
+		StreamComparison(context.Context, string, int, ai.GatewayRequest, func(ai.GatewayEvent)) ([]inference.Attempt, error)
+	}); ok {
+		attempts, streamErr = gateway.StreamComparison(ctx, model.ID, estimated+maxOutput, request, forwardText)
+	} else {
+		attempts, streamErr = s.gateway.Stream(ctx, model.ID, estimated+maxOutput, "", request, forwardText)
+	}
 	var spent int64
 	knownCost := true
 	for _, attempt := range attempts {
@@ -229,7 +244,7 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	completed := streamErr == nil && ctx.Err() == nil && hasText
 	saveCtx, done := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer done()
-	if err = s.db.FinishComparisonArm(saveCtx, cmp.ID, input.Arm, completed, cost, time.Now()); err != nil || !completed {
+	if err = s.db.FinishComparisonArm(saveCtx, cmp.ID, input.Arm, completed, cost, spent, time.Now()); err != nil || !completed {
 		emit(map[string]string{"type": "error", "code": "comparison_arm_failed"})
 		return
 	}
@@ -268,24 +283,30 @@ func (s *Server) registerComparisonAdmin(allow func(http.ResponseWriter, *http.R
 		if _, ok := allow(w, r, false); !ok {
 			return
 		}
-		rows, err := s.db.ComparisonMetrics(r.Context())
+		experiment := r.URL.Query().Get("experiment")
+		if experiment != "" && !identifier.MatchString(experiment) {
+			fail(w, http.StatusBadRequest, "invalid_comparison_experiment")
+			return
+		}
+		rows, err := s.db.ComparisonMetrics(r.Context(), experiment)
 		if err != nil {
 			fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
 			return
 		}
 		respond(w, http.StatusOK, rows)
 	})
-	s.mux.HandleFunc("GET /v1/admin/answer-comparisons/audit", func(w http.ResponseWriter, r *http.Request) {
+	s.mux.HandleFunc("GET /v1/admin/answer-comparisons/records", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := allow(w, r, false); !ok {
 			return
 		}
-		audience := r.URL.Query().Get("audience")
-		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-		if (audience != "" && audience != "guest" && audience != "registered") || offset < 0 || offset > 1_000_000 {
-			fail(w, http.StatusBadRequest, "invalid_comparison_audit")
+		query := r.URL.Query()
+		experiment, audience, rawOffset := query.Get("experiment"), query.Get("audience"), query.Get("offset")
+		offset, offsetErr := strconv.Atoi(rawOffset)
+		if !identifier.MatchString(experiment) || (audience != "" && audience != "guest" && audience != "registered") || (rawOffset != "" && offsetErr != nil) || offset < 0 || offset > 1_000_000 {
+			fail(w, http.StatusBadRequest, "invalid_comparison_records")
 			return
 		}
-		rows, err := s.db.ComparisonAudit(r.Context(), audience, offset)
+		rows, err := s.db.ComparisonRecords(r.Context(), experiment, audience, offset)
 		if err != nil {
 			fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
 			return

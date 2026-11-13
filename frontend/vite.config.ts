@@ -37,6 +37,12 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      input: {
+        app: path.resolve(__dirname, 'index.html'),
+        htmlPreview: path.resolve(__dirname, 'html-preview.html'),
+      },
+    },
     sourcemap: true,
     chunkSizeWarningLimit: 1024,
   },

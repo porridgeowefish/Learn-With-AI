@@ -1,6 +1,6 @@
 import { LearnWriting } from '@/shared/primitive/LearnWriting';
 import { useLearningProfile } from '@/features/settings';
-import { memo, useId, useState } from 'react';
+import { memo, useId } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { ConversationMessage } from '../api/learningWorkspace';
 import { CopyIcon, DownloadIcon, RegenerateIcon } from '@/shared/primitive/Icons';
@@ -80,33 +80,23 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
   const hasAnswer = (message.blocks ?? []).some(block => block.type === 'markdown' && teacherMarkdown(block.source ?? '').trim().length > 0);
   const awaitingAnswer = teacher && streaming && !hasAnswer && !message.comparison && message.status !== 'failed';
   const profile = useLearningProfile();
-  const [selectedEvidence, setSelectedEvidence] = useState('');
   const citations = message.sourceCitations ?? [];
   const citationSource = (source: string) => source.replace(/\[\[source:([^\]]+)\]\]/g, (_marker, id: string) => {
     const index = citations.findIndex(item => item.evidenceId === id);
-    return index < 0 ? '' : `[资料${index + 1}](#source-${id})`;
+    return index < 0 ? '' : `[资料 ${index + 1}]`;
   });
   return (
     <article id={`message-${message.id}`} data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
       {teacher && <div className={s.speaker}>教师{awaitingAnswer && <span className={s.writing} role="status" aria-label="教师正在思考或调用工具"><LearnWriting /></span>}</div>}
       {message.comparison && !message.comparison.vote && <AnswerComparison slug={slug} message={{ ...message, comparison: message.comparison }} streaming={streaming} />}
       {awaitingAnswer && <div className={s.thinking}>思考中</div>}
-      <div className={s.messageBody} onClick={event => {
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        const href = target.closest('a')?.getAttribute('href');
-        if (!href?.startsWith('#source-')) return;
-        const evidenceId = href.slice('#source-'.length);
-        if (!citations.some(item => item.evidenceId === evidenceId)) return;
-        event.preventDefault();
-        setSelectedEvidence(evidenceId);
-      }}>
+      <div className={s.messageBody}>
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? (profile.data?.settings.showReasoning !== false && <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} open={reasoningOpen} onOpenChange={setReasoningOpen} />)
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
-        {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
+        {teacher && !streaming && <SourceCitations citations={citations} sourceNames={sourceNames} />}
         {teacher && !streaming && message.creditUsage && <p className={s.creditUsage}>
           {message.creditUsage.pending
             ? (message.creditUsage.units ? `已扣 ${credits.format(message.creditUsage.units / 1000)} 积分 · 部分待结算` : '积分待结算')

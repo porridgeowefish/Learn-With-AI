@@ -3,6 +3,7 @@ package httpx
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -24,11 +25,14 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Write(body)
 }
 
-// ReadJSON reads up to MaxBody bytes from r and decodes into v.
+// ReadJSON decodes a request body no larger than MaxBody bytes.
 func ReadJSON(r *http.Request, v any) error {
-	body, err := io.ReadAll(io.LimitReader(r.Body, MaxBody))
+	body, err := io.ReadAll(io.LimitReader(r.Body, MaxBody+1))
 	if err != nil {
 		return err
+	}
+	if len(body) > MaxBody {
+		return errors.New("JSON body exceeds the 2 MiB limit")
 	}
 	return json.Unmarshal(body, v)
 }

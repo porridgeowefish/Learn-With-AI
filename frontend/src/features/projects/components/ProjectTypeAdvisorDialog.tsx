@@ -42,11 +42,14 @@ export function ProjectTypeAdvisorDialog({
   const [recommendation, setRecommendation] = useState<ProjectType | undefined>();
   const [recommendationReason, setRecommendationReason] = useState('');
   const [recommendationTradeoff, setRecommendationTradeoff] = useState('');
+  const composing = useRef(false);
+  const conversationId = useRef(0);
   const messageId = useRef(1);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    composing.current = false;
     messageId.current = 1;
     setMessages([WELCOME]);
     setInput('');
@@ -54,7 +57,8 @@ export function ProjectTypeAdvisorDialog({
     setRecommendationReason('');
     setRecommendationTradeoff('');
     advice.reset();
-    // Reset-on-open is intentional; `advice` is a stable object.
+    return () => { conversationId.current++; };
+    // Reset-on-open is intentional.
   }, [open]);
 
   useEffect(() => {
@@ -65,6 +69,7 @@ export function ProjectTypeAdvisorDialog({
   const send = async () => {
     const content = input.trim();
     if (!content || advice.isPending) return;
+    const sendingConversation = conversationId.current;
 
     const userMessage: AdvisorMessage = {
       id: ++messageId.current,
@@ -86,6 +91,7 @@ export function ProjectTypeAdvisorDialog({
           content: messageContent,
         })),
       });
+      if (sendingConversation !== conversationId.current) return;
       setMessages((current) => [
         ...current,
         {
@@ -164,8 +170,10 @@ export function ProjectTypeAdvisorDialog({
             autoFocus
             placeholder="例如：我想学博弈论，但还不知道它有哪些研究方向"
             onChange={(event) => setInput(event.target.value)}
+            onCompositionStart={() => { composing.current = true; }}
+            onCompositionEnd={() => { composing.current = false; }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === 'Enter' && !event.shiftKey && !composing.current && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
                 event.preventDefault();
                 void send();
               }

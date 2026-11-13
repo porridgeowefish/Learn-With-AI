@@ -15,8 +15,7 @@ const DefaultFileLimit = impl.DefaultFileLimit
 const DefaultUnitByteLimit = impl.DefaultUnitByteLimit
 
 var ErrSourceDeleted = impl.ErrSourceDeleted
-var ErrRevisionChanged = impl.ErrRevisionChanged
-var ErrSourceNotReadable = impl.ErrSourceNotReadable
+var ErrUploadConflict = impl.ErrUploadConflict
 
 type Source = impl.Source
 type FileRef = impl.FileRef
@@ -41,7 +40,6 @@ type SourceListData = retrieval.ListData
 type SourceOutlineData = retrieval.OutlineData
 type SourceSearchData = retrieval.SearchData
 type SourceReadData = retrieval.ReadData
-type SourceEvidencePreview = retrieval.EvidencePreview
 type SourceOutlineNode = retrieval.Node
 type SourceSearchHit = retrieval.Hit
 type RetrievalStatus = impl.RetrievalStatus
@@ -110,9 +108,7 @@ func ParseDisposition(filename, mediaType string) (string, string) {
 
 func New(slug string) (*Store, error) { return impl.New(slug) }
 
-// ImageOCRConfigured reports whether askAiProviders.bindings.ocr resolves to
 // a usable vision provider.
-func ImageOCRConfigured() bool { return ocr.Configured() }
 
 // ProcessImageOCR extracts text from an uploaded image revision through the
 // configured vision model and commits it as the single derived content.md.

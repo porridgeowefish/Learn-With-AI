@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -105,14 +105,6 @@ func (s *Server) handleExportConversation(w http.ResponseWriter, r *http.Request
 	_, _ = w.Write([]byte(out.String()))
 }
 
-func writeQueueError(w http.ResponseWriter, err error) {
-	if errors.Is(err, teacher.ErrQueueItemNotFound) {
-		httpx.Error(w, http.StatusNotFound, "queued turn not found")
-		return
-	}
-	learningWorkspaceError(w, err)
-}
-
 func (s *Server) handleActiveTeacherResponse(w http.ResponseWriter, r *http.Request) {
 	run := s.teachingLifecycle().Responses.Project(r.PathValue("id"))
 	if run == nil {
@@ -201,7 +193,7 @@ func (s *Server) handlePutLearningAsset(w http.ResponseWriter, r *http.Request) 
 		learningWorkspaceError(w, err)
 		return
 	}
-	asset, err := store.UpdateLearner(r.PathValue("assetKey"), in.BaseEditRevision, in.Content)
+	asset, err := store.UpdateLearner("practice", in.BaseEditRevision, in.Content)
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -267,17 +259,24 @@ func (s *Server) handleGetSource(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
+	const sizeMessage = "single source exceeds 100 MiB"
 	r.Body = http.MaxBytesReader(w, r.Body, sourcestore.DefaultFileLimit+(1<<20))
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		if r.MultipartForm != nil {
 			_ = r.MultipartForm.RemoveAll()
 		}
-		httpx.Error(w, http.StatusRequestEntityTooLarge, "source too large or malformed")
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) || errors.Is(err, multipart.ErrMessageTooLarge) {
+			httpx.Error(w, http.StatusRequestEntityTooLarge, sizeMessage)
+		} else {
+			httpx.Error(w, http.StatusBadRequest, "malformed source upload")
+		}
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
-	if strings.TrimSpace(r.FormValue("operationId")) == "" {
-		httpx.Error(w, http.StatusBadRequest, "operationId is required")
+	operationID := strings.TrimSpace(r.FormValue("operationId"))
+	if operationID == "" || len(operationID) > 128 {
+		httpx.Error(w, http.StatusBadRequest, "operationId must be between 1 and 128 bytes")
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -287,7 +286,7 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 	if header.Size > sourcestore.DefaultFileLimit {
-		httpx.Error(w, http.StatusRequestEntityTooLarge, "single source exceeds 50MB")
+		httpx.Error(w, http.StatusRequestEntityTooLarge, sizeMessage)
 		return
 	}
 	if s.sourceProcessor == nil {
@@ -299,24 +298,23 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 		learningWorkspaceError(w, err)
 		return
 	}
-	source, revision, err := store.Add(r.FormValue("displayName"), header.Filename, header.Header.Get("Content-Type"), header.Size, file, false)
+	source, revision, created, err := store.Upload(operationID, r.FormValue("displayName"), header.Filename, header.Header.Get("Content-Type"), header.Size, file)
 	if err != nil {
+		if errors.Is(err, sourcestore.ErrUploadConflict) {
+			httpx.Error(w, http.StatusConflict, err.Error())
+			return
+		}
 		learningWorkspaceError(w, err)
 		return
 	}
-	disposition, reason := sourcestore.ParseDisposition(header.Filename, header.Header.Get("Content-Type"))
-	if disposition == "parse" {
-		source, err = store.BeginParse(source.SourceID)
-	} else {
-		source, err = store.SetStatus(source.SourceID, "opaque", reason, "")
+	disposition, reason := sourcestore.ParseDisposition(revision.Original.Filename, revision.Original.MediaType)
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+		s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
 	}
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"source": source, "revision": revision, "parseDisposition": disposition, "parseReason": reason})
-	if disposition == "parse" {
+	httpx.WriteJSON(w, status, map[string]any{"source": source, "revision": revision, "parseDisposition": disposition, "parseReason": reason})
+	if source.Status == "processing" {
 		s.sourceProcessor.Notify()
 	}
 }
@@ -410,99 +408,6 @@ func (s *Server) handlePermanentDeleteSource(w http.ResponseWriter, r *http.Requ
 	}
 	s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
 	httpx.WriteJSON(w, http.StatusOK, source)
-}
-
-func (s *Server) handleReadSourceFile(w http.ResponseWriter, r *http.Request) {
-	store, err := sourcestore.New(r.PathValue("id"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	source, revision, err := store.Get(r.PathValue("sourceId"))
-	if err != nil || revision.RevisionID != r.PathValue("revisionId") || source.Status == "deleted" {
-		http.NotFound(w, r)
-		return
-	}
-	fileKey := r.PathValue("fileKey")
-	var relative, mediaType string
-	if fileKey == "original" {
-		if revision.OriginalUnavailable {
-			httpx.Error(w, http.StatusGone, "source-original-excluded")
-			return
-		}
-		relative, mediaType = revision.Original.Path, revision.Original.MediaType
-	} else {
-		for _, file := range revision.DerivedFiles {
-			if file.Key == fileKey {
-				relative, mediaType = file.Path, file.MediaType
-				break
-			}
-		}
-	}
-	if relative == "" {
-		http.NotFound(w, r)
-		return
-	}
-	root, _ := workspace.ProjectRootForSlug(r.PathValue("id"))
-	base := filepath.Join(root, "sources", source.SourceID, "revisions", revision.RevisionID)
-	path, ok := safeWorkspaceFile(base, relative)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", mediaType)
-	if !strings.HasPrefix(mediaType, "text/") && !strings.HasPrefix(mediaType, "image/") && mediaType != "application/pdf" {
-		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
-	}
-	http.ServeFile(w, r, path)
-}
-
-// handleReadSourceContent exposes the one parsed Markdown representation used
-// for teacher citations. Original files and arbitrary derived files stay out of
-// this contract so the picker has one stable, safe-to-preview payload.
-func (s *Server) handleReadSourceContent(w http.ResponseWriter, r *http.Request) {
-	store, err := sourcestore.New(r.PathValue("id"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	source, revision, err := store.Get(r.PathValue("sourceId"))
-	if err != nil || source.Status != "ready" || revision.RevisionID != r.PathValue("revisionId") {
-		http.NotFound(w, r)
-		return
-	}
-	var content sourcestore.FileRef
-	for _, file := range revision.DerivedFiles {
-		if file.Key == "content" {
-			content = file
-			break
-		}
-	}
-	if content.Key != "content" || !strings.HasPrefix(strings.ToLower(content.MediaType), "text/markdown") {
-		http.NotFound(w, r)
-		return
-	}
-	_, _, body, err := store.ReadRevision(source.SourceID, revision.RevisionID, content.SHA256)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	_, _ = w.Write(body)
-}
-
-func safeWorkspaceFile(base, relative string) (string, bool) {
-	clean := filepath.Clean(filepath.FromSlash(relative))
-	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
-		return "", false
-	}
-	path := filepath.Join(base, clean)
-	back, err := filepath.Rel(base, path)
-	if err != nil || strings.HasPrefix(back, "..") {
-		return "", false
-	}
-	info, err := os.Stat(path)
-	return path, err == nil && info.Mode().IsRegular()
 }
 
 func learningWorkspaceError(w http.ResponseWriter, err error) {

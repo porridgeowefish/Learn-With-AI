@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { assetViewKey } from '@/shared/lib/projectStorage';
 import s from './LearningProgress.module.css';
 
 export interface LearningProgressValue { goal: string; taught: number; total: number; achieved: boolean; replies: string[] }
@@ -64,7 +65,7 @@ export function LearningProgress({ value, slug }: { value?: LearningProgressValu
       {value && !value.achieved && <span className={s.remaining}>{remaining > 0 ? `还剩约 ${remaining} 个要点` : '已讲完，等你验证理解'}</span>}
       {!value && <span className={s.remaining}>这条回答没有给出进度</span>}
     </p>
-    {value?.achieved && <div className={s.complete}><span>恭喜，已达成本轮学习目标！</span><Link to={`/project/${encodeURIComponent(slug)}/assets`} onClick={() => localStorage.setItem(`lll.assets.view.${slug}`, 'review')}>去复习</Link><Link to={`/project/${encodeURIComponent(slug)}/assets`} onClick={() => localStorage.setItem(`lll.assets.view.${slug}`, 'practice')}>去练习</Link></div>}
+    {value?.achieved && <div className={s.complete}><span>恭喜，已达成本轮学习目标！</span><Link to={`/project/${encodeURIComponent(slug)}/assets`} onClick={() => localStorage.setItem(assetViewKey(slug), 'review')}>去复习</Link><Link to={`/project/${encodeURIComponent(slug)}/assets`} onClick={() => localStorage.setItem(assetViewKey(slug), 'practice')}>去练习</Link></div>}
   </div>;
 }
 

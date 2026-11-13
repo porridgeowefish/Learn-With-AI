@@ -2,9 +2,10 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, us
 import { managedProviderPrefix, type CloudStatus } from '@/features/cloud-account';
 import { useAskAiSettings, useLearningProfile, effortNames } from '@/features/settings';
 import { SendIcon, StopIcon } from '@/shared/primitive/Icons';
+import { conversationEffortKey, conversationModelKey } from '@/shared/lib/projectStorage';
 import { ChatMediaInput, ChatMicrophone, useChatMedia } from './ChatMediaInput';
 import { TeacherModelPicker } from './TeacherModelPicker';
-import { conversationModelKey, readConversationModel } from '../teacher/modelSelection';
+import { readConversationModel } from '../teacher/modelSelection';
 import type { TeacherSession, TeacherSubmission } from '../teacher/useTeacherSession';
 import s from './TeacherView.module.css';
 
@@ -17,7 +18,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
   const media = useChatMedia(slug);
   const settings = useAskAiSettings();
   const profile = useLearningProfile();
-  const [chosenEffort, setChosenEffort] = useState(() => localStorage.getItem(`lll.teacher.effort.${slug}`) ?? '');
+  const [chosenEffort, setChosenEffort] = useState(() => localStorage.getItem(conversationEffortKey(slug)) ?? '');
   const [webSearch, setWebSearch] = useState(false);
   const models = (settings.data?.providers ?? []).filter(provider => provider.id && provider.model && (provider.kind === 'siwc' || provider.baseURL));
   const managedModel = cloudStatus?.signedIn ? cloudStatus.selectedModel : undefined;
@@ -159,7 +160,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
             localModels={models.map(provider => ({ id: provider.id, label: provider.name ? `${provider.name} · ${provider.model}` : provider.model }))} />)}
         {!media.hasRecording && !media.voicePending && <span className={s.reasoningControl}>
           <select className={s.modelSelect} aria-label="思考强度" title={capabilities.length ? '使用模型原生思考参数，从下次发送开始生效' : '当前模型不支持调节思考强度'} disabled={!capabilities.length || !profile.data} value={effort} onChange={event => {
-            setChosenEffort(event.target.value); localStorage.setItem(`lll.teacher.effort.${slug}`, event.target.value);
+            setChosenEffort(event.target.value); localStorage.setItem(conversationEffortKey(slug), event.target.value);
           }}>{!capabilities.length && <option value="">思考：不可调节</option>}{capabilities.map(value => <option key={value} value={value}>思考：{effortNames[value]}</option>)}</select>
         </span>}
         <ChatMicrophone media={media} onStop={() => void finishVoice(false)} />

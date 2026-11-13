@@ -20,6 +20,8 @@ import (
 
 const SchemaVersion = 1
 
+const ReviewDirectory = "review-html"
+
 var coreKeys = []string{"review", "practice"}
 
 type Meta struct {
@@ -104,11 +106,32 @@ func validKey(key string) bool {
 	return false
 }
 
+func (s *Store) assetDir(key string) string {
+	if key == "review" {
+		key = ReviewDirectory
+	}
+	return filepath.Join(s.root, "assets", key)
+}
+
+func contentKind(key string) string {
+	if key == "review" {
+		return "html"
+	}
+	return "markdown"
+}
+
+func contentExtension(key string) string {
+	if key == "review" {
+		return ".html"
+	}
+	return ".md"
+}
+
 func (s *Store) ensure() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, key := range coreKeys {
-		dir := filepath.Join(s.root, "assets", key)
+		dir := s.assetDir(key)
 		if err := os.MkdirAll(filepath.Join(dir, "versions"), 0o755); err != nil {
 			return err
 		}
@@ -124,7 +147,7 @@ func (s *Store) ensure() error {
 }
 
 func (s *Store) createInitialLocked(key, content, author string) error {
-	dir := filepath.Join(s.root, "assets", key)
+	dir := s.assetDir(key)
 	now := time.Now().UTC()
 	assetID := idgen.New("asset")
 	versionID := idgen.New("aver")
@@ -139,7 +162,7 @@ func (s *Store) List() ([]Meta, error) {
 	defer s.mu.Unlock()
 	out := make([]Meta, 0, len(coreKeys))
 	for _, key := range coreKeys {
-		meta, err := readMeta(filepath.Join(s.root, "assets", key, "asset.json"))
+		meta, err := readMeta(filepath.Join(s.assetDir(key), "asset.json"))
 		if err != nil {
 			return nil, err
 		}
@@ -154,17 +177,30 @@ func (s *Store) Get(key string) (Asset, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	dir := filepath.Join(s.root, "assets", key)
+	dir := s.assetDir(key)
 	meta, err := readMeta(filepath.Join(dir, "asset.json"))
 	if err != nil {
 		return Asset{}, err
 	}
-	contentBytes, err := os.ReadFile(filepath.Join(dir, "current.md"))
+	contentBytes, err := os.ReadFile(filepath.Join(dir, "current"+contentExtension(key)))
 	if err != nil {
 		return Asset{}, err
 	}
 	content := string(contentBytes)
 	if contentHash(content) != meta.ContentHash {
+		if key == "review" {
+			// Read the immutable version if the current projection was edited externally
+			// or publication was interrupted before the metadata commit.
+			contentBytes, err = os.ReadFile(filepath.Join(dir, "versions", meta.CurrentVersionID, "content.html"))
+			if err != nil {
+				return Asset{}, err
+			}
+			content = string(contentBytes)
+			if contentHash(content) != meta.ContentHash {
+				return Asset{}, errors.New("review version content hash mismatch")
+			}
+			return s.assetLocked(key, meta, content), nil
+		}
 		updated, err := s.commitLocked(key, meta, content, "learner", "", "", meta.CurrentVersionID, nil, nil, "导入外部文件编辑", meta.ConversationCursor)
 		if err != nil {
 			return Asset{}, err
@@ -175,12 +211,12 @@ func (s *Store) Get(key string) (Asset, error) {
 }
 
 func (s *Store) UpdateLearner(key string, baseRevision uint64, content string) (Asset, error) {
-	if !validKey(key) {
+	if key != "practice" {
 		return Asset{}, os.ErrNotExist
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	dir := filepath.Join(s.root, "assets", key)
+	dir := s.assetDir(key)
 	meta, err := readMeta(filepath.Join(dir, "asset.json"))
 	if err != nil {
 		return Asset{}, err
@@ -223,7 +259,7 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	dir := filepath.Join(s.root, "assets", in.Key)
+	dir := s.assetDir(in.Key)
 	meta, err := readMeta(filepath.Join(dir, "asset.json"))
 	if err != nil {
 		return CandidateResult{}, err
@@ -238,7 +274,7 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 		}
 		var version Version
 		if readJSON(filepath.Join(dir, "versions", entry.Name(), "version.json"), &version) == nil && version.TaskID == in.TaskID && version.RunID == in.RunID {
-			content := readText(filepath.Join(dir, "versions", version.VersionID, "content.md"))
+			content := readText(filepath.Join(dir, "versions", version.VersionID, "content"+contentExtension(in.Key)))
 			if version.AssetID != meta.AssetID || contentHash(content) != version.ContentHash {
 				return CandidateResult{}, errors.New("existing assistant version is incomplete")
 			}
@@ -254,7 +290,7 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 				meta.ConversationCursor = through
 			}
 			meta.UpdatedAt = version.CreatedAt
-			if err := filesystem.AtomicWriteFile(filepath.Join(dir, "current.md"), []byte(content), 0o644); err != nil {
+			if err := filesystem.AtomicWriteFile(filepath.Join(dir, "current"+contentExtension(in.Key)), []byte(content), 0o644); err != nil {
 				return CandidateResult{}, err
 			}
 			if err := writeJSON(filepath.Join(dir, "asset.json"), meta); err != nil {
@@ -264,10 +300,18 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 			return CandidateResult{Status: "updated", Asset: &asset}, nil
 		}
 	}
-	current := readText(filepath.Join(dir, "current.md"))
-	merged, ok := mergeThreeWay(in.BaseContent, current, in.CandidateContent)
-	if !ok {
-		return CandidateResult{Status: "failed", Code: "edit-conflict"}, nil
+	merged := in.CandidateContent
+	if in.Key == "review" {
+		if in.BaseVersionID != meta.CurrentVersionID {
+			return CandidateResult{Status: "failed", Code: "edit-conflict"}, nil
+		}
+	} else {
+		current := readText(filepath.Join(dir, "current.md"))
+		var ok bool
+		merged, ok = mergeThreeWay(in.BaseContent, current, in.CandidateContent)
+		if !ok {
+			return CandidateResult{Status: "failed", Code: "edit-conflict"}, nil
+		}
 	}
 	rangeMap := map[string]uint64{"fromSeq": in.FromSeq, "throughSeq": in.ThroughSeq}
 	author := "assistant"
@@ -283,27 +327,8 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 	return CandidateResult{Status: "updated", Asset: asset}, nil
 }
 
-// assetLocked returns canonical Markdown only; old protocols are cut over once.
 func (s *Store) assetLocked(key string, meta Meta, content string) Asset {
-	return Asset{Meta: meta, Content: content, ContentKind: "markdown"}
-}
-
-func (s *Store) AdvanceCursor(key string, throughSeq uint64) (Meta, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	dir := filepath.Join(s.root, "assets", key)
-	meta, err := readMeta(filepath.Join(dir, "asset.json"))
-	if err != nil {
-		return Meta{}, err
-	}
-	if throughSeq > meta.ConversationCursor {
-		meta.ConversationCursor = throughSeq
-		meta.UpdatedAt = time.Now().UTC()
-		if err := writeJSON(filepath.Join(dir, "asset.json"), meta); err != nil {
-			return Meta{}, err
-		}
-	}
-	return meta, nil
+	return Asset{Meta: meta, Content: content, ContentKind: contentKind(key)}
 }
 
 func (s *Store) commitLocked(key string, meta Meta, content, author, taskID, runID, baseVersionID string, conversationRange map[string]uint64, sourceRevisionIDs []string, summary string, cursor uint64) (Meta, error) {
@@ -311,7 +336,7 @@ func (s *Store) commitLocked(key string, meta Meta, content, author, taskID, run
 }
 
 func (s *Store) commitProvenanceLocked(key string, meta Meta, content, author, taskID, runID, baseVersionID string, conversationRange map[string]uint64, sourceRevisionIDs []string, summary string, cursor uint64, jobID string, attempt int) (Meta, error) {
-	dir := filepath.Join(s.root, "assets", key)
+	dir := s.assetDir(key)
 	now := time.Now().UTC()
 	versionID := idgen.New("aver")
 	version := Version{SchemaVersion: SchemaVersion, VersionID: versionID, AssetID: meta.AssetID, ParentVersionID: meta.CurrentVersionID, Author: author, TaskID: taskID, RunID: runID, BaseVersionID: baseVersionID, ConversationRange: conversationRange, SourceRevisionIDs: sourceRevisionIDs, ContentHash: contentHash(content), ChangeSummary: summary, CreatedAt: now}
@@ -334,7 +359,7 @@ func (s *Store) Versions(key string) ([]Version, error) {
 	if !validKey(key) {
 		return nil, os.ErrNotExist
 	}
-	dir := filepath.Join(s.root, "assets", key, "versions")
+	dir := filepath.Join(s.assetDir(key), "versions")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -358,13 +383,13 @@ func writeAssetFiles(dir, content string, meta Meta, version Version) error {
 	if err := os.MkdirAll(versionDir, 0o755); err != nil {
 		return err
 	}
-	if err := filesystem.AtomicWriteFile(filepath.Join(versionDir, "content.md"), []byte(content), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(versionDir, "content"+contentExtension(meta.Key)), []byte(content), 0o644); err != nil {
 		return err
 	}
 	if err := writeJSON(filepath.Join(versionDir, "version.json"), version); err != nil {
 		return err
 	}
-	if err := filesystem.AtomicWriteFile(filepath.Join(dir, "current.md"), []byte(content), 0o644); err != nil {
+	if err := filesystem.AtomicWriteFile(filepath.Join(dir, "current"+contentExtension(meta.Key)), []byte(content), 0o644); err != nil {
 		return err
 	}
 	return writeJSON(filepath.Join(dir, "asset.json"), meta)

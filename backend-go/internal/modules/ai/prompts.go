@@ -542,25 +542,3 @@ func ComposePrompt(ctx context.Context, scene string, facts map[string]string, s
 	}
 	return ComposedPrompt{Text: strings.Join(parts, "\n\n"), Tools: p.Tools, Messages: messages, HistoryStart: historyStart, HistoryEnd: historyEnd, Budgets: p.Budgets, Skipped: skipped, Fragments: fragments, ResourceVersion: string(snapshot["_manifest_version"])}, nil
 }
-
-// PromptSceneTools resolves the declared tool names without reading context data.
-func PromptSceneTools(scene string) ([]string, error) {
-	snapshot, err := promptSnapshot()
-	if err != nil {
-		return nil, err
-	}
-	b, err := snapshotFile(snapshot, "profiles/"+scene, ".json")
-	if err != nil {
-		return nil, err
-	}
-	var p promptProfile
-	d := json.NewDecoder(strings.NewReader(string(b)))
-	d.DisallowUnknownFields()
-	if err = d.Decode(&p); err != nil {
-		return nil, err
-	}
-	if p.SchemaVersion != 1 || p.SceneID != scene {
-		return nil, fmt.Errorf("invalid prompt profile identity")
-	}
-	return append([]string(nil), p.Tools...), nil
-}

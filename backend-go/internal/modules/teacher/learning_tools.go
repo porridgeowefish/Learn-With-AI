@@ -6,30 +6,26 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/activity"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
-	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"strings"
 	"sync"
-	"time"
 )
 
 var ErrAIUnavailable = errors.New("ask-ai not configured")
 var ErrProviderMissing = errors.New("provider not found")
 var ErrReviewEmpty = errors.New("review_empty")
-var ErrAnnotationMissing = errors.New("annotation not found")
 
-// LearningTools owns annotation Q&A, summaries and Feynman teaching operations.
+// LearningTools owns Feynman teaching operations.
 // HTTP adapters only forward the returned stream and encode domain errors.
 type LearningTools struct {
-	OnActivity          func(string, activity.ProgressEvent)
-	OnFeynmanCompleted  func(slug, sessionID, messageID, content string)
-	OnAnnotationUpdated func(string, string, string)
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	mu                  sync.Mutex
-	active              map[string]int
-	deleted             map[string]bool
-	closed              bool
-	wg                  sync.WaitGroup
+	OnActivity         func(string, activity.ProgressEvent)
+	OnFeynmanCompleted func(slug, sessionID, messageID, content string)
+	ctx                context.Context
+	cancel             context.CancelFunc
+	mu                 sync.Mutex
+	active             map[string]int
+	deleted            map[string]bool
+	closed             bool
+	wg                 sync.WaitGroup
 }
 
 func NewLearningTools() *LearningTools {
@@ -70,11 +66,6 @@ func (s *LearningTools) activity(slug string, e activity.ProgressEvent) {
 		s.OnActivity(slug, e)
 	}
 }
-func (s *LearningTools) annotation(slug, action, id string) {
-	if s.OnAnnotationUpdated != nil {
-		s.OnAnnotationUpdated(slug, action, id)
-	}
-}
 func (s *LearningTools) streamContext(parent context.Context) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(parent)
 	stop := context.AfterFunc(s.ctx, cancel)
@@ -101,127 +92,6 @@ type ToolInput struct {
 	Content    string
 }
 
-func (s *LearningTools) PrepareAnnotationAsk(slug, id string, in ToolInput) (ToolStream, error) {
-	store, err := assets.NewAnnotations(slug)
-	if err != nil {
-		return nil, err
-	}
-	annotation, err := store.Get(id)
-	if err != nil {
-		return nil, ErrAnnotationMissing
-	}
-	pc, err := resolveToolProvider(in.ProviderID, "annotationAskAI")
-	if err != nil {
-		return nil, err
-	}
-	return func(parent context.Context, emit func(ai.AIFrame)) error {
-		if err := s.begin(slug); err != nil {
-			return err
-		}
-		defer s.end(slug)
-		ctx, cancel := s.streamContext(parent)
-		defer cancel()
-		updated, err := store.AppendMessage(id, assets.Message{Role: "learner", Content: in.Content})
-		if err != nil {
-			return err
-		}
-		messageID := id
-		if updated.Ask != nil && len(updated.Ask.Messages) > 0 {
-			messageID = updated.Ask.Messages[len(updated.Ask.Messages)-1].ID
-		}
-		s.activity(slug, activity.ProgressEvent{ID: "ask-ai:" + messageID, SourceType: "ask-ai", SourceID: id, ActivityDelta: 1, Title: "使用 Ask AI", Detail: strings.TrimSpace(annotation.QuoteSnapshot)})
-		var messages []ai.AIMessage
-		if annotation.Ask != nil {
-			for _, m := range annotation.Ask.Messages {
-				role := m.Role
-				if role == "learner" {
-					role = "user"
-				}
-				messages = append(messages, ai.AIMessage{Role: role, Content: m.Content})
-			}
-		}
-		messages = append(messages, ai.AIMessage{Role: "user", Content: in.Content})
-		system, promptErr := ai.RenderPrompt("auxiliary/annotation/ask", map[string]string{"quote": annotation.QuoteSnapshot, "version": annotation.AssetVersionID})
-		if promptErr != nil {
-			return promptErr
-		}
-		var text strings.Builder
-		err = ai.Stream(ctx, ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model}, system, messages, func(f ai.AIFrame) {
-			if f.Type == "thinking" || f.Type == "done" {
-				return
-			}
-			if f.Type == "text" {
-				text.WriteString(f.Content)
-			}
-			emit(f)
-		})
-		status := "completed"
-		if err != nil {
-			status = "failed"
-			if errors.Is(err, context.Canceled) {
-				status = "interrupted"
-			}
-		}
-		if text.Len() > 0 {
-			if _, saveErr := store.AppendMessage(id, assets.Message{Role: "assistant", Content: text.String(), Status: status}); saveErr != nil {
-				return saveErr
-			}
-		}
-		s.annotation(slug, "ask", id)
-		if err == nil {
-			emit(ai.AIFrame{Type: "done"})
-		}
-		return err
-	}, nil
-}
-func (s *LearningTools) SummarizeAnnotation(slug, id string) error {
-	store, err := assets.NewAnnotations(slug)
-	if err != nil {
-		return err
-	}
-	annotation, err := store.Get(id)
-	if err != nil {
-		return ErrAnnotationMissing
-	}
-	if err = s.begin(slug); err != nil {
-		return err
-	}
-	if _, err = store.SetAskSummary(id, "", "pending"); err != nil {
-		s.end(slug)
-		return err
-	}
-	s.annotation(slug, "summarize", id)
-	release := workspacegate.Continue()
-	go func() {
-		defer release()
-		defer s.end(slug)
-		pc, err := resolveToolProvider("", "annotationAskAI")
-		summary := ""
-		if err == nil {
-			ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
-			defer cancel()
-			messages := []ai.AIMessage{{Role: "user", Content: "疑问原文：" + annotation.QuoteSnapshot}}
-			if annotation.Ask != nil {
-				for _, m := range annotation.Ask.Messages {
-					messages = append(messages, ai.AIMessage{Role: m.Role, Content: m.Content})
-				}
-			}
-			prompt, promptErr := ai.RenderPrompt("auxiliary/annotation/summary", nil)
-			if promptErr != nil {
-				err = promptErr
-			} else {
-				summary, err = ai.Complete(ctx, ai.Provider{ID: pc.ID, Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}, prompt, messages)
-			}
-		}
-		status := "done"
-		if err != nil || strings.TrimSpace(summary) == "" {
-			summary, status = "总结生成失败。", "failed"
-		}
-		_, _ = store.SetAskSummary(id, strings.TrimSpace(summary), status)
-		s.annotation(slug, "summarize", id)
-	}()
-	return nil
-}
 func CreateFeynmanSession(slug string) (assets.FeynmanSession, error) {
 	store, err := assets.New(slug)
 	if err != nil {

@@ -32,7 +32,7 @@ Learn-With-AI is a desktop study workspace for moving from reading an explanatio
 | Understand a concept | AI tutor conversations with text, formulas, tables, diagrams and interactive examples |
 | Study your own materials | PDF, Markdown, TXT, PPTX, DOCX, XLSX and CSV import, local parsing and source references |
 | Work with scanned pages | Local OCR where supported by the operating system; check formulas against the original |
-| Keep useful explanations | Automatic notes, editable review guides, version history and text annotations |
+| Keep useful explanations | Automatic notes, HTML review guides from learning conversations, text annotations and Yuanbao Search |
 | Test your understanding | Generated quizzes with objective-question scoring, answers and explanations |
 | Keep a formula in view while reading an explanation | In the Windows app's Teacher view, use the crop icon beside Additional Information to capture any visible app area; resize or move the temporary card, then close it when done |
 | Explain it yourself | Teach-back practice: explain a concept and let the tutor ask follow-up questions |
@@ -90,7 +90,7 @@ The interactive screenshot uses preset HTML in the real renderer, without a mode
 
 ### 3. Review and check your understanding
 
-Keep notes, create review guides and annotate text. Attempt a quiz before revealing the answers and explanations. In teach-back practice, explain the idea in your own words and ask for feedback.
+Keep notes and generate an HTML review from your learning conversations. Select text to annotate it or look it up with Yuanbao Search. Attempt a quiz before revealing the answers and explanations. In teach-back practice, explain the idea in your own words and ask for feedback.
 
 ![Quiz feedback showing correct and incorrect responses](docs/images/practice.png)
 
@@ -116,7 +116,7 @@ Change storage location or transfer learning records as ZIP. Restart the app aft
 
 - Projects, conversations, imported materials, notes and configuration are stored as ordinary local files. Updates and uninstalling preserve learning data.
 - The app does not require an account with a Learn-With-AI cloud service. Live tutoring and generation need a working connection to the model provider you select.
-- Local parsing and local OCR do not upload documents. Tutoring, Ask AI, generation, web search, memory extraction and optional cloud recognition send the necessary content to the relevant configured services.
+- Local parsing and local OCR do not upload documents. Tutoring, generation, web search, memory extraction and optional cloud recognition send the necessary content to the relevant configured services.
 - Model output, quiz answers and OCR can be wrong. Check important claims and formulas against your sources.
 - API connection keys are stored in `config.local.json`; search configuration and learning memory are in `learning-profile.json`. These local files are not encrypted. Do not commit or share them in an issue.
 

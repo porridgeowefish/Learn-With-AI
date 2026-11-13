@@ -19,7 +19,7 @@ var requiredFields = map[string]string{
 	"conversation/usage.jsonl":        "responseId inputTokens outputTokens", "conversation/note-usage.jsonl": "responseId inputTokens outputTokens",
 	"assets/notes/state.json": "schemaVersion", "assets/notes/entries/*.json": "id content",
 	"assets/*/asset.json": "key assetId currentVersionId", "assets/*/versions/*/version.json": "versionId assetId",
-	"assets/review/annotations.jsonl": "eventId annotationId seq type", "assets/practice/results/*.json": "versionId score",
+	"assets/review-html/annotations.jsonl": "eventId annotationId seq type", "assets/practice/results/*.json": "versionId score",
 	"assets/feynman/sessions/*.json": "sessionId messages", "assets/notes/jobs/*.json": "id status",
 	"progress/events.jsonl": "id sourceType sourceId", "progress/summary.json": "total bySource",
 	"generation/jobs/*.json": "id status", "generation/inputs/*/input.json": "system messages", "generation/usage.jsonl": "requestId jobId",

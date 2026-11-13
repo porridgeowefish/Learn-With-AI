@@ -102,7 +102,7 @@ export async function settings(ctx) {
   const key = path.replace('/api/settings/','');
   if (path === '/api/settings/learning') {
     state.settings ||= {};
-    const saved = state.settings.learning ||= {length:'medium',effort:'medium',showReasoning:true,memoryEnabled:false,search:{enabled:false,provider:'',providerId:'',hasKey:false}};
+    const saved = state.settings.learning ||= {length:'medium',effort:'medium',showReasoning:true,memoryEnabled:false,search:{enabled:false,provider:'yuanbao',providerId:'',hasKey:false}};
     if (method === 'PUT') {
       const input = await request.json();
       if (input.search.enabled && !((input.search.provider==='chatgpt' && input.search.providerId) || (['zhipu','deepseek','yuanbao'].includes(input.search.provider) && (input.search.apiKey || (saved.search.provider===input.search.provider && saved.search.hasKey))) || (input.search.provider==='zhipu-plan' && (state.settings['ask-ai']?.providers || []).some(p=>p.baseURL?.startsWith('https://open.bigmodel.cn/api/coding/') || p.baseURL==='https://open.bigmodel.cn/api/anthropic')))) {
@@ -114,7 +114,6 @@ export async function settings(ctx) {
       state.settings.learning=input;
     }
     const providers = state.settings['ask-ai']?.providers || defaults['ask-ai'].providers;
-    if (!state.settings.learning.search.provider) { const plan=providers.find(p=>p.baseURL?.startsWith('https://open.bigmodel.cn/api/coding/') || p.baseURL==='https://open.bigmodel.cn/api/anthropic'); if(plan) state.settings.learning.search={enabled:true,provider:'zhipu-plan',providerId:plan.id,hasKey:true}; }
     return json({settings:state.settings.learning,capabilities:Object.fromEntries(providers.map(p=>[p.id,['low','medium','high','xhigh']]))});
   }
   if (path.startsWith('/api/learning-memories')) {
