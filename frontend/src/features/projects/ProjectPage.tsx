@@ -17,7 +17,7 @@ export function ProjectPage() {
 
   useEffect(() => { if (slug) selectProject(slug); }, [selectProject, slug]);
 
-  if (!slug) return <div className={s.host}><EmptyState title="未指定学习单元" description="回到主页选择一个学习单元。" /></div>;
+  if (!slug) return <div className={s.host}><EmptyState title="未指定学习内容" description="从左侧学习库选择路线或专题。" /></div>;
   if (isLoading) return <div className={s.host}>加载中…</div>;
   if (error || !data?.project) return <div className={s.host}><EmptyState title={`暂时无法打开「${slug}」`} description={(error as Error)?.message ?? '请从主页选择一个已有项目。'} /></div>;
 

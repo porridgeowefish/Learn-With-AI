@@ -224,8 +224,8 @@ function stream(frames, delay = 0, interrupted = () => undefined) {
   return new Response(
     new ReadableStream({
       async pull(controller) {
-        if (delay && index > 1)
-          await new Promise((done) => setTimeout(done, delay));
+        const wait = typeof delay === 'function' ? delay(index) : index > 1 ? delay : 0;
+        if (wait) await new Promise((done) => setTimeout(done, wait));
         let [event, data] = frames[index++];
         const partial = interrupted();
         if (partial !== undefined) {
@@ -282,21 +282,23 @@ function conversation(ctx, s, parts, b) {
     releaseQueue(s);
     ctx.dirty();
   }
-  if (!action)
+  if (!action) {
+    const messages = s.messages.filter(item => item.id !== s.previewComparison?.id || Date.now() >= s.previewComparison.availableAt);
     return json({
       conversationId: 'preview',
       unitId: 'preview',
-      latestSeq: s.messages.length,
+      latestSeq: messages.length,
       pageFromSeq: 1,
-      pageThroughSeq: s.messages.length,
-      totalMessages: s.messages.length,
+      pageThroughSeq: messages.length,
+      totalMessages: messages.length,
       hasMore: false,
       hasPrevious: false,
-      messages: s.messages,
+      messages,
       queue: s.queue,
       queuePaused: !!s.queuePaused,
       latestResponseId: s.responseId,
     });
+  }
   if ((action === 'feedback' || action === 'comparison-vote') && method === 'POST') {
     const target = s.messages.find(item => item.id === b.messageId && item.role === 'teacher');
     if (!target) return json({ error: 'answer_unavailable' }, 404);
@@ -439,14 +441,19 @@ function conversation(ctx, s, parts, b) {
       const responseId = (s.responseId = id());
       const left = comparison.a.match(/[\s\S]{1,24}/gu);
       const right = comparison.b.match(/[\s\S]{1,24}/gu);
-      const deltas = left.flatMap((delta, index) => [['comparison-delta', {arm:'a', delta}],
-        ...(right[index] ? [['comparison-delta', {arm:'b', delta:right[index]}]] : [])]);
-      if (right.length > left.length) for (const delta of right.slice(left.length)) deltas.push(['comparison-delta', {arm:'b', delta}]);
+      const deltas = [];
+      const rightDelay = 4;
+      for (let index = 0; index < Math.max(left.length, rightDelay + right.length); index++) {
+        if (left[index]) deltas.push(['comparison-delta', {arm:'a', delta:left[index]}]);
+        if (right[index - rightDelay]) deltas.push(['comparison-delta', {arm:'b', delta:right[index - rightDelay]}]);
+      }
+      const wait = (index) => index < 2 ? 0 : index === 3 ? 1200 : 360;
+      s.previewComparison = { id: teacher.id, availableAt: Date.now() + 1200 + 360 * (deltas.length + 1) };
       return stream([
         ['turn-accepted', {learnerMessageId: learner.id}], ['message-started', {teacherMessageId: teacher.id}],
         ['comparison-started', {comparisonId:comparison.id}], ...deltas,
         ['message-completed', {messageId:teacher.id,latestSeq:s.messages.length}],
-      ].map(([event,data],index) => [event,{...data,responseId,frameSeq:index+1}]), 160);
+      ].map(([event,data],index) => [event,{...data,responseId,frameSeq:index+1}]), wait);
     }
     const cloudAccount = ctx.state.cloud;
     const managed = b.providerId ? b.providerId.startsWith('lwa-cloud:') || b.providerId.startsWith('lll-cloud:') : cloudAccount?.selectedModel;
@@ -763,7 +770,7 @@ export async function learning(ctx) {
       overviewMarkdown: s.mapVersion
         ? `## 研究目的\n梳理${project.title}的主要概念与先修关系。\n\n## ${project.title}\n### 核心主题\n` +
           s.topics.map((t) => '#### ' + t.title + '\n' + t.goal).join('\n')
-        : '尚未生成学科总览',
+        : '尚未生成路线总览',
       topics: {
         schemaVersion: 1,
         topics: s.mapVersion ? s.topics : [],

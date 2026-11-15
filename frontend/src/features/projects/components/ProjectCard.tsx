@@ -30,7 +30,7 @@ export function ProjectCard({ project, variant = 'tile', className, onClick }: P
         }}
       >
         <Icon name="plus" size={20} className={s.plus} />
-        <span className={s.title}>新建项目</span>
+        <span className={s.title}>新建学习内容</span>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export function ProjectCard({ project, variant = 'tile', className, onClick }: P
         <code className={s.slug}>{project.slug}</code>
  {project.layoutStatus && project.layoutStatus !== "current" && <Tag tone="muted">{project.layoutStatus === "legacy-format-unsupported" ? "旧版格式 · 需手动处理" : "数据需检查"}</Tag>}
         <Tag tone={project.projectType === 'discipline-map' ? 'orange' : 'muted'}>
-          {project.projectType === 'discipline-map' ? '学科地图' : '系统学习'}
+          {project.projectType === 'discipline-map' ? '学习路线' : '学习专题'}
         </Tag>
       </div>
     </Link>

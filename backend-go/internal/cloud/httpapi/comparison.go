@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/cloud/inference"
 	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
+	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
 )
 
 func (s *Server) comparisonSubject(w http.ResponseWriter, r *http.Request) (string, string, bool) {
@@ -116,7 +116,7 @@ func (s *Server) startComparison(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	respond(w, http.StatusOK, map[string]string{"id": result.ID, "model": result.Model})
+	respond(w, http.StatusOK, llmcloud.ComparisonAssignment{ID: result.ID, Model: result.Model, Protocol: 2})
 }
 
 func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
@@ -125,10 +125,10 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		ID, Arm, Question, Mode, Context string
-		Opening                          bool
+		ID, Arm string
+		llmcloud.ComparisonInput
 	}
-	if !decode(w, r, &input, 256<<10) {
+	if !decode(w, r, &input, 512<<10) {
 		return
 	}
 	if !identifier.MatchString(input.ID) || (input.Arm != "a" && input.Arm != "b") || strings.TrimSpace(input.Question) == "" || len(input.Question) > 64<<10 || len(input.Context) > 16<<10 || !comparisonMode(input.Mode) {
@@ -159,34 +159,28 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
 		return
 	}
-	system := pack.Content.Resources["teaching/teacher"]
-	if input.Mode != "" {
-		modePrompt := pack.Content.Resources["modes/"+input.Mode]
-		if modePrompt != "" {
-			system += "\n\n" + modePrompt
-		}
+	request, err := comparisonRequest(input.ComparisonInput, pack, s.comparisonRules)
+	if err != nil {
+		fail(w, http.StatusBadRequest, "invalid_comparison_request")
+		return
 	}
-	question := input.Question
-	if input.Opening && pack.Opening != "" {
-		question = pack.Opening
+	if support, ok := s.gateway.(interface{ SupportsTools(string) bool }); ok && !support.SupportsTools(model.ID) {
+		request.Tools = nil
 	}
-	messages := []ai.GatewayMessage{{Role: "user", Content: question}}
-	if input.Context != "" {
-		messages = append([]ai.GatewayMessage{{Role: "user", Content: input.Context}}, messages...)
-	}
-	estimated := ai.EstimateTextTokens(system) + ai.EstimateTextTokens(question) + ai.EstimateTextTokens(input.Context) + 128
-	if estimated > min(model.MaxInput, 64_000) {
+	estimated := (ai.Budget{}).Input(request)
+	maxInput := min(model.MaxInput, 64_000)
+	if estimated > maxInput {
 		fail(w, http.StatusRequestEntityTooLarge, "model_input_limit")
 		return
 	}
-	maxOutput := min(model.MaxOutput, 4096)
+	request.MaxOutputTokens = min(model.MaxOutput, 4096)
 	hold := store.BudgetHold{Currency: s.budget.Currency, Limit: s.budget.MonthlyNanos}
 	if hold.Limit > 0 {
 		estimator, has := s.gateway.(interface {
 			EstimateCost(string, string, int, int, bool) (int64, bool)
 		})
 		if has {
-			hold.Estimated, has = estimator.EstimateCost(model.ID, hold.Currency, estimated, maxOutput, false)
+			hold.Estimated, has = estimator.EstimateCost(model.ID, hold.Currency, estimated, request.MaxOutputTokens, len(request.Tools) > 0)
 		}
 		if !has {
 			fail(w, http.StatusServiceUnavailable, "model_cost_unconfigured")
@@ -195,7 +189,10 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	}
 	start := time.Now()
 	questionDigest := sha256.Sum256([]byte(input.Question))
-	if input.Mode != "" || input.Context != "" || input.Opening {
+	if input.Teaching != nil {
+		binding, _ := json.Marshal(input.ComparisonInput)
+		questionDigest = sha256.Sum256(binding)
+	} else if input.Mode != "" || input.Context != "" || input.Opening {
 		binding, _ := json.Marshal([]any{input.Question, input.Mode, input.Context, input.Opening})
 		questionDigest = sha256.Sum256(binding)
 	}
@@ -226,25 +223,13 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var hasText bool
-	hidden := false
-	request := ai.GatewayRequest{
-		System: system, Messages: messages, MaxOutputTokens: maxOutput, ShowReasoning: &hidden,
-	}
 	forwardText := func(event ai.GatewayEvent) {
 		if event.Type == "text-delta" {
 			hasText = hasText || strings.TrimSpace(event.Delta) != ""
 			emit(event)
 		}
 	}
-	var attempts []inference.Attempt
-	var streamErr error
-	if gateway, ok := s.gateway.(interface {
-		StreamComparison(context.Context, string, int, ai.GatewayRequest, func(ai.GatewayEvent)) ([]inference.Attempt, error)
-	}); ok {
-		attempts, streamErr = gateway.StreamComparison(ctx, model.ID, estimated+maxOutput, request, forwardText)
-	} else {
-		attempts, streamErr = s.gateway.Stream(ctx, model.ID, estimated+maxOutput, "", request, forwardText)
-	}
+	attempts, streamErr := s.runComparison(ctx, subject, cmp.ID, input.Arm, model.ID, maxInput, request, hold, start, emit, forwardText)
 	var spent int64
 	knownCost := true
 	for _, attempt := range attempts {

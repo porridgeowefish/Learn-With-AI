@@ -15,6 +15,8 @@ npm run dev
 
 重新制作的顺序：npm run assets → Blender 后台执行 scripts/refine-assets.py → node scripts/export-gem-cuts.mjs → Blender 后台执行 scripts/refine-assets.py -- --stones → Blender 后台执行 scripts/sync-gem-library.py。最后通过 src/thumbnails.js 的 renderThumbnails 重新生成实际模型缩略图。单独执行 assets 会重置清单为基础版本。
 
+收藏目标展台使用 1024 × 1024 透明 WebP。用已安装的 Chrome 从当前 GLB 重新渲染，输出到桌面前端的 `public/treasures/assets/portraits/`。从本目录运行 `node scripts/render-portraits.mjs` 可生成全部素材。附加 `citrine` 等藏品 ID 可只渲染指定款式。图鉴的 192 × 192 缩略图单独保留。
+
 ## 文件
 
 - public/assets/manifest.json 中的 url 指向当前版本：refined/ 为 Blender 纹理细化模型，jewelry/ 为重新制作的宝石切面。根目录 GLB 是基础版本。

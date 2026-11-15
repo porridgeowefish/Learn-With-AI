@@ -9,8 +9,9 @@ import (
 )
 
 type ComparisonAssignment struct {
-	ID    string `json:"id"`
-	Model string `json:"model"`
+	ID       string `json:"id"`
+	Model    string `json:"model"`
+	Protocol int    `json:"protocol"`
 }
 
 func (c *Client) StartComparison(ctx context.Context, operation string) (ComparisonAssignment, error) {
@@ -32,10 +33,32 @@ func (c *Client) StartComparison(ctx context.Context, operation string) (Compari
 }
 
 type ComparisonInput struct {
-	Question string `json:"question"`
-	Context  string `json:"context,omitempty"`
-	Mode     string `json:"mode,omitempty"`
-	Opening  bool   `json:"opening,omitempty"`
+	Question string              `json:"question"`
+	Context  string              `json:"context,omitempty"`
+	Mode     string              `json:"mode,omitempty"`
+	Opening  bool                `json:"opening,omitempty"`
+	Teaching *ComparisonTeaching `json:"teaching,omitempty"`
+}
+
+// ComparisonTeaching carries one provider-neutral teaching request for both arms.
+// Indices refer to the positions of the replaceable parts of that request.
+type ComparisonTeaching struct {
+	Messages        json.RawMessage `json:"messages"`
+	Tools           json.RawMessage `json:"tools,omitempty"`
+	TeacherIndex    int             `json:"teacherIndex"`
+	ModeIndex       *int            `json:"modeIndex,omitempty"`
+	ModeText        string          `json:"modeText,omitempty"`
+	OpeningIndex    *int            `json:"openingIndex,omitempty"`
+	ReasoningEffort string          `json:"reasoningEffort,omitempty"`
+}
+
+func (c *Client) SubmitComparisonToolResult(ctx context.Context, id, text string, final bool) error {
+	token, _ := c.promptSubject()
+	_, err := c.json(ctx, http.MethodPost, "v1/answer-comparison/tool-result", token, struct {
+		ID, Text string
+		Final    bool
+	}{id, text, final}, nil)
+	return err
 }
 
 func (c *Client) StreamComparison(ctx context.Context, id, arm string, input ComparisonInput, emit func(json.RawMessage) error) error {

@@ -69,7 +69,7 @@ function reduceLive(current: LiveResponse | null, frame: TeacherStreamFrame): Li
     if (frame.type === 'comparison-delta' && current.comparison) {
       const arm = frame.data.arm;
       if (arm === 'a' || arm === 'b') return { ...current, comparison: {
-        ...current.comparison, [arm]: current.comparison[arm] + String(frame.data.delta ?? ''),
+        ...current.comparison, [arm]: (frame.data.replace === true ? '' : current.comparison[arm]) + String(frame.data.delta ?? ''),
       } };
     }
     if (frame.type === 'message-reset') return { ...current, text: '', reasoning: '', notice: '', searches: [], reading: undefined };

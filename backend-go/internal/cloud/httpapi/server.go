@@ -25,23 +25,26 @@ type Streamer interface {
 }
 
 type Server struct {
-	budget         Budget
-	trustedProxies []netip.Prefix
-	db             *store.Store
-	accounts       *auth.Service
-	gateway        Streamer
-	models         map[string]Model
-	list           []Model
-	guestModels    []GuestModel
-	prompts        atomic.Pointer[promptState]
-	comparisonKey  []byte
-	promptPublish  sync.Mutex
-	mux            *http.ServeMux
-	limit          authLimit
-	modelMu        sync.RWMutex
-	routeRevision  string
-	routeAffinity  routeAffinity
-	adminAuthorize func(http.ResponseWriter, *http.Request, bool) (store.Account, bool)
+	budget                  Budget
+	trustedProxies          []netip.Prefix
+	db                      *store.Store
+	accounts                *auth.Service
+	gateway                 Streamer
+	models                  map[string]Model
+	list                    []Model
+	guestModels             []GuestModel
+	prompts                 atomic.Pointer[promptState]
+	comparisonKey           []byte
+	comparisonRules         string
+	comparisonToolsFinished string
+	comparisonTools         sync.Map
+	promptPublish           sync.Mutex
+	mux                     *http.ServeMux
+	limit                   authLimit
+	modelMu                 sync.RWMutex
+	routeRevision           string
+	routeAffinity           routeAffinity
+	adminAuthorize          func(http.ResponseWriter, *http.Request, bool) (store.Account, bool)
 }
 
 func New(db *store.Store, accounts *auth.Service, gateway Streamer, models []Model) (*Server, error) {

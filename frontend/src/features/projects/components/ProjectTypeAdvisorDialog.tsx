@@ -113,7 +113,7 @@ export function ProjectTypeAdvisorDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="问问 AI：我该选哪一种？"
-      description="临时对话仅用于本次选择，关闭后即清空，不会写入项目或学习记录。"
+      description="临时对话仅用于本次选择，关闭后即清空。"
       size="md"
       className={s.modal}
     >
@@ -131,7 +131,7 @@ export function ProjectTypeAdvisorDialog({
             <div className={s.thinking} role="status" aria-live="polite">
               <div className={s.thinkingCopy}>
                 <Icon name="bot" size={15} />
-                <span><strong>正在梳理你的学习意图</strong><small>先辨别你需要一张全景地图，还是一条深入路线，请稍等片刻。</small></span>
+                <span><strong>正在判断适合的学习内容类型</strong><small>学习路线用于规划范围，学习专题用于深入具体问题。</small></span>
               </div>
               <div className={s.thinkingTrack} role="progressbar" aria-label="AI 正在生成建议" aria-valuetext="正在分析">
                 <i />
@@ -144,7 +144,7 @@ export function ProjectTypeAdvisorDialog({
           <div className={s.recommendation}>
             <div>
               <strong>
-                建议选择：{recommendation === 'discipline-map' ? '学科地图' : '系统学习'}
+                建议选择：{recommendation === 'discipline-map' ? '学习路线' : '学习专题'}
               </strong>
               {recommendationReason && <span>{recommendationReason}</span>}
               {recommendationTradeoff && <span>取舍：{recommendationTradeoff}</span>}

@@ -161,7 +161,7 @@ export function DisciplineOverview({ slug, title, providerId }: DisciplineOvervi
       ? disciplineTopics.data?.topics.find((candidate) => candidate.id === topicId)
       : topicCatalogByTitle.get(topicTitle);
     if (topicTitle && !topic) {
-      setLaunchNotice('这个主题还没有可用的范围定义。请重新生成地图中的主题边界后再开始系统学习。');
+      setLaunchNotice('这个小节还缺少学习范围。请重新生成路线内容后再开始。');
       return;
     }
     setInitialTitle(topic?.title ?? topicTitle);
@@ -190,7 +190,7 @@ export function DisciplineOverview({ slug, title, providerId }: DisciplineOvervi
       const badge = document.createElement('span');
       badge.className = `${s.priority} ${priority ? s[`priority${priority}`] : s.priorityUnknown}`;
       badge.textContent = priority ? { I: 'Ⅰ', II: 'Ⅱ', III: 'Ⅲ' }[priority] : '待评级';
-      badge.title = priority ? { I: '关键必学', II: '中等深度', III: '深入选学' }[priority] : '重新生成地图后可获得优先级';
+      badge.title = priority ? { I: '关键必学', II: '中等深度', III: '深入选学' }[priority] : '重新生成路线后可获得优先级';
       badge.setAttribute('aria-label', `学习优先级：${badge.title}`);
       heading.appendChild(badge);
       const planButton = document.createElement('button');
@@ -247,7 +247,7 @@ export function DisciplineOverview({ slug, title, providerId }: DisciplineOvervi
         <div>
           <h1>{title}</h1>
           <p>一个统一入口，帮助你看清学科边界、主要领域及可选择的学习路线。</p>
-          <div className={s.viewTabs} role="tablist" aria-label="学科地图视图">
+          <div className={s.viewTabs} role="tablist" aria-label="学习路线视图">
             <button
               type="button"
               role="tab"
@@ -255,7 +255,7 @@ export function DisciplineOverview({ slug, title, providerId }: DisciplineOvervi
               className={activeView === 'overview' ? s.viewTabActive : undefined}
               onClick={() => setActiveView('overview')}
             >
-              学科总览
+              路线总览
             </button>
             <button
               type="button"
@@ -297,21 +297,21 @@ export function DisciplineOverview({ slug, title, providerId }: DisciplineOvervi
             />
           )
         ) : overview.isLoading ? (
-          <div className={s.loading}>正在读取学科总览…</div>
+          <div className={s.loading}>正在读取路线总览…</div>
         ) : overview.error ? (
-          <EmptyState title="暂时无法读取学科总览" description={(overview.error as Error).message} />
+          <EmptyState title="暂时无法读取路线总览" description={(overview.error as Error).message} />
         ) : overviewPending ? (
           <section className={s.emptyOverview}>
             <Icon name="book" size={28} />
-            <h2>还没有学科总览</h2>
-            <p>生成地图后，这里会成为该学科统一的总览入口。</p>
+            <h2>还没有路线总览</h2>
+            <p>生成后可在这里查看这条路线的目录和小节。</p>
             <GenerationControl slug={slug} kind="discipline-map" initialProviderId={providerId}/>
           </section>
         ) : (
           <article ref={articleRef} className={s.paper}>
             {projection.data?.coverage?.gap && <aside className={s.coverageNotice} aria-label="资料覆盖范围"><strong>资料依据</strong><p>{projection.data.coverage.gap}</p>{projection.data.coverage.sources?.map((source, index) => <small key={index}>{source.name}{source.extractionCoverage?.unreadUnits?.length ? ` · ${source.extractionCoverage.unreadUnits.length} 处内容未提取` : ''}</small>)}</aside>}
             {outline.length > 0 && (
-              <nav className={s.tableOfContents} aria-label="学科总览目录">
+              <nav className={s.tableOfContents} aria-label="路线总览目录">
                 <h2>目录</h2>
                 <ol>
                   {outline.map((item) => (
@@ -409,7 +409,7 @@ function LearningTaskList({
       <section className={s.emptyOverview}>
         <Icon name="book" size={28} />
         <h2>任务清单还是空的</h2>
-        <p>回到学科总览，按照你想学的顺序，把细分主题逐个加入计划。</p>
+        <p>回到路线总览，按照你想学的顺序，把细分主题逐个加入计划。</p>
         <Button variant="primary" onClick={onBackToOverview}>去选择学习任务</Button>
       </section>
     );
@@ -440,7 +440,7 @@ function LearningTaskList({
             <div className={s.taskActions}>
               <button type="button" onClick={() => move(index, -1)} disabled={saving || index === 0}>上移</button>
               <button type="button" onClick={() => move(index, 1)} disabled={saving || index === items.length - 1}>下移</button>
-              <button type="button" onClick={() => onStartDeepDive(item.topicTitle, item.topicId)} disabled={saving}>系统学习</button>
+              <button type="button" onClick={() => onStartDeepDive(item.topicTitle, item.topicId)} disabled={saving}>开始学这一节</button>
               {item.status === 'planned' && (
                 <button type="button" className={s.taskPrimary} onClick={() => setStatus(item.id, 'in-progress')} disabled={saving}>开始</button>
               )}

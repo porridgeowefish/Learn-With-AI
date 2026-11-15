@@ -54,9 +54,9 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
       <header className={s.header}>
         <div className={s.identity}>
           <h1>{project.title}</h1>
-          <span>学习单元</span>
+          <span>学习专题</span>
         </div>
-        <nav className={s.tabs} aria-label="学习单元">
+        <nav className={s.tabs} aria-label="学习专题">
           {tabs.map((tab) => (
             <NavLink key={tab.key} to={`/project/${project.slug}/${tab.key}`} className={({ isActive }) => isActive ? s.tabActive : s.tab}>
               {tab.label}

@@ -6,7 +6,7 @@ const messages: Record<string,string> = {
  'input-budget-exhausted':'本次资料与对话超过模型上下文预算，请减少资料或调整连接的上下文容量。',
  'generation-active':'此内容正在生成，请查看当前任务进度。',
  'generation-queue-full':'生成队列已满，请稍后重试。',
- 'generation-project-type':'此页面不支持这类生成，请从对应学习单元操作。',
+ 'generation-project-type':'请从对应的学习专题或学习路线发起生成。',
  'source-not-readable':'所选资料尚未解析完成，请等待或取消选择该资料。',
  'source-unavailable':'所选资料已不可用，请重新选择。',
  'source-selection-required':'请先选择可用的参考资料。',

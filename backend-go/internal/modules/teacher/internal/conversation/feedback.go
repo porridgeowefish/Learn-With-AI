@@ -6,16 +6,22 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 )
 
 var ErrFeedbackNotFound = errors.New("teacher answer unavailable")
 var ErrComparisonPending = errors.New("select a comparison answer first")
 
 type AnswerComparison struct {
-	ID   string `json:"id"`
-	A    string `json:"a"`
-	B    string `json:"b"`
-	Vote string `json:"vote,omitempty"`
+	ID         string                   `json:"id"`
+	A          string                   `json:"a"`
+	B          string                   `json:"b"`
+	Vote       string                   `json:"vote,omitempty"`
+	CitationsA []sources.SourceCitation `json:"sourceCitationsA,omitempty"`
+	CitationsB []sources.SourceCitation `json:"sourceCitationsB,omitempty"`
+	CoverageA  []ReadingCoverage        `json:"readingCoverageA,omitempty"`
+	CoverageB  []ReadingCoverage        `json:"readingCoverageB,omitempty"`
 }
 
 type answerFeedback struct {
@@ -50,8 +56,10 @@ func applyAnswerFeedback(message *Message, feedback, votes map[string]string) {
 	if vote := votes[message.ID]; vote != "" {
 		message.Comparison.Vote = vote
 		answer := message.Comparison.A
+		message.SourceCitations, message.ReadingCoverage = message.Comparison.CitationsA, message.Comparison.CoverageA
 		if vote == "b" {
 			answer = message.Comparison.B
+			message.SourceCitations, message.ReadingCoverage = message.Comparison.CitationsB, message.Comparison.CoverageB
 		}
 		message.Blocks = []Block{{ID: message.ID + "-answer", Type: "markdown", Source: answer}}
 	}

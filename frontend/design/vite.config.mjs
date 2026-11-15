@@ -3,9 +3,10 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import base from '../vite.config.ts';
+import { changePolicy, defaultPolicy } from './rewards-policy.mjs';
 
 const source = fileURLToPath(new URL('.', import.meta.url));
-const modules = () => ['worker.mjs', 'runtime.mjs', 'page-adapter.mjs', 'projects.mjs', 'learning.mjs', 'settings.mjs', 'snapshot.mjs', 'visuals.mjs', 'cloud.mjs'];
+const modules = () => ['worker.mjs', 'runtime.mjs', 'page-adapter.mjs', 'projects.mjs', 'learning.mjs', 'settings.mjs', 'snapshot.mjs', 'visuals.mjs', 'cloud.mjs', 'rewards.mjs', 'rewards-policy.mjs'];
 const files = () => [...modules(), 'fflate.mjs', 'treasures.json', 'starter-dialogue.json'];
 const filePath = name => name === 'treasures.json' ? resolve(source, '../../backend-go/internal/modules/treasures/catalog.json')
   : name === 'starter-dialogue.json' ? resolve(source, '../../backend-go/internal/app/workspaceservice/starter-dialogue.json')
@@ -26,6 +27,27 @@ export default {
         .replace('<title>Learn-With-AI</title>', `<title>Learn-With-AI · 设计预览</title><meta name="lll-design-revision" content="${revision()}">`);
     }},
     configureServer(server) {
+      let policy = defaultPolicy;
+      server.middlewares.use(async (req, res, next) => {
+        if (req.url?.split('?')[0] !== '/__design/rewards-policy') return next();
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        try {
+          if (req.method === 'POST') {
+            if (req.headers['x-design-backstage'] !== 'reward-policy') { res.statusCode = 403; res.end('{}'); return; }
+            let raw = '';
+            for await (const chunk of req) {
+              raw += chunk;
+              if (raw.length > 16384) throw new Error('配置过长。');
+            }
+            policy = changePolicy(policy, JSON.parse(raw));
+          } else if (req.method !== 'GET') { res.statusCode = 405; res.end('{}'); return; }
+          res.end(JSON.stringify(policy));
+        } catch (error) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: error.message }));
+        }
+      });
       server.middlewares.use((req, res, next) => {
         const path = req.url?.split('?')[0];
         const name = files().find(file => urlFor(file) === path);

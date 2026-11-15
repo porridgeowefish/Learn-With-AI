@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import type { ConversationMessage } from '../api/learningWorkspace';
 import { CopyIcon, DownloadIcon, RegenerateIcon } from '@/shared/primitive/Icons';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
-import { SourceCitations } from './SourceCitations';
+import { annotateSourceCitations, SourceCitations } from './SourceCitations';
 import { ChatMediaBlock } from './ChatMediaInput';
 import { teacherMarkdown } from './LearningProgress';
 import { AnswerComparison, AnswerFeedback } from './AnswerFeedback';
@@ -87,19 +87,15 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
     {actions.canRegenerate && message.status !== 'failed' && <button type="button" className={s.iconButton} title="重新生成这条回复" aria-label="重新生成这条回复" onClick={actions.onRegenerate}><RegenerateIcon /></button>}
     <button type="button" className={s.iconButton} title="下载本条文本" aria-label="下载本条文本" onClick={() => actions.onDownload(message)}><DownloadIcon /></button>
   </>;
-  const citationSource = (source: string) => source.replace(/\[\[source:([^\]]+)\]\]/g, (_marker, id: string) => {
-    const index = citations.findIndex(item => item.evidenceId === id);
-    return index < 0 ? '' : `[资料 ${index + 1}]`;
-  });
   return (
     <article id={`message-${message.id}`} data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
       {teacher && <div className={s.speaker}>教师{awaitingAnswer && <span className={s.writing} role="status" aria-label="教师正在思考或调用工具"><LearnWriting /></span>}</div>}
-      {message.comparison && !message.comparison.vote && <AnswerComparison slug={slug} message={{ ...message, comparison: message.comparison }} streaming={streaming} />}
+      {message.comparison && !message.comparison.vote && <AnswerComparison slug={slug} message={{ ...message, comparison: message.comparison }} streaming={streaming} sourceNames={sourceNames} />}
       {awaitingAnswer && <div className={s.thinking}>思考中</div>}
       <div className={s.messageBody}>
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? (profile.data?.settings.showReasoning !== false && <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} open={reasoningOpen} onOpenChange={setReasoningOpen} />)
-          : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
+          : block.type === 'markdown' ? <MarkdownView key={block.id} source={annotateSourceCitations(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '', citations)} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
         {teacher && !streaming && <SourceCitations citations={citations} sourceNames={sourceNames} />}

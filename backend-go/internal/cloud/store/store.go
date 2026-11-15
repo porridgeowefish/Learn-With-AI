@@ -79,7 +79,7 @@ func (s *Store) initialize(ctx context.Context) error {
 		if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 			return err
 		}
-		if version > 24 {
+		if version > learningPointSchemaVersion {
 			return fmt.Errorf("unsupported cloud schema version %d", version)
 		}
 		if version == 0 {
@@ -163,7 +163,10 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err := s.migrateUpstreamCredentials(ctx); err != nil {
 		return err
 	}
-	return s.migrateReplyFeedback(ctx)
+	if err := s.migrateReplyFeedback(ctx); err != nil {
+		return err
+	}
+	return s.migrateLearningPointRules(ctx)
 }
 
 func (s *Store) transaction(ctx context.Context, run func(*sql.Tx) error) error {

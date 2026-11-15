@@ -72,6 +72,8 @@ api /api/system/speech
 api /api/system/update/{}
 api /api/system/update{}
 api /api/treasures
+api /api/treasures/challenge
+api /api/treasures/exchange
 api /api/treasures/rewards/{}/seen
 api /api/treasures/rewards/{}/source
 api /api/workspace/

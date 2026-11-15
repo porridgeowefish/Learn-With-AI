@@ -29,8 +29,8 @@ export function LearningRhythm({ projects }: Props) {
           <p>颜色表示每日投入，连续天数记录坚持；成长值只来自可验证的学习成果。</p>
         </div>
         <div className={s.filters}>
-          <select value={project} onChange={(event) => setProject(event.target.value)} aria-label="筛选学习项目">
-            <option value="">全部项目</option>
+          <select value={project} onChange={(event) => setProject(event.target.value)} aria-label="筛选学习路线">
+            <option value="">全部学习内容</option>
             {projects.map((item) => <option key={item.slug} value={item.slug}>{item.title}</option>)}
           </select>
           <button className={weeks === 26 ? s.activeRange : ''} onClick={() => setWeeks(26)}>近26周</button>

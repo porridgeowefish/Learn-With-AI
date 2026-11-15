@@ -283,6 +283,29 @@ func (s *Store) FinishComparisonArm(ctx context.Context, id, arm string, complet
 	return err
 }
 
+func (s *Store) ExtendComparisonArmBudget(ctx context.Context, id, arm string, start time.Time, hold BudgetHold) error {
+	return s.transaction(ctx, func(tx *sql.Tx) error {
+		usage, err := budgetUsage(ctx, tx, hold.Currency, start)
+		if err != nil {
+			return err
+		}
+		if hold.Estimated <= 0 || usage.Settled >= hold.Limit || usage.Reserved >= hold.Limit-usage.Settled ||
+			hold.Estimated > hold.Limit-usage.Settled-usage.Reserved {
+			return ErrBudget
+		}
+		result, err := tx.ExecContext(ctx, `UPDATE answer_comparison_arm SET estimated=estimated+?
+			WHERE comparison_id=? AND arm=? AND state='running' AND currency=? AND month=?`,
+			hold.Estimated, id, arm, hold.Currency, start.In(shanghai).Format("2006-01"))
+		if err != nil {
+			return err
+		}
+		if n, err := result.RowsAffected(); err != nil || n != 1 {
+			return ErrConflict
+		}
+		return nil
+	})
+}
+
 func (s *Store) VoteComparison(ctx context.Context, subject, id, vote string, now time.Time) error {
 	return s.transaction(ctx, func(tx *sql.Tx) error {
 		var current sql.NullString

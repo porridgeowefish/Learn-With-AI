@@ -2,9 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/shared/client';
 import { Button } from '@/shared/primitive/Button';
+import { LearnWriting } from '@/shared/primitive/LearnWriting';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { learningWorkspaceKeys, saveAnswerFeedback, saveComparisonVote, type ComparisonVote, type ConversationMessage } from '../api/learningWorkspace';
 import { teacherMarkdown } from './LearningProgress';
+import { annotateSourceCitations, SourceCitations } from './SourceCitations';
 import s from './AnswerFeedback.module.css';
 
 type Feedback = NonNullable<ConversationMessage['feedback']>;
@@ -39,8 +41,8 @@ function Thumb({ down = false }: { down?: boolean }) {
   </svg>;
 }
 
-export function AnswerComparison({ slug, message, streaming }: {
-  slug: string; message: ConversationMessage & { comparison: NonNullable<ConversationMessage['comparison']> }; streaming: boolean;
+export function AnswerComparison({ slug, message, streaming, sourceNames }: {
+  slug: string; message: ConversationMessage & { comparison: NonNullable<ConversationMessage['comparison']> }; streaming: boolean; sourceNames: Map<string, string>;
 }) {
   const comparison = message.comparison;
   const [choice, setChoice] = useState<ComparisonVote>();
@@ -55,13 +57,20 @@ export function AnswerComparison({ slug, message, streaming }: {
   return <section className={s.comparison} aria-label="比较两个回答" aria-busy={streaming}>
     <header className={s.heading}><strong>哪一个回答更好？</strong><span>本次对比不消耗积分</span></header>
     <div className={s.answers}>
-      {(['a', 'b'] as const).map(arm => <div key={arm} className={s.answer} data-selected={choice === arm || undefined}>
-        <div className={s.answerTitle}>回答 {arm.toUpperCase()}</div>
-        {comparison[arm] ? <MarkdownView source={teacherMarkdown(comparison[arm])} streaming={streaming} />
-          : <p className={s.waiting}>正在生成…</p>}
-        {!streaming && <Button variant="outline" size="sm" aria-pressed={choice === arm}
-          disabled={vote.isPending} onClick={() => setChoice(arm)}>选择 {arm.toUpperCase()}</Button>}
-      </div>)}
+      {(['a', 'b'] as const).map((arm) => {
+        const citations = (arm === 'a' ? comparison.sourceCitationsA : comparison.sourceCitationsB) ?? [];
+        const text = annotateSourceCitations(teacherMarkdown(comparison[arm]), citations);
+        return <div key={arm} className={s.answer} data-selected={choice === arm || undefined}>
+          <div className={s.answerTitle}>回答 {arm.toUpperCase()}</div>
+          {text.trim() ? <MarkdownView source={text} streaming={streaming} /> : streaming &&
+            <div className={s.waiting} role="status" aria-label={`回答 ${arm.toUpperCase()} 正在思考`}>
+              <LearnWriting /><span aria-hidden="true">思考中</span>
+            </div>}
+          {!streaming && <SourceCitations citations={citations} sourceNames={sourceNames} />}
+          {!streaming && <Button variant="outline" size="sm" aria-pressed={choice === arm}
+            disabled={vote.isPending} onClick={() => setChoice(arm)}>选择 {arm.toUpperCase()}</Button>}
+        </div>;
+      })}
     </div>
     {!streaming && <div className={s.choices}>
       <Button variant="ghost" size="sm" aria-pressed={choice === 'tie'} disabled={vote.isPending} onClick={() => setChoice('tie')}>一样好</Button>

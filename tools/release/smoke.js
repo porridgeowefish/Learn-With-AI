@@ -48,7 +48,7 @@ async function smoke(binary) {
     assert.deepEqual(collection.rewards, []);
     assert(!fs.existsSync(path.join(workspace, 'treasures', 'ledger.json')), 'Startup seeded a reward ledger');
     for (const item of collection.catalog) {
-      for (const resource of [item.url, `assets/thumbs/${item.id}.webp`]) {
+      for (const resource of [item.url, `assets/thumbs/${item.id}.webp`, `assets/portraits/${item.id}.webp`]) {
         const asset = await fetch(`${base}/treasures/${resource}`, { method: 'HEAD' });
         assert.equal(asset.status, 200, `Packaged collectible missing: ${resource}`);
         assert(!asset.headers.get('content-type')?.includes('text/html'), `SPA fallback masked missing asset: ${resource}`);

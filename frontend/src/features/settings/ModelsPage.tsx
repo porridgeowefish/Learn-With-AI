@@ -12,7 +12,7 @@ const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: co
   bindings: Object.fromEntries(Object.entries(config.bindings ?? {}).map(([key, value]) => [key, { ...value }])),
 });
 const PURPOSES = [ ['teacher', '教师'], ['review', '复习稿'], ['practice', '练习'],
-  ['disciplineMap', '学科地图'], ['documentStructure', '文档公式识别'] ] as const;
+  ['disciplineMap', '学习路线'], ['documentStructure', '文档公式识别'] ] as const;
 const API_SOURCES = [
   { id: 'tencent-tokenhub', label: '腾讯云 TokenHub' },
   { id: 'openai', label: 'OpenAI' },

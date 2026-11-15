@@ -7,6 +7,8 @@
 .comparison { display: grid; gap: 12px; min-width: 0; margin-block: 8px 14px; }
 .heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; }
 .heading span, .waiting { color: var(--muted); font-size: .82rem; }
+.waiting { display: grid; justify-items: start; }
+.waiting img { width: 112px; height: 44px; }
 .answers { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .answer { display: flex; flex-direction: column; min-width: 0; min-height: 112px; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
 .answer[data-selected] { border-color: var(--accent); outline: 1px solid var(--accent); }

@@ -208,6 +208,9 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	}
 	var promptKey ed25519.PrivateKey
 	if cfg.Prompts.Root != "" {
+		if err := handler.LoadComparisonRules(cfg.Prompts.Root); err != nil {
+			return err
+		}
 		promptKey, err = promptSigningKey(cfg)
 		if err != nil {
 			return err

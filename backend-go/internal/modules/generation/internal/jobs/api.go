@@ -283,7 +283,7 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 		id = in.ProviderID
 	}
 	p := cfg.FindExact(id)
-	if p == nil || !p.HasConnection() || (p.Kind != "openai" && p.Kind != "anthropic" && p.Kind != "siwc" && p.Kind != ai.ManagedKind) {
+	if !generationProviderAvailable(p) {
 		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	chosen := *p
@@ -297,6 +297,18 @@ func resolveProvider(in Input) (ai.ProviderConfig, error) {
 	}
 	return chosen, nil
 }
+
+func generationProviderAvailable(p *ai.ProviderConfig) bool {
+	if p == nil || !p.HasConnection() {
+		return false
+	}
+	switch p.Kind {
+	case "openai", "anthropic", "siwc", ai.ManagedKind:
+		return true
+	}
+	return false
+}
+
 func prompt(ctx context.Context, kind string) (ai.ComposedPrompt, *promptpack.Reference, error) {
 	scene := "generation/" + kind
 	if kind == "practice" {

@@ -154,11 +154,11 @@ export function Sidebar() {
         ))}
 
         <div className={s.sectionRow}>
-          <div className={s.section}>项目</div>
+          <div className={s.section}>学习库</div>
           <button
             type="button"
             className={s.iconBtn}
-            title="新建文件夹"
+            title="新建分组"
             onClick={() => setCreating(true)}
           >
             <PlusIcon />
@@ -168,7 +168,7 @@ export function Sidebar() {
         {save.isPending && <div className={s.saving}>保存中…</div>}
         {save.isError && (
           <div className={s.saveError} role="alert">
-            文件夹保存失败：{(save.error as Error).message}（请确认后端已重启）
+            分组保存失败：{(save.error as Error).message}（请确认后端已重启）
           </div>
         )}
         {deleteProject.isError && (
@@ -179,7 +179,7 @@ export function Sidebar() {
 
         {isLoading && <div className={s.muted}>加载中…</div>}
         {!isLoading && projects.length === 0 && (
-          <div className={s.muted}>尚无项目，去总览创建一个 →</div>
+          <div className={s.muted}>还没有学习内容，可在首页新建。</div>
         )}
 
         {layout.folders.map((f) => {
@@ -233,7 +233,7 @@ export function Sidebar() {
                   <button
                     type="button"
                     className={s.iconBtn}
-                    title="删除文件夹"
+                    title="删除分组"
                     onClick={() => removeFolder(f.id, f.name)}
                   >
                     <Icon name="x" size={13} />
@@ -248,7 +248,7 @@ export function Sidebar() {
                     return (
                       <ProjectRow
                         slug={mapProject.slug}
-                        title={`${f.name}学科总览`}
+                        title={mapProject.title}
                         projectType="discipline-map"
                         currentFolderId={f.id}
                         folders={layout.folders}
@@ -276,7 +276,7 @@ export function Sidebar() {
           <input
             className={`${s.folderInput} ${s.createInput}`}
             autoFocus
-            placeholder="文件夹名称，回车创建"
+            placeholder="分组名称，回车创建"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
             onCompositionStart={() => { composingFolderName.current = true; }}
@@ -300,12 +300,12 @@ export function Sidebar() {
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title={deleteTarget?.kind === 'folder'
-          ? '删除文件夹？'
+          ? '删除分组？'
           : deleteTarget?.projectType === 'discipline-map'
-            ? '删除学科项目？'
-            : '删除学习单元？'}
+            ? '删除学习路线？'
+            : '删除学习专题？'}
         description={deleteTarget?.kind === 'folder'
-          ? '只删除侧栏分类，其中的学习内容会回到「未分类」。'
+          ? '删除分组后，组内专题会移到「未分类」。'
           : '这个操作会永久删除本地文件、学习记录和相关会话，无法撤销。'}
         size="sm"
         footer={(
@@ -388,15 +388,15 @@ function ProjectRow({
       <Link to={`/project/${slug}`} className={s.link}>
         <Icon name="folder" size={15} className={s.linkIcon} />
         <span className={s.title}>{title}</span>
-        <span className={s.projectType}>{projectType === 'discipline-map' ? '总览' : '学习'}</span>
+        <span className={s.projectType}>{projectType === 'discipline-map' ? '路线' : '专题'}</span>
       </Link>
       <div className={s.menuWrap}>
         <button
           ref={btnRef}
           type="button"
           className={`${s.menuBtn} ${menuOpen ? s.menuBtnOpen : ''}`}
-          title="项目操作"
-          aria-label={`项目操作：${title}`}
+          title="学习内容操作"
+          aria-label={`学习内容操作：${title}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -411,7 +411,7 @@ function ProjectRow({
             <div ref={menuRef} className={s.menu} role="menu" style={menuPos ?? undefined}>
               {projectType === 'system-learning' && (
                 <>
-                  <div className={s.menuLabel}>移动到文件夹</div>
+                  <div className={s.menuLabel}>移到分组</div>
                   <button
                     type="button"
                     role="menuitem"
@@ -446,7 +446,7 @@ function ProjectRow({
                   className={s.menuDanger}
                   onClick={onDelete}
               >
-                {projectType === 'discipline-map' ? '删除学科项目' : '删除学习单元'}
+                {projectType === 'discipline-map' ? '删除学习路线' : '删除学习专题'}
               </button>
             </div>
           </>

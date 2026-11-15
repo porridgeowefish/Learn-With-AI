@@ -13,7 +13,7 @@ const steps = [
   { title: '练习', instruction: '先尝试作答，再展开“参考答案与解析”。真实项目可生成新一轮练习，并翻看以前的轮次。' },
   { title: '笔记', instruction: '在这里写下自己的理解。真实项目的笔记与复习页也有笔记，自动笔记和自己的复习批注各自保留。' },
   { title: '附件', instruction: '真实学习时，可在对话栏上传附件，也可进入“附件”管理文件。教师回答会列出查阅过的资料和范围。' },
-  { title: '学科地图', instruction: '展开节点，看看知识如何组织。真实学习时，新建“学科地图”梳理领域，再为其中的主题创建系统学习项目。' },
+  { title: '学习路线', instruction: '展开节点，看看知识如何组织。真实学习时，新建“学习路线”梳理领域，再为其中的主题创建学习专题。' },
 ] as const;
 
 export function LearningDemo({ onClose, onStart, onConfigure }: { onClose: () => void; onStart: () => void; onConfigure?: () => void }) {
@@ -57,7 +57,7 @@ export function LearningDemo({ onClose, onStart, onConfigure }: { onClose: () =>
         {step === 5 && <section className={s.padded}><h2>把一个知识点放回体系</h2><p className={s.note}>优化方法 · 示例地图</p>
           <details className={s.resource} open><summary>一阶优化 → 梯度下降</summary><p>目标：理解目标函数、梯度和学习率的关系。</p><ul><li>方向：局部变化与负梯度</li><li>步长：下降、振荡与发散</li><li>边界：凸性、驻点与停止条件</li></ul></details>
           <details className={s.resource}><summary>接下来可探索：随机梯度与动量</summary><p>当完整梯度计算昂贵时，如何使用采样？如何利用过去的更新信息？这些是后续主题，本次示例尚未讲解。</p></details>
-          <p className={s.note}>你已经体验了从提问到复习、练习、笔记和资料的过程。创建自己的系统学习项目，或先建一张学科地图。</p>
+          <p className={s.note}>你已经体验了从提问到复习、练习、笔记和资料的过程。创建自己的学习专题，或先建一条学习路线。</p>
           {onConfigure && <div className={s.annotation}><p>还没有 AI 连接？可在设置里添加已有的 API Key，也可查看不同服务商的获取入口。</p><Button size="sm" onClick={onConfigure}>设置 AI 连接</Button></div>}
         </section>}
       </div>

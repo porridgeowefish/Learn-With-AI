@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -12,13 +14,23 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
 )
 
 var resolveComparisonClient = llmcloud.Default
 
-func compareFirstAnswer(ctx context.Context, slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message, responseID, messageID string, emit func(StreamFrame)) (bool, error) {
+type comparisonPreparation struct {
+	composition         ai.ComposedPrompt
+	tools               []ai.Tool
+	searcher            websearch.Searcher
+	turnContext, effort string
+	budget              ai.TeacherBudget
+}
+
+func (s *Service) compareFirstAnswer(ctx context.Context, slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message, responseID, messageID string, prepared comparisonPreparation, emit func(StreamFrame)) (bool, error) {
 	if ctx.Value(skipMemoryObservation{}) != nil || (learner.Role != "learner" && !history.opening) {
 		return false, nil
 	}
@@ -52,11 +64,19 @@ func compareFirstAnswer(ctx context.Context, slug, providerID string, conversati
 	if assignment.ID == "" {
 		return false, nil
 	}
+	var runTool comparisonToolFactory
+	if assignment.Protocol >= 2 {
+		runTool, err = s.prepareComparisonTeaching(ctx, slug, providerID, responseID, conversation, history, prepared, &input)
+		if err != nil {
+			log.Print("composed comparison input unavailable")
+			return false, nil
+		}
+	}
 	claimed, err := conversation.FirstAnswerComparisonOperation(true)
 	if err != nil || claimed == "" {
 		return false, nil
 	}
-	return true, streamComparison(ctx, client, conversation, assignment, input, responseID, messageID, emit)
+	return true, streamComparison(ctx, client, conversation, assignment, input, responseID, messageID, emit, runTool)
 }
 
 func firstAnswerInput(slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message) (llmcloud.ComparisonInput, error) {
@@ -128,47 +148,206 @@ func limitComparisonText(value string, maxBytes int) string {
 	return value[:maxBytes]
 }
 
-func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, assignment llmcloud.ComparisonAssignment, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame)) error {
+type comparisonToolFactory func(func(StreamFrame)) (*responseTools, *responseSources, error)
+
+func (s *Service) prepareComparisonTeaching(ctx context.Context, slug, providerID, responseID string, conversation *conversationstore.Store, history teacherHistory, prepared comparisonPreparation, input *llmcloud.ComparisonInput) (comparisonToolFactory, error) {
+	teaching := &llmcloud.ComparisonTeaching{TeacherIndex: -1, ReasoningEffort: prepared.effort}
+	var messages []ai.GatewayMessage
+	var tools []ai.Tool
+	var reading *responseSources
+	if ai.IsManagedProvider(providerID) {
+		messages = slices.Clone(prepared.composition.Messages)
+		tools = prepared.tools
+		for _, fragment := range prepared.composition.Fragments {
+			switch {
+			case fragment.Resource == "teaching/teacher":
+				teaching.TeacherIndex = fragment.MessageIndex
+			case fragment.SourceID == "guideline":
+				guideline, err := conversation.LearningGuideline()
+				if err != nil {
+					return nil, err
+				}
+				if guideline.Version == 2 && guideline.Guideline == "prompt:modes/"+input.Mode {
+					teaching.ModeIndex = &fragment.MessageIndex
+					teaching.ModeText, err = ai.RenderPromptContext(ctx, "modes/"+input.Mode, nil)
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
+		if history.opening {
+			index := prepared.composition.HistoryEnd - 1
+			teaching.OpeningIndex = &index
+		}
+		limit := prepared.budget.SourceLimit(ai.GatewayRequest{Messages: messages, Tools: tools, System: prepared.turnContext})
+		if slices.ContainsFunc(tools, func(tool ai.Tool) bool { return isSourceTool(tool.Name) }) {
+			reading = newResponseSources(ctx, slug, limit)
+			reading.allowed = map[string]bool{}
+			for _, tool := range tools {
+				reading.allowed[tool.Name] = true
+			}
+			prepared.turnContext += reading.bootstrap(ctx, input.Question, min(2500, limit))
+		}
+		if strings.TrimSpace(prepared.turnContext) != "" {
+			text, err := ai.RenderPrompt("teaching/context/turn", map[string]string{"content": prepared.turnContext})
+			if err != nil {
+				return nil, err
+			}
+			messages = append(messages, ai.GatewayMessage{Role: "user", Content: text})
+		}
+	} else {
+		// A custom connection never sends its local history, saved instructions,
+		// preference, memory or source content to the comparison service.
+		for _, fragment := range prepared.composition.Fragments {
+			if fragment.Resource == "" || fragment.Resource == "tools/sources/instructions" || fragment.Resource == "tools/web-search/instructions" {
+				continue
+			}
+			if fragment.Resource == "teaching/teacher" {
+				teaching.TeacherIndex = len(messages)
+			}
+			messages = append(messages, prepared.composition.Messages[fragment.MessageIndex])
+		}
+		if input.Mode != "" {
+			modeText, err := ai.RenderPromptContext(ctx, "modes/"+input.Mode, nil)
+			if err != nil {
+				return nil, err
+			}
+			index := len(messages)
+			teaching.ModeIndex, teaching.ModeText = &index, modeText
+			messages = append(messages, ai.GatewayMessage{Role: "user", Content: modeText})
+		}
+		messages = append(messages, ai.GatewayMessage{Role: "user", Content: input.Context})
+		if input.Opening {
+			index := len(messages)
+			teaching.OpeningIndex = &index
+		}
+		messages = append(messages, ai.GatewayMessage{Role: "user", Content: input.Question})
+		for _, tool := range prepared.tools {
+			if tool.Name == visualTool.Name {
+				tools = append(tools, tool)
+			}
+		}
+		prepared.searcher = nil
+	}
+	if teaching.TeacherIndex < 0 || len(messages) > 128 {
+		return nil, errors.New("invalid shared teaching composition")
+	}
+	var err error
+	teaching.Messages, err = json.Marshal(messages)
+	if err != nil {
+		return nil, err
+	}
+	teaching.Tools, err = json.Marshal(tools)
+	if err != nil {
+		return nil, err
+	}
+	input.Context = ""
+	input.Teaching = teaching
+	if payload, err := json.Marshal(input); err != nil || len(payload) > 500<<10 {
+		return nil, errors.New("shared teaching composition exceeds the comparison limit")
+	}
+	return func(emit func(StreamFrame)) (*responseTools, *responseSources, error) {
+		var armReading *responseSources
+		if reading != nil {
+			copy := *reading
+			copy.citations = maps.Clone(reading.citations)
+			copy.coverage = make(map[string]*conversationstore.ReadingCoverage, len(reading.coverage))
+			for key, coverage := range reading.coverage {
+				value := *coverage
+				value.CoveredRanges = slices.Clone(coverage.CoveredRanges)
+				value.UnresolvedTopics = slices.Clone(coverage.UnresolvedTopics)
+				copy.coverage[key] = &value
+			}
+			armReading = &copy
+		}
+		runtime, err := bindResponseTools(tools, armReading, prepared.searcher, s, slug, responseID, emit)
+		return runtime, armReading, err
+	}, nil
+}
+
+func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, assignment llmcloud.ComparisonAssignment, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame), factories ...comparisonToolFactory) error {
 	comparisonID := assignment.ID
 	emit(StreamFrame{Type: "comparison-started", Data: map[string]any{"comparisonId": comparisonID}})
 	type arm struct {
-		id       string
-		text     string
-		complete bool
+		id        string
+		text      string
+		complete  bool
+		citations []sources.SourceCitation
+		coverage  []conversationstore.ReadingCoverage
 	}
 	left := arm{id: "a"}
 	right := arm{id: "b"}
 	var group sync.WaitGroup
 	var output sync.Mutex
+	emitSafely := func(frame StreamFrame) {
+		output.Lock()
+		defer output.Unlock()
+		emit(frame)
+	}
 	for _, side := range []*arm{&left, &right} {
 		group.Go(func() {
 			var reply strings.Builder
+			var runtime *responseTools
+			var reading *responseSources
+			if len(factories) > 0 && factories[0] != nil {
+				var bindErr error
+				runtime, reading, bindErr = factories[0](emitSafely)
+				if bindErr != nil {
+					return
+				}
+			}
 			err := client.StreamComparison(ctx, comparisonID, side.id, input, func(raw json.RawMessage) error {
-				var event ai.GatewayEvent
+				var event struct {
+					ai.GatewayEvent
+					ResultID string
+					Room     int
+				}
 				if err := json.Unmarshal(raw, &event); err != nil {
 					return err
 				}
 				if event.Type == "text-delta" {
 					reply.WriteString(event.Delta)
-					output.Lock()
-					emit(StreamFrame{Type: "comparison-delta", Data: map[string]any{"arm": side.id, "delta": event.Delta}})
-					output.Unlock()
+					emitSafely(StreamFrame{Type: "comparison-delta", Data: map[string]any{"arm": side.id, "delta": event.Delta}})
+				}
+				if event.Type == "comparison-reset" {
+					reply.Reset()
+					emitSafely(StreamFrame{Type: "comparison-delta", Data: map[string]any{"arm": side.id, "replace": true}})
+				}
+				if event.Type == "comparison-tool-call" {
+					if runtime == nil || event.ToolCall == nil || event.ResultID == "" || event.Room < 0 || event.Room > 4000 {
+						return errors.New("invalid comparison tool call")
+					}
+					result := runtime.execute(ctx, *event.ToolCall, event.Room)
+					if result.Text == "" {
+						encoded, _ := json.Marshal(sourceError(result.Code))
+						result.Text = string(encoded)
+					}
+					return client.SubmitComparisonToolResult(ctx, event.ResultID, result.Text, result.Final || runtime.webCalls >= 2)
 				}
 				return nil
 			})
 			side.text = reply.String()
 			side.complete = err == nil && strings.TrimSpace(side.text) != ""
+			if side.complete && reading != nil {
+				side.text, side.citations, side.coverage = reading.verifiedAnswer(ctx, side.text)
+				if side.text != reply.String() {
+					emitSafely(StreamFrame{Type: "comparison-delta", Data: map[string]any{"arm": side.id, "replace": true, "delta": side.text}})
+				}
+			}
 		})
 	}
 	group.Wait()
 	message := conversationstore.Message{ID: messageID, Role: "teacher", Status: "completed", CreatedAt: time.Now().UTC(), Blocks: []conversationstore.Block{}}
 	switch {
 	case left.complete && right.complete && ctx.Err() == nil:
-		message.Comparison = &conversationstore.AnswerComparison{ID: comparisonID, A: left.text, B: right.text}
+		message.Comparison = &conversationstore.AnswerComparison{ID: comparisonID, A: left.text, B: right.text, CitationsA: left.citations, CitationsB: right.citations, CoverageA: left.coverage, CoverageB: right.coverage}
 	case left.complete:
 		message.Blocks = append(message.Blocks, conversationstore.Block{Type: "markdown", Source: left.text})
+		message.SourceCitations, message.ReadingCoverage = left.citations, left.coverage
 	case right.complete:
 		message.Blocks = append(message.Blocks, conversationstore.Block{Type: "markdown", Source: right.text})
+		message.SourceCitations, message.ReadingCoverage = right.citations, right.coverage
 	default:
 		message.Status = "failed"
 		message.FailureCode = "comparison_unavailable"

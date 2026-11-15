@@ -201,7 +201,7 @@ func frozenProvider(j Job) (ai.ProviderConfig, error) {
 		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	p := cfg.FindExact(j.ProviderID)
-	if p == nil || (p.Kind != "siwc" && (p.APIKey == "" || p.BaseURL == "")) || (p.Kind != "openai" && p.Kind != "anthropic" && p.Kind != "siwc") {
+	if !generationProviderAvailable(p) {
 		return ai.ProviderConfig{}, problem("provider-unavailable", 409)
 	}
 	copy := *p
@@ -332,7 +332,10 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	completedTokens := 0
 	completedTokensEstimated := false
 	lastProgress := time.Time{}
-	for round := 0; round < 8; round++ {
+	const maxRounds, maxSourceCalls, maxSourceTokens = 8, 12, 12000
+	mapJob := j.Kind == "discipline-map"
+	finalMapRound := false
+	for round := 0; round < maxRounds; round++ {
 		available, e := ai.CheckGenerationRequest(req, p)
 		if e != nil {
 			s.fail(slug, j, "input-budget-exhausted")
@@ -428,6 +431,8 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			code := "provider-failed"
 			if ctx.Err() != nil {
 				code = "request-interrupted"
+			} else if ai.IsContextOverflow(err) {
+				code = "input-budget-exhausted"
 			}
 			s.fail(slug, j, code)
 			return
@@ -444,11 +449,15 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		if len(pending) == 0 {
 			break
 		}
-		if round == 7 || len(pending) > 8 {
+		if finalMapRound || round == maxRounds-1 || len(pending) > 8 {
 			s.fail(slug, j, "tool-budget-exhausted")
 			return
 		}
 		req.Messages = append(req.Messages, ai.GatewayMessage{Role: "assistant", Content: text, ToolCalls: pending, ThinkingBlocks: thinking, ProviderContent: providerContent.String(), ReasoningContent: providerReasoning.String()})
+		if mapJob {
+			available, _ = ai.CheckGenerationRequest(req, p)
+		}
+		finishMap := mapJob && round == maxRounds-2
 		for _, call := range pending {
 			if call.ToolName == "search_web" {
 				webCalls++
@@ -471,14 +480,22 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 					return
 				}
 				req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
+				if mapJob {
+					available, _ = ai.CheckGenerationRequest(req, p)
+				}
 				continue
 			}
 			sourceCalls++
-			if sourceCalls > 12 || reader == nil {
+			if reader == nil || (!mapJob && sourceCalls > maxSourceCalls) {
 				s.fail(slug, j, "tool-budget-exhausted")
 				return
 			}
-			budget := min(4000, 12000-sourceTokens, max(0, available-1024))
+			budget := min(4000, maxSourceTokens-sourceTokens, max(0, available-1024))
+			if mapJob && (budget < 128 || sourceCalls > maxSourceCalls) {
+				finishMap = true
+				req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: `{"status":"error","error":{"code":"budget_exhausted","message":"已达到本轮资料续读额度。"}}`})
+				continue
+			}
 			if budget < 128 {
 				s.fail(slug, j, "source-budget-exhausted")
 				return
@@ -499,6 +516,23 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 				}
 			}
 			req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
+			if mapJob {
+				available, _ = ai.CheckGenerationRequest(req, p)
+				finishMap = finishMap || sourceCalls >= maxSourceCalls || sourceTokens >= maxSourceTokens-128
+			}
+		}
+		if finishMap {
+			instructions, renderErr := ai.RenderPrompt("teaching/runtime/tools-finished", nil)
+			if renderErr != nil {
+				s.fail(slug, j, "prompt-resource-unavailable")
+				return
+			}
+			finalMapRound = true
+			req.Tools = nil
+			req.TurnInstructions = instructions
+			if j.MapMode == "sources" {
+				j.Coverage.Gap += " 本轮达到续读限制，地图按已取得的证据整理，仍有资料未读完。"
+			}
 		}
 	}
 	if !s.phase(slug, &j, "validating") {

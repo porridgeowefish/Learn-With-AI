@@ -23,7 +23,7 @@ export function PreferencesPage() {
         <div>
           <span className={s.eyebrow}>LEARNER-OWNED CONTEXT</span>
           <h1>全局学习偏好</h1>
-          <p>只保留这一份跨学习单元生效的偏好文件。教师与助教可以读取，但不会编辑或自动推断新偏好。</p>
+          <p>同一份偏好文件对所有学习专题生效。教师与助教可以读取，但不会编辑或自动推断新偏好。</p>
         </div>
         <span className={s.status} role="status">{state.error ? '尚未保存' : state.saving ? '正在保存…' : dirty ? '等待自动保存…' : state.ready ? '已自动保存' : '加载中…'}</span>
       </header>

@@ -14,14 +14,15 @@ function GemStage({item,beach}:{item:TreasureItem;beach:number}){
 }
 export function TreasureDisplay(){
  const {itemId}=useParams();const query=useCollection();const [beach,setBeach]=useState(0);const container=useRef<HTMLDivElement>(null);
- const item=query.data?.catalog.find(i=>i.id===itemId);const count=query.data?.rewards.filter(r=>r.itemId===itemId).length??0;
+ const item=query.data?.catalog.find(i=>i.id===itemId);const history=query.data?.rewards.filter(r=>r.itemId===itemId)??[];
+ const count=history.filter(reward=>!reward.redeemed).length;
  if(query.isLoading)return <div className={s.loading}>正在打开宝物…</div>;
  if(query.isError)return <div className={s.loading}>暂时无法读取收藏。<button onClick={()=>void query.refetch()}>重试</button></div>;
- if(!item||!count)return <div className={s.loading}><h1>{item?.name??'这件宝物'}</h1><p>尚未发现。在学习途中，等待一次相遇。</p><Link to="/collection">返回收藏 →</Link></div>;
+ if(!item||!history.length)return <div className={s.loading}><h1>{item?.name??'这件宝物'}</h1><p>尚未发现。在学习途中，等待一次相遇。</p><Link to="/collection">返回收藏 →</Link></div>;
  return <section ref={container} className={s.display} style={{backgroundImage:`url(/treasures/references/${beachFiles[beach]}.png)`}}>
   <GemStage item={item} beach={beach}/>
   <header className={s.displayHeader}><Link to="/collection">← 返回收藏</Link><button onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void container.current?.requestFullscreen().catch(()=>{});}} aria-label="切换全屏">⛶</button></header>
-  <div className={s.gemCaption}><h1>{item.name}</h1><p>{item.english.toUpperCase()}</p><span>{tierNames[item.tier-1]}</span><span>已收藏 ×{count}</span></div>
+  <div className={s.gemCaption}><h1>{item.name}</h1><p>{item.english.toUpperCase()}</p><span>{tierNames[item.tier-1]}</span><span>{count ? `持有 ×${count}` : '曾获得'}</span></div>
   <footer className={s.beachPicker}><div>{beachFiles.map((file,i)=><button aria-label={beachNames[i]} aria-pressed={i===beach} className={i===beach?s.chosenBeach:''} key={file} onClick={()=>setBeach(i)}><img src={`/treasures/references/${file}.png`} alt=""/></button>)}</div><p>换一片海</p><small>拖动欣赏 · 滚轮缩放</small></footer>
  </section>;
 }

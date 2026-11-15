@@ -5,12 +5,15 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
+	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 )
 
 func promptExperimentBase(ctx context.Context, db *store.Store, draft promptcatalog.Draft) (map[string]string, error) {
@@ -45,7 +48,25 @@ func (s *Server) EnablePrompts(catalog *promptcatalog.Catalog, identityKey []byt
 	s.mux.HandleFunc("GET /v1/prompts", s.servePrompt)
 	s.mux.HandleFunc("POST /v1/answer-comparison/start", s.startComparison)
 	s.mux.HandleFunc("POST /v1/answer-comparison/stream", s.streamComparison)
+	s.mux.HandleFunc("POST /v1/answer-comparison/tool-result", s.submitComparisonToolResult)
 	s.mux.HandleFunc("POST /v1/answer-comparison/vote", s.voteComparison)
+}
+
+// LoadComparisonRules supplies ordinary teaching format rules to older clients,
+// whose first-answer requests do not carry the composed teaching messages.
+func (s *Server) LoadComparisonRules(root string) error {
+	var rules []string
+	for _, name := range []string{"teaching/formatting", "teaching/interactive"} {
+		rule, err := ai.RenderPromptAt(root, name)
+		if err != nil {
+			return fmt.Errorf("comparison prompt %s: %w", name, err)
+		}
+		rules = append(rules, rule)
+	}
+	s.comparisonRules = strings.Join(rules, "\n\n")
+	var err error
+	s.comparisonToolsFinished, err = ai.RenderPromptAt(root, "teaching/runtime/tools-finished")
+	return err
 }
 
 func (s *Server) EnablePromptAdmin(key ed25519.PrivateKey) {

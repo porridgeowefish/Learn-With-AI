@@ -60,3 +60,20 @@
 .specimen .tierLabel{font-size:0.93333rem;font-weight:800;letter-spacing:.04em}
 .detail .detailRarity{font-size:1.2rem!important;font-weight:800;margin:8px 0}
 .specimen strong{line-height:1.5;text-align:center}
+
+.collectionHeader.collectionWithExchange { grid-template-columns: minmax(0, 1fr) auto; gap: 20px; margin-bottom: 22px; }
+.wallet { display: flex; align-items: center; flex-wrap: wrap; gap: clamp(12px, 2vw, 27px); padding: 13px 18px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; }
+.wallet > div { display: grid; gap: 3px; }
+.wallet span { color: var(--muted); font-size: .84rem; }
+.wallet strong { color: var(--accent-ink); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.collectionNav { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border); margin-bottom: 21px; }
+.collectionNav nav { display: flex; align-items: center; gap: 18px; }
+.collectionNav button { padding: 9px 3px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.collectionNav button[aria-pressed='true'] { color: var(--accent-ink); border-bottom-color: var(--accent); }
+.collectionNav .layoutPicker button { font-size: .82rem; }
+.fullCabinet { grid-template-columns: minmax(0, 1fr); }
+.fullCabinet .grid { grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); }
+.fullCabinet .locked img { filter: saturate(.6); opacity: .69; }
+.exchangeItem { width: 100%; margin-top: 9px; }
+.quoteFooter { margin: 38px 0 12px; max-width: 850px; }
+@media (max-width: 780px) { .collectionHeader.collectionWithExchange { grid-template-columns: 1fr; } .wallet { justify-self: start; } }

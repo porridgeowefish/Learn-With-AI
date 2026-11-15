@@ -37,10 +37,11 @@ type ComposedPrompt struct {
 // PromptFragment records local provenance. Unknown source versions and freshness
 // are intentionally omitted rather than inferred from content.
 type PromptFragment struct {
-	Resource string
-	SourceID string
-	Role     string
-	SHA256   string
+	Resource     string
+	SourceID     string
+	Role         string
+	SHA256       string
+	MessageIndex int
 }
 type promptSlot struct {
 	Resource string           `json:"resource"`
@@ -86,7 +87,10 @@ var promptCache struct {
 }
 
 func promptSnapshot() (map[string][]byte, error) {
-	root := filepath.Join(filesystem.PROJECT_ROOT, "learning-prompts")
+	return promptSnapshotAt(filepath.Join(filesystem.PROJECT_ROOT, "learning-prompts"))
+}
+
+func promptSnapshotAt(root string) (map[string][]byte, error) {
 	b, err := os.ReadFile(filepath.Join(root, "manifest.json"))
 	if err != nil {
 		return nil, err
@@ -196,6 +200,14 @@ func snapshotFile(snapshot map[string][]byte, name, extension string) ([]byte, e
 }
 func RenderPrompt(name string, variables map[string]string) (string, error) {
 	return RenderPromptContext(context.Background(), name, variables)
+}
+
+func RenderPromptAt(root, name string) (string, error) {
+	snapshot, err := promptSnapshotAt(root)
+	if err != nil {
+		return "", err
+	}
+	return renderSnapshot(snapshot, name, nil)
 }
 
 func RenderPromptContext(ctx context.Context, name string, variables map[string]string) (string, error) {
@@ -518,11 +530,11 @@ func ComposePrompt(ctx context.Context, scene string, facts map[string]string, s
 		}
 		if s.Source != "" {
 			messages = append(messages, GatewayMessage{Role: "user", Content: text, Pinned: true})
-			fragments = append(fragments, PromptFragment{SourceID: s.Source, Role: "user", SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(text)))})
+			fragments = append(fragments, PromptFragment{SourceID: s.Source, Role: "user", SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(text))), MessageIndex: len(messages) - 1})
 		} else {
 			parts = append(parts, text)
 			messages = append(messages, GatewayMessage{Role: "system", Content: text, Pinned: true})
-			fragments = append(fragments, PromptFragment{Resource: s.Resource, Role: "system", SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(text)))})
+			fragments = append(fragments, PromptFragment{Resource: s.Resource, Role: "system", SHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(text))), MessageIndex: len(messages) - 1})
 		}
 	}
 	bytes := 0

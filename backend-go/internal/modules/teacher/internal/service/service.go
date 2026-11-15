@@ -242,11 +242,6 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 
 	sequenced, checkpoint, err := conversation.ContextHistory(learnerSeq)
 	history := teacherHistory{messages: sequenced, checkpoint: checkpoint, learnerSeq: learnerSeq, opening: learner.Role == "system"}
-	if err == nil {
-		if compared, compareErr := compareFirstAnswer(ctx, slug, effectiveProviderID, conversation, history, learner, responseID, teacherMessageID, emit); compared {
-			return compareErr
-		}
-	}
 	promptCtx := ai.CloudPromptContext(ctx, "teacher/general")
 	var composition ai.ComposedPrompt
 	if err == nil {
@@ -302,6 +297,10 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		if selected[tool.Name] {
 			tools = append(tools, tool)
 		}
+	}
+	comparison := comparisonPreparation{composition: composition, tools: tools, searcher: searcher, turnContext: turnContext, effort: options.Effort, budget: budget}
+	if compared, compareErr := s.compareFirstAnswer(promptCtx, slug, effectiveProviderID, conversation, history, learner, responseID, teacherMessageID, comparison, emit); compared {
+		return compareErr
 	}
 	usage := map[string]int{}
 	var creditUsage *conversationstore.CreditUsage

@@ -127,7 +127,7 @@ export function WorkspaceSettings() {
   }
   return <>
     <section className={s.workspaceSection} aria-labelledby="workspace-location">
-      <header className={s.workspaceHeader}><div><h2 id="workspace-location">更改存储位置</h2><p>当前位置 · {health.data?.workspace || '…'}</p></div>
+      <header className={s.workspaceHeader}><div><h2 id="workspace-location">存储位置</h2><p>学习记录保存于 · {health.data?.workspace || '…'}</p></div>
       <div className={s.settingsActions}><button type="button" disabled={!!busy} onClick={() => run('directories')}>选择文件夹</button></div></header>
       {dir && <><p>迁移至 <strong>{dir.destination}</strong>。若目录已被占用，将使用下一个可用编号。</p>
         <div className={s.workspaceActions}><Button size="sm" variant="primary" disabled={!!busy} onClick={() => run('move')}>确认迁移</Button><Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setDir(undefined)}>取消</Button></div></>}

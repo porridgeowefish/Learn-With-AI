@@ -184,8 +184,8 @@ func (g *Gateway) Stream(ctx context.Context, model string, estimatedTokens int,
 
 // StreamComparison allows the second arm to wait for a shared connection to
 // finish the first arm. It uses the same finite wait slots as ordinary traffic.
-func (g *Gateway) StreamComparison(ctx context.Context, model string, estimatedTokens int, request ai.GatewayRequest, emit func(ai.GatewayEvent)) ([]Attempt, error) {
-	return g.stream(ctx, model, estimatedTokens, "", request, emit, 12*time.Second)
+func (g *Gateway) StreamComparison(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent)) ([]Attempt, error) {
+	return g.stream(ctx, model, estimatedTokens, preferred, request, emit, 12*time.Second)
 }
 
 func (g *Gateway) stream(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent), wait time.Duration) ([]Attempt, error) {

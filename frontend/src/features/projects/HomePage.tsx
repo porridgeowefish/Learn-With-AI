@@ -49,7 +49,7 @@ export function HomePage() {
           <div className={s.headerActions}>
           <Button ref={replayButton} onClick={event => openDemo(event.currentTarget)}>体验示例</Button>
           <Button data-tour="create-project" variant="primary" iconLeft={<Icon name="plus" size={14} />} onClick={openModal}>
-            新建项目
+            新建学习内容
           </Button>
           </div>
         </header>
@@ -59,16 +59,16 @@ export function HomePage() {
 
         {/* Projects grid */}
         <section>
-          <h2 className={s.sectionTitle}>学习项目</h2>
+          <h2 className={s.sectionTitle}>学习路线</h2>
           {projectsLoading ? (
             <div className={s.loading}>加载中…</div>
           ) : projects.length === 0 ? (
             <EmptyState
-              title="还没有学科地图"
-              description="创建学科地图来梳理一个领域。对话项目可从左侧栏进入。"
+              title="还没有学习路线"
+              description="创建一条学习路线来规划一个领域。已有学习专题可从左侧学习库打开。"
               action={
                 <Button variant="primary" onClick={openModal}>
-                  创建第一个项目
+                  新建学习内容
                 </Button>
               }
             />

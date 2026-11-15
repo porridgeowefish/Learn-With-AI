@@ -17,10 +17,10 @@ import s from './CreateProjectModal.module.css';
 
 const schema = z.object({
   projectType: z.enum(['discipline-map', 'system-learning'], {
-    required_error: '请选择学科地图或系统学习',
-    invalid_type_error: '请选择学科地图或系统学习',
+    required_error: '请选择学习路线或学习专题',
+    invalid_type_error: '请选择学习路线或学习专题',
   }),
-  title: z.string().trim().min(1, '请填写项目标题'),
+  title: z.string().trim().min(1, '请填写标题'),
   systemPrompt: z.string().optional().default(''),
   learningMode: z.enum(['general', 'history', 'book', 'concept']).default('general'),
 });
@@ -105,8 +105,8 @@ export function CreateProjectModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={fromDisciplineMap ? '创建深入学习项目' : '新建项目'}
-      description={fromDisciplineMap ? '创建一个普通、平级的系统学习项目；之后仍可在侧栏自由分类' : '先选择当前需要的是建立地图，还是进入系统学习'}
+      title={fromDisciplineMap ? '开始学这一节' : '新建学习内容'}
+      description={fromDisciplineMap ? '为这一节创建学习专题，之后可在学习库里分组。' : '想规划一个领域，选学习路线。想弄懂一个具体问题，选学习专题。'}
       size="md"
       footer={(
         <>
@@ -120,7 +120,7 @@ export function CreateProjectModal({
             loading={isSubmitting || create.isPending}
             disabled={!modelOptions.canUse}
           >
-            {fromDisciplineMap ? '确认创建' : '创建项目'}
+            {fromDisciplineMap ? '确认创建' : selectedType === 'discipline-map' ? '创建学习路线' : '创建学习专题'}
           </Button>
         </>
       )}
@@ -129,12 +129,12 @@ export function CreateProjectModal({
         {!fixedProjectType && (
           <div className={s.field}>
             <div className={s.typeHeader}>
-              <label>项目形态 <span className={s.req}>*</span></label>
+              <label>学习内容类型 <span className={s.req}>*</span></label>
               <button
                 type="button"
                 className={s.advisorTrigger}
                 onClick={() => setAdvisorOpen(true)}
-                aria-label="问问 AI，帮我选择项目形态"
+                aria-label="问问 AI，帮我选择学习内容类型"
               >
                 <Icon name="bot" size={15} />
                 <span>问问 AI</span>
@@ -144,13 +144,13 @@ export function CreateProjectModal({
             <div className={s.typeGrid}>
               <label className={s.typeCard}>
                 <input type="radio" value="discipline-map" {...register('projectType')} />
-                <strong>学科地图</strong>
-                <span>先全面了解一门学科的边界、领域与路线。</span>
+                <strong>学习路线</strong>
+                <span>梳理一个领域的主题与先后顺序。例如「学习数据库」。</span>
               </label>
               <label className={s.typeCard}>
                 <input type="radio" value="system-learning" {...register('projectType')} />
-                <strong>系统学习</strong>
-                <span>围绕具体主题进入引入、讲解、练习、拓展和总结。</span>
+                <strong>学习专题</strong>
+                <span>围绕一个具体问题学习、复习并保存资料。例如「为什么索引用 B+ 树」。</span>
               </label>
             </div>
             {errors.projectType && <div className={s.error}>{errors.projectType.message}</div>}
@@ -158,7 +158,7 @@ export function CreateProjectModal({
         )}
         <div className={s.field}>
           <label htmlFor="cp-title">
-            项目标题 <span className={s.req}>*</span>
+            标题 <span className={s.req}>*</span>
           </label>
           <input
             id="cp-title"
@@ -167,7 +167,7 @@ export function CreateProjectModal({
             autoComplete="off"
             {...register('title')}
           />
-          <div className={s.hint}>我们会根据标题自动创建本地项目目录，后续仍可修改显示标题。</div>
+          <div className={s.hint}>学习记录保存在设置中的「存储位置」。显示标题可以修改。</div>
           {errors.title && <div className={s.error}>{errors.title.message}</div>}
         </div>
 

@@ -164,7 +164,20 @@ func configuredWindow(p aiconfig.Provider) int {
 	if p.ContextWindowTokens > 0 {
 		return p.ContextWindowTokens
 	}
-	if strings.TrimSpace(p.Model) == "glm-5.3" {
+	model := strings.TrimSpace(p.Model)
+	if p.Kind == "siwc" && model == "gpt-6.1-sol" {
+		// OpenAI documents a separate 500K default for Codex/ChatGPT Work.
+		return 500000
+	}
+	if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Hostname() == "api.openai.com" && p.Kind == "openai" {
+		switch model {
+		case "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.5", "gpt-5.5-2026-04-23", "gpt-6.1-sol":
+			return 1050000
+		case "gpt-5.2", "gpt-5.2-2025-12-11":
+			return 400000
+		}
+	}
+	if model == "glm-5.3" {
 		// Verified GLM-5.3 model capacity (2026-10-11). Legacy connections
 		// omit this field; do not incorrectly constrain the first-party model
 		// to the generic fallback. Unknown relays retain the safe fallback.
@@ -174,7 +187,6 @@ func configuredWindow(p aiconfig.Provider) int {
 	}
 	if p.ContextWindowTokens == 0 {
 		if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Hostname() == "tokenhub.tencentmaas.com" {
-			model := strings.TrimSpace(p.Model)
 			switch model {
 			case "hy4-preview", "deepseek/deepseek-flash", "deepseek-v4.1-flash", "deepseek-v4-flash-202605", "deepseek-v4-pro-202606",
 				"deepseek/deepseek-v4-flash-0731", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro-0813", "deepseek/deepseek-v4-pro",

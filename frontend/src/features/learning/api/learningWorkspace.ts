@@ -23,7 +23,7 @@ export interface ConversationMessage {
   readingCoverage?: Array<{ sourceId: string; revisionId: string; contentHash: string; scope: string; completeWithinScope: boolean }>;
   creditUsage?: { units: number; pending: boolean };
   feedback?: 'up' | 'down';
-  comparison?: { id: string; a: string; b: string; vote?: ComparisonVote | 'skipped' };
+  comparison?: { id: string; a: string; b: string; vote?: ComparisonVote | 'skipped'; sourceCitationsA?: SourceCitation[]; sourceCitationsB?: SourceCitation[] };
 }
 
 export type ComparisonVote = 'a' | 'b' | 'tie';

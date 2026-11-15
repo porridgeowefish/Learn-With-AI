@@ -9,12 +9,12 @@ import s from './ScreenGuide.module.css';
 const steps = [
  { title: '欢迎，先认识你的学习工作台', target: 'welcome', route: '/', body: '接下来会带你操作真实界面。关闭向导后不会再次显示；离线体验示例仍可使用。', next: '开始配置' },
  { title: '连接你的教师模型', target: 'model-connections', route: '/settings?section=models', body: '选择“API 连接”，点击“添加 API 连接”，填写你自己的模型与 Key，检测并保存。也可以选择登录连接。向导不会读取或填写密钥。', next: '已保存连接，继续' },
- { title: '告诉教师，你希望怎样学习', target: 'preferences', route: '/preferences', body: '在下方填写你喜欢的讲解方式，例如“先讲直觉，多给例子”，再点击“保存偏好”。这是选填项，可以直接继续。', next: '去创建学习项目' },
- { title: '创建第一个系统学习项目', target: 'create-project', route: '/', body: '点击“新建项目”，选择“系统学习”，输入一个具体主题，然后点击“创建项目”。也可以从向导下方选择已有的系统学习项目继续。', next: '等待你进入学习项目' },
+ { title: '告诉教师，你希望怎样学习', target: 'preferences', route: '/preferences', body: '在下方填写你喜欢的讲解方式，例如“先讲直觉，多给例子”，再点击“保存偏好”。这是选填项，可以直接继续。', next: '去创建学习专题' },
+ { title: '创建第一个学习专题', target: 'create-project', route: '/', body: '点击“新建学习内容”，选择“学习专题”，输入一个具体主题，然后点击“创建学习专题”。也可以从向导下方选择已有的学习专题继续。', next: '等待你进入学习专题' },
  { title: '向教师提出第一个问题', target: 'teacher-composer', body: '在高亮输入框写下问题并发送。左侧加号可上传附件，右侧可以选择模型或使用麦克风。教师回答期间，后续问题会进入等待队列。', next: '去看笔记与复习' },
  { title: '把对话变成自己的知识', target: 'notes-tabs', body: '这里可以查看复习稿、练习、笔记和“讲给教师听”。复习稿可直接生成，练习题只需填写题数；自动笔记会按设置积累。试着切换上方入口，再继续。', next: '去管理附件' },
- { title: '把学习材料放在同一个地方', target: 'source-upload', body: '这里管理上传的文档及解析进度。教师可按需查阅，正文里的引用可以追溯原文。图片和音频也可从对话输入框左侧上传；此步可以先跳过上传。', next: '了解学科地图' },
- { title: '从一个主题，走向一整门学科', target: 'create-project', route: '/', body: '想先梳理一个领域时，在“新建项目”选择“学科地图”；确认地图中的主题后，再进入系统学习。你已走完主要流程，回到项目继续学习吧。', next: '完成向导，开始学习' },
+ { title: '把学习材料放在同一个地方', target: 'source-upload', body: '这里管理上传的文档及解析进度。教师可按需查阅，正文里的引用可以追溯原文。图片和音频也可从对话输入框左侧上传；此步可以先跳过上传。', next: '了解学习路线' },
+ { title: '从一个主题，走向一整门学科', target: 'create-project', route: '/', body: '想先梳理一个领域时，在“新建学习内容”选择“学习路线”；从路线里选一个小节开始学。你已走完主要流程，回到项目继续学习吧。', next: '完成向导，开始学习' },
 ] as const;
 interface Box { left: number; top: number; right: number; bottom: number }
 interface Geometry { box: Box | null; width: number; height: number; modal: HTMLElement | null; answered: boolean }
@@ -81,7 +81,7 @@ export function ScreenGuide() {
   if(tour.step===7) { tour.finish(); if(tour.slug) navigate(`${projectPath}/teacher`); }
   else tour.move(tour.step+1);
  };
- if(geometry.modal) return createPortal(<p className={s.modalHint} role="status">屏幕向导 · 第 {tour.step+1} / 8 步<br/>{tour.step===3 ? '选择“系统学习”，填写主题并创建。' : tour.step===1 ? '填写连接、检测并保存；向导将在关闭弹窗后继续。' : '按需完成此窗口的操作，关闭后继续向导。'}</p>,geometry.modal);
+ if(geometry.modal) return createPortal(<p className={s.modalHint} role="status">屏幕向导 · 第 {tour.step+1} / 8 步<br/>{tour.step===3 ? '选择“学习专题”，填写主题并创建。' : tour.step===1 ? '填写连接、检测并保存；向导将在关闭弹窗后继续。' : '按需完成此窗口的操作，关闭后继续向导。'}</p>,geometry.modal);
  const {box,width,height} = geometry;
  const panelWidth = Math.min(344,width-24), panelHeight = card.current?.offsetHeight ?? 238;
  const left = box ? Math.min(width-panelWidth-12,Math.max(12,(box.left+box.right-panelWidth)/2)) : (width-panelWidth)/2;
@@ -99,7 +99,7 @@ export function ScreenGuide() {
    <div className={s.track} aria-hidden="true">{steps.map((item,i)=><i key={item.title} data-complete={i<=tour.step || undefined}/>)}</div>
    <h2>{step.title}</h2><p>{step.body}</p>
    {!box && <p role="status" className={s.wait}>正在等待此页的入口。若你离开了当前步骤，可点击“重新定位”。</p>}
-   {tour.step===3 && projects.data?.projects.some(p=>p.projectType==='system-learning') && <label className={s.projectPicker}>使用已有项目<select aria-label="选择已有学习项目" value="" onChange={event=>{if(event.target.value)tour.selectProject(event.target.value);}}><option value="">选择一个学习项目…</option>{projects.data.projects.filter(p=>p.projectType==='system-learning').map(p=><option key={p.slug} value={p.slug}>{p.title}</option>)}</select></label>}
+   {tour.step===3 && projects.data?.projects.some(p=>p.projectType==='system-learning') && <label className={s.projectPicker}>使用已有专题<select aria-label="选择已有学习专题" value="" onChange={event=>{if(event.target.value)tour.selectProject(event.target.value);}}><option value="">选择一个学习专题…</option>{projects.data.projects.filter(p=>p.projectType==='system-learning').map(p=><option key={p.slug} value={p.slug}>{p.title}</option>)}</select></label>}
    <div className={s.actions}>
     <button type="button" onClick={()=>tour.move(tour.step-1)} disabled={tour.step===0}>上一步</button>
     <button type="button" className={s.primary} disabled={blocked} onClick={next}>{step.next}</button>
