@@ -160,7 +160,7 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "credits_unavailable")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), inferenceTimeout(in.MaxOutputTokens))
 	defer cancel()
 	startedAt := time.Now()
 	started := false
@@ -232,6 +232,13 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 	} else {
 		failWithSettlement(w, http.StatusBadGateway, "inference_unavailable", receipt)
 	}
+}
+
+func inferenceTimeout(maxOutput int) time.Duration {
+	if maxOutput > 8192 {
+		return 15 * time.Minute
+	}
+	return 5 * time.Minute
 }
 
 func failWithSettlement(w http.ResponseWriter, status int, code string, receipt ai.CreditSettlement) {

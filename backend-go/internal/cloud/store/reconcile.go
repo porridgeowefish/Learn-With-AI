@@ -153,7 +153,7 @@ func (s *Store) PendingInference(ctx context.Context, now time.Time) ([]PendingI
 	SELECT p.*,COALESCE(c.model,(SELECT a.model FROM inference_attempt a WHERE a.account_id=p.account_id AND a.request_id=p.request_id
 		ORDER BY a.ordinal LIMIT 1),''),COALESCE(route.revision,'')
 	FROM pending p LEFT JOIN inference_route route USING(account_id,request_id) LEFT JOIN answer_comparison c ON c.id=p.comparison_id
-	ORDER BY p.created_at,p.account_id,p.request_id,p.comparison_id,p.arm`, now.Add(-10*time.Minute).Unix(), now.Add(-10*time.Minute).Unix())
+	ORDER BY p.created_at,p.account_id,p.request_id,p.comparison_id,p.arm`, now.Add(-inferenceHoldTTL).Unix(), now.Add(-10*time.Minute).Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (s *Store) ReconcileInference(ctx context.Context, actor, account, request,
 		}
 		var ok bool
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM inference_request r LEFT JOIN cost_budget b USING(account_id,request_id)
-			WHERE r.account_id=? AND r.request_id=? AND `+reconciliable+`)`, account, request, now.Add(-10*time.Minute).Unix()).Scan(&ok); err != nil {
+			WHERE r.account_id=? AND r.request_id=? AND `+reconciliable+`)`, account, request, now.Add(-inferenceHoldTTL).Unix()).Scan(&ok); err != nil {
 			return err
 		}
 		if !ok {
