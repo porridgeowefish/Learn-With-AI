@@ -145,24 +145,8 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 	prices := model.Rate.prices()
 	weighted := int64(estimated)*max(prices.Input, prices.Cached, prices.Write) + int64(in.MaxOutputTokens)*prices.Output
 	units := model.Rate.creditUnits(weighted)
-	budget := store.BudgetHold{Currency: s.budget.Currency, Limit: s.budget.MonthlyNanos}
-	if budget.Limit > 0 {
-		estimator, ok := s.gateway.(interface {
-			EstimateCost(string, string, int, int, bool) (int64, bool)
-		})
-		if ok {
-			budget.Estimated, ok = estimator.EstimateCost(model.ID, budget.Currency, model.MaxInput, in.MaxOutputTokens, needsTools)
-		}
-		if !ok {
-			fail(w, http.StatusServiceUnavailable, "model_cost_unconfigured")
-			return
-		}
-	}
-	hold, err := s.db.ReserveBudgeted(r.Context(), account.ID, in.RequestID, hex.EncodeToString(digest[:]), units, time.Now(), budget)
+	hold, err := s.db.Reserve(r.Context(), account.ID, in.RequestID, hex.EncodeToString(digest[:]), units, time.Now())
 	switch {
-	case errors.Is(err, store.ErrBudget):
-		fail(w, http.StatusServiceUnavailable, "cloud_budget_exhausted")
-		return
 	case errors.Is(err, store.ErrBalance):
 		fail(w, http.StatusPaymentRequired, "insufficient_credits")
 		return
@@ -289,7 +273,7 @@ func (s *Server) settle(ctx context.Context, user, request string, rate Rate, at
 			return ai.CreditSettlement{Pending: true}, s.db.MarkPending(ctx, user, request, time.Now())
 		}
 		units += charge
-		if attempt.CostNanos == nil || attempt.Currency != s.budget.Currency {
+		if attempt.CostNanos == nil || attempt.Currency != s.supplierCostCurrency {
 			knownSpend = false
 		} else {
 			spend += *attempt.CostNanos

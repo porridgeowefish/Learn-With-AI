@@ -1,7 +1,22 @@
 .control { display:flex; flex-wrap:wrap; gap:10px; align-items:center; min-width:0; }
-.control button { padding:7px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--fg); }
-.status { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:0.8rem; }
-.status progress { max-width:160px; width:100%; accent-color:var(--accent); }
+.loading, .result {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  padding:6px 8px 6px 12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--card);
+  font-size:0.8rem;
+}
+.progress { display:grid; gap:3px; min-width:0; }
+.progress small { color:var(--muted); font-size:inherit; line-height:1.5; }
+.loading .progress { min-width:clamp(80px, 17vw, 148px); }
+.progress progress { width:100%; height:5px; accent-color:var(--accent); }
+.loading > button, .result > button { flex:none; }
+.result[data-status='failed'] strong, .result[data-status='interrupted'] strong { color:var(--pink); }
+@media (max-width:600px) { .result { flex-wrap:wrap; } }
 .fields { display:grid; gap:16px; }
 .fields label { display:grid; gap:6px; font-size:0.86667rem; }
 .fields input,.fields select { min-width:0; max-width:100%; padding:8px; border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:6px; }

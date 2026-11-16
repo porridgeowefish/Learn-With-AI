@@ -29,7 +29,11 @@ import (
 
 type config struct {
 	httpapi.ModelConfig
-	Budget            httpapi.Budget
+	Budget struct {
+		Currency string
+		// Accepted for existing deployment files. Inference has no monthly cost cap.
+		MonthlyNanos int64
+	}
 	UpstreamHosts     []string // Accepted in existing deployment files. Upstream hosts no longer use a list.
 	TrustedProxyCIDRs []string
 	Operators         map[string]struct{ Role, TOTPEnv string }
@@ -309,7 +313,7 @@ func run(ctx context.Context, address, path, database string, checkOnly bool) er
 	if err := handler.SetStartupModelRevision(cfg.ModelConfig, active.Version); err != nil {
 		return err
 	}
-	if err := handler.EnableBudget(cfg.Budget); err != nil {
+	if err := handler.EnableCostReporting(cfg.Budget.Currency); err != nil {
 		return err
 	}
 	if checkOnly {

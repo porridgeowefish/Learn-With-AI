@@ -176,10 +176,6 @@ type Reservation struct {
 }
 
 func (s *Store) Reserve(ctx context.Context, accountID, requestID, digest string, units int64, now time.Time) (Reservation, error) {
-	return s.ReserveBudgeted(ctx, accountID, requestID, digest, units, now, BudgetHold{})
-}
-
-func (s *Store) ReserveBudgeted(ctx context.Context, accountID, requestID, digest string, units int64, now time.Time, budget BudgetHold) (Reservation, error) {
 	if requestID == "" || digest == "" || units <= 0 {
 		return Reservation{}, errors.New("invalid inference reservation")
 	}
@@ -210,10 +206,7 @@ func (s *Store) ReserveBudgeted(ctx context.Context, accountID, requestID, diges
 		hold = Reservation{Created: true, State: "reserved"}
 		_, err = tx.ExecContext(ctx, `INSERT INTO inference_request(account_id,request_id,digest,held,state,created_at,updated_at)
 			VALUES(?,?,?,?,'reserved',?,?)`, accountID, requestID, digest, units, now.Unix(), now.Unix())
-		if err != nil || budget.Limit == 0 {
-			return err
-		}
-		return reserveCost(ctx, tx, accountID, requestID, now, budget)
+		return err
 	})
 	return hold, err
 }

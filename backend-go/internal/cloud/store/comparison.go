@@ -242,7 +242,7 @@ func (s *Store) SelectedComparisonPrompt(ctx context.Context, subject, experimen
 	return json.RawMessage(selected), err
 }
 
-func (s *Store) ReserveComparisonArm(ctx context.Context, id, arm, questionDigest string, now time.Time, hold BudgetHold) error {
+func (s *Store) StartComparisonArm(ctx context.Context, id, arm, questionDigest, currency string, now time.Time) error {
 	return s.transaction(ctx, func(tx *sql.Tx) error {
 		result, err := tx.ExecContext(ctx, "UPDATE answer_comparison SET question_digest=? WHERE id=? AND (question_digest='' OR question_digest=?)", questionDigest, id, questionDigest)
 		if err != nil {
@@ -251,18 +251,8 @@ func (s *Store) ReserveComparisonArm(ctx context.Context, id, arm, questionDiges
 		if n, err := result.RowsAffected(); err != nil || n != 1 {
 			return ErrConflict
 		}
-		if hold.Limit > 0 {
-			usage, err := budgetUsage(ctx, tx, hold.Currency, now)
-			if err != nil {
-				return err
-			}
-			if hold.Estimated <= 0 || usage.Settled >= hold.Limit || usage.Reserved >= hold.Limit-usage.Settled ||
-				hold.Estimated > hold.Limit-usage.Settled-usage.Reserved {
-				return ErrBudget
-			}
-		}
 		result, err = tx.ExecContext(ctx, `INSERT INTO answer_comparison_arm(comparison_id,arm,state,created_at,month,currency,estimated)
-			VALUES(?,?,'running',?,?,?,?) ON CONFLICT DO NOTHING`, id, arm, now.Unix(), now.In(shanghai).Format("2006-01"), hold.Currency, hold.Estimated)
+			VALUES(?,?,'running',?,?,?,0) ON CONFLICT DO NOTHING`, id, arm, now.Unix(), now.In(shanghai).Format("2006-01"), currency)
 		if err != nil {
 			return err
 		}
@@ -281,29 +271,6 @@ func (s *Store) FinishComparisonArm(ctx context.Context, id, arm string, complet
 	_, err := s.db.ExecContext(ctx, `UPDATE answer_comparison_arm SET state=?,finished_at=?,settled=COALESCE(settled,?),known_cost_floor=?
 		WHERE comparison_id=? AND arm=? AND state='running'`, state, now.Unix(), cost, knownCostFloor, id, arm)
 	return err
-}
-
-func (s *Store) ExtendComparisonArmBudget(ctx context.Context, id, arm string, start time.Time, hold BudgetHold) error {
-	return s.transaction(ctx, func(tx *sql.Tx) error {
-		usage, err := budgetUsage(ctx, tx, hold.Currency, start)
-		if err != nil {
-			return err
-		}
-		if hold.Estimated <= 0 || usage.Settled >= hold.Limit || usage.Reserved >= hold.Limit-usage.Settled ||
-			hold.Estimated > hold.Limit-usage.Settled-usage.Reserved {
-			return ErrBudget
-		}
-		result, err := tx.ExecContext(ctx, `UPDATE answer_comparison_arm SET estimated=estimated+?
-			WHERE comparison_id=? AND arm=? AND state='running' AND currency=? AND month=?`,
-			hold.Estimated, id, arm, hold.Currency, start.In(shanghai).Format("2006-01"))
-		if err != nil {
-			return err
-		}
-		if n, err := result.RowsAffected(); err != nil || n != 1 {
-			return ErrConflict
-		}
-		return nil
-	})
 }
 
 func (s *Store) VoteComparison(ctx context.Context, subject, id, vote string, now time.Time) error {

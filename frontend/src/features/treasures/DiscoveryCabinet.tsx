@@ -187,7 +187,7 @@ export function DiscoveryCabinet({ collection, exchange, catalogFooter }: { coll
       {challenge && <p className={s.earnNote}>样例练习可体验积分到账，当前分值仅用于预览。</p>}
     </section>}
 
-    <Modal open={!!focus} onOpenChange={open => { if (!open) setFocus(undefined); }} title={focus?.name ?? '藏品详情'} description={focus ? `${tierNames[focus.tier - 1]} · ${focus.kind === 'gem' ? '宝石' : '贝壳'}` : undefined} size="sm" className={s.modal}
+    <Modal open={!!focus} onOpenChange={open => { if (!open) setFocus(undefined); }} title={focus?.name ?? '藏品详情'} description={focus ? `${tierNames[focus.tier - 1]} · ${focus.kind === 'gem' ? '宝石' : '贝壳'}` : undefined} size="sm"
       footer={focus && <><Button onClick={() => setFocus(undefined)}>关闭</Button>{!inventory.found.has(focus.id) && <Button variant="primary" onClick={() => chooseGoal(focus)}>设为收藏目标</Button>}</>}>
       {focus && <div className={s.specimenDetail}><TreasurePortrait item={focus} /><section>
         {inventory.found.has(focus.id) ? <><p>{inventory.held.get(focus.id) ? `持有 ${inventory.held.get(focus.id)} 件` : '曾获得 · 当前持有 0 件'}</p><Link to={`/collection/${focus.id}`}>打开三维展示 →</Link></> : <p>尚未发现</p>}
@@ -197,7 +197,7 @@ export function DiscoveryCabinet({ collection, exchange, catalogFooter }: { coll
       </section></div>}
     </Modal>
 
-    <Modal open={practiceOpen} onOpenChange={open => { if (!practice.isPending) setPracticeOpen(open); }} title={challenge?.title ?? '学习练习'} description={`${challenge?.subject ?? '学习'} · 预览练习`} className={s.modal}
+    <Modal open={practiceOpen} onOpenChange={open => { if (!practice.isPending) setPracticeOpen(open); }} title={challenge?.title ?? '学习练习'} description={`${challenge?.subject ?? '学习'} · 预览练习`}
       footer={challengeResult ? <Button variant="primary" onClick={() => { setPracticeOpen(false); show('discovery'); }}>回到收藏目标</Button> : <><Button disabled={practice.isPending} onClick={() => setPracticeOpen(false)}>稍后再做</Button><Button variant="primary" loading={practice.isPending} disabled={!challenge?.questions.every((_, index) => Number.isInteger(answers[index]))} onClick={() => practice.mutate(answers)}>提交练习</Button></>}>
       {challengeResult && <p className={s.notice} role="status">答对 {challengeResult.score} / {challenge?.questions.length} 题 · 学习积分 +{fmt(challengeResult.award)}</p>}
       {challenge?.questions.map((question, index) => <fieldset key={question.prompt} className={s.question}>
@@ -212,7 +212,7 @@ export function DiscoveryCabinet({ collection, exchange, catalogFooter }: { coll
       {practice.isError && <p role="alert">{practice.error.message}</p>}
     </Modal>
 
-    <Modal open={!!quote} onOpenChange={open => { if (!open && !redeem.isPending) setQuote(undefined); }} title="兑换并收录" description={quote ? `用 ${fmt(quote.price)} 学习积分兑换 ${quote.name}。` : undefined} className={s.modal} size="sm"
+    <Modal open={!!quote} onOpenChange={open => { if (!open && !redeem.isPending) setQuote(undefined); }} title="兑换并收录" description={quote ? `用 ${fmt(quote.price)} 学习积分兑换 ${quote.name}。` : undefined} size="sm"
       footer={<><Button onClick={() => setQuote(undefined)} disabled={redeem.isPending}>取消</Button><Button variant="primary" disabled={quote?.input.version !== policy?.version} loading={redeem.isPending} onClick={() => { if (quote) redeem.mutate(quote.input); }}>确认兑换</Button></>}>
       {quote && <p>兑换后余额 {fmt(Math.max(0, points - quote.price))} 学习积分。</p>}
       {quote && quote.input.version !== policy?.version && <p role="alert">价格已更新，请重新打开报价。</p>}

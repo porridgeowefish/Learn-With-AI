@@ -275,7 +275,11 @@ export function DisciplineOverview({ slug, title, providerId }: DisciplineOvervi
             <span><b className={`${s.priority} ${s.priorityII}`}>Ⅱ</b>中等深度</span>
             <span><b className={`${s.priority} ${s.priorityIII}`}>Ⅲ</b>深入选学</span>
           </div>}
-          <div className={s.actions}><GenerationControl slug={slug} kind="discipline-map" initialProviderId={providerId}/><SourceImportControl slug={slug}/></div>
+          <div className={s.actions}>
+            {!(activeView === 'overview' && overviewPending && !overview.isLoading && !overview.error) &&
+              <GenerationControl slug={slug} kind="discipline-map" initialProviderId={providerId}/>}
+            <SourceImportControl slug={slug}/>
+          </div>
         </div>
       </header>
 

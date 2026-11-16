@@ -85,23 +85,6 @@ func (g *Gateway) SupportsTools(model string) bool {
 	return false
 }
 
-// EstimateCost reserves at the highest eligible same-model connection rate.
-// A missing rate makes the model ineligible while a global budget is enabled.
-func (g *Gateway) EstimateCost(model, currency string, input, output int, needsTools bool) (int64, bool) {
-	var highest int64
-	for _, upstream := range g.providers {
-		if upstream.Connection.Model != model || (needsTools && upstream.Connection.TextOnly) {
-			continue
-		}
-		rate := upstream.Cost
-		if rate.Currency != currency || rate.Input <= 0 || rate.Output <= 0 {
-			return 0, false
-		}
-		highest = max(highest, int64(input)*max(rate.Input, rate.Cached, rate.Write)+int64(output)*rate.Output)
-	}
-	return highest, highest > 0
-}
-
 func (g *Gateway) CarryCapacity(previous *Gateway) {
 	g.pool.CarryCapacity(previous.pool)
 }

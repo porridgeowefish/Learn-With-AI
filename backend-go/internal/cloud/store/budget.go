@@ -2,12 +2,8 @@ package store
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 )
-
-var ErrBudget = errors.New("global inference cost budget exhausted")
 
 const budgetSchema = `
 CREATE TABLE cost_budget (
@@ -24,45 +20,24 @@ CREATE INDEX cost_budget_period ON cost_budget(currency,month);
 PRAGMA user_version = 8;
 `
 
-type BudgetHold struct {
-	Currency         string
-	Limit, Estimated int64
-}
-
-type BudgetUsage struct {
+// SupplierCost keeps the existing Backstage report shape. Reserved is always zero.
+type SupplierCost struct {
 	Month    string `json:"month"`
 	Currency string `json:"currency"`
 	Reserved int64  `json:"reserved"`
 	Settled  int64  `json:"settled"`
 }
 
-func (s *Store) BudgetUsage(ctx context.Context, currency string, now time.Time) (BudgetUsage, error) {
-	return budgetUsage(ctx, s.db, currency, now)
-}
-
-func budgetUsage(ctx context.Context, db queryer, currency string, now time.Time) (BudgetUsage, error) {
-	u := BudgetUsage{Month: now.In(shanghai).Format("2006-01"), Currency: currency}
-	err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(reserved),0),
-		COALESCE(SUM(settled),0) FROM (
-		SELECT CASE WHEN settled IS NULL THEN estimated ELSE 0 END AS reserved,settled FROM cost_budget WHERE currency=? AND month=?
-		UNION ALL SELECT CASE WHEN settled IS NULL THEN MAX(estimated-known_cost_floor,0) ELSE 0 END,COALESCE(settled,known_cost_floor)
+func (s *Store) MonthlySupplierCost(ctx context.Context, currency string, now time.Time) (SupplierCost, error) {
+	local := now.In(shanghai)
+	start := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, shanghai)
+	u := SupplierCost{Month: start.Format("2006-01"), Currency: currency}
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(cost),0) FROM (
+		SELECT settled AS cost FROM cost_budget WHERE currency=? AND month=?
+		UNION ALL SELECT a.cost_nanos FROM inference_attempt a WHERE a.currency=? AND a.created_at>=? AND a.created_at<?
+			AND NOT EXISTS (SELECT 1 FROM cost_budget b WHERE b.account_id=a.account_id AND b.request_id=a.request_id AND b.currency=a.currency)
+		UNION ALL SELECT COALESCE(settled,known_cost_floor)
 		FROM answer_comparison_arm WHERE currency=? AND month=?
-		)`, currency, u.Month, currency, u.Month).Scan(&u.Reserved, &u.Settled)
+		)`, currency, u.Month, currency, start.Unix(), start.AddDate(0, 1, 0).Unix(), currency, u.Month).Scan(&u.Settled)
 	return u, err
-}
-
-func reserveCost(ctx context.Context, tx *sql.Tx, account, request string, now time.Time, hold BudgetHold) error {
-	if hold.Currency == "" || hold.Estimated <= 0 || hold.Limit <= 0 {
-		return ErrBudget
-	}
-	u, err := budgetUsage(ctx, tx, hold.Currency, now)
-	if err != nil {
-		return err
-	}
-	if u.Settled >= hold.Limit || u.Reserved >= hold.Limit-u.Settled || hold.Estimated > hold.Limit-u.Settled-u.Reserved {
-		return ErrBudget
-	}
-	_, err = tx.ExecContext(ctx, "INSERT INTO cost_budget(account_id,request_id,month,currency,estimated) VALUES(?,?,?,?,?)",
-		account, request, u.Month, u.Currency, hold.Estimated)
-	return err
 }

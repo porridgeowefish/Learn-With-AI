@@ -25,7 +25,7 @@ type Streamer interface {
 }
 
 type Server struct {
-	budget                  Budget
+	supplierCostCurrency    string
 	trustedProxies          []netip.Prefix
 	db                      *store.Store
 	accounts                *auth.Service

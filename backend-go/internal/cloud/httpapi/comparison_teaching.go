@@ -6,11 +6,9 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/cloud/inference"
 	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
-	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
@@ -147,7 +145,7 @@ func (s *Server) requestComparisonTool(ctx context.Context, subject string, call
 	}
 }
 
-func (s *Server) runComparison(ctx context.Context, subject, id, arm, model string, maxInput int, request ai.GatewayRequest, hold store.BudgetHold, start time.Time, emit func(any), forward func(ai.GatewayEvent)) ([]inference.Attempt, error) {
+func (s *Server) runComparison(ctx context.Context, subject, model string, maxInput int, request ai.GatewayRequest, emit func(any), forward func(ai.GatewayEvent)) ([]inference.Attempt, error) {
 	const maxRounds = 8
 	var attempts []inference.Attempt
 	preferred := ""
@@ -155,19 +153,6 @@ func (s *Server) runComparison(ctx context.Context, subject, id, arm, model stri
 		estimated := (ai.Budget{}).Input(request)
 		if estimated > maxInput {
 			return attempts, ai.ErrContextBudgetExhausted
-		}
-		if round > 0 && hold.Limit > 0 {
-			estimator := s.gateway.(interface {
-				EstimateCost(string, string, int, int, bool) (int64, bool)
-			})
-			var known bool
-			hold.Estimated, known = estimator.EstimateCost(model, hold.Currency, estimated, request.MaxOutputTokens, true)
-			if !known {
-				return attempts, errors.New("comparison tool continuation cost unavailable")
-			}
-			if err := s.db.ExtendComparisonArmBudget(ctx, id, arm, start, hold); err != nil {
-				return attempts, err
-			}
 		}
 		var text, content, reasoning strings.Builder
 		assistant := ai.GatewayMessage{Role: "assistant"}

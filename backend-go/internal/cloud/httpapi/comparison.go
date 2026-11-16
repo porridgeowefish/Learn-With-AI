@@ -174,19 +174,6 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	request.MaxOutputTokens = min(model.MaxOutput, 4096)
-	hold := store.BudgetHold{Currency: s.budget.Currency, Limit: s.budget.MonthlyNanos}
-	if hold.Limit > 0 {
-		estimator, has := s.gateway.(interface {
-			EstimateCost(string, string, int, int, bool) (int64, bool)
-		})
-		if has {
-			hold.Estimated, has = estimator.EstimateCost(model.ID, hold.Currency, estimated, request.MaxOutputTokens, len(request.Tools) > 0)
-		}
-		if !has {
-			fail(w, http.StatusServiceUnavailable, "model_cost_unconfigured")
-			return
-		}
-	}
 	start := time.Now()
 	questionDigest := sha256.Sum256([]byte(input.Question))
 	if input.Teaching != nil {
@@ -196,11 +183,11 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		binding, _ := json.Marshal([]any{input.Question, input.Mode, input.Context, input.Opening})
 		questionDigest = sha256.Sum256(binding)
 	}
-	if err = s.db.ReserveComparisonArm(r.Context(), cmp.ID, input.Arm, hex.EncodeToString(questionDigest[:]), start, hold); err != nil {
+	if err = s.db.StartComparisonArm(r.Context(), cmp.ID, input.Arm, hex.EncodeToString(questionDigest[:]), s.supplierCostCurrency, start); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			fail(w, http.StatusConflict, "comparison_arm_already_started")
 		} else {
-			fail(w, http.StatusServiceUnavailable, "comparison_budget_unavailable")
+			fail(w, http.StatusServiceUnavailable, "comparison_unavailable")
 		}
 		return
 	}
@@ -229,14 +216,14 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 			emit(event)
 		}
 	}
-	attempts, streamErr := s.runComparison(ctx, subject, cmp.ID, input.Arm, model.ID, maxInput, request, hold, start, emit, forwardText)
+	attempts, streamErr := s.runComparison(ctx, subject, model.ID, maxInput, request, emit, forwardText)
 	var spent int64
 	knownCost := true
 	for _, attempt := range attempts {
 		if attempt.Status == "rate_limited" || attempt.Status == "auth_rejected" {
 			continue
 		}
-		if attempt.CostNanos == nil || attempt.Currency != hold.Currency {
+		if attempt.CostNanos == nil || attempt.Currency != s.supplierCostCurrency {
 			knownCost = false
 			continue
 		}

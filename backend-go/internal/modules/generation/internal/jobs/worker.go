@@ -5,19 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
-	sources "github.com/xmz14/lll/backend-go/internal/modules/sources"
-	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
+	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
-
+	sources "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
+	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
+	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 )
 
 type Usage struct {
@@ -428,11 +428,9 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		}
 		s.mu.Unlock()
 		if err != nil || ctx.Err() != nil {
-			code := "provider-failed"
+			code := generationProviderError(err)
 			if ctx.Err() != nil {
 				code = "request-interrupted"
-			} else if ai.IsContextOverflow(err) {
-				code = "input-budget-exhausted"
 			}
 			s.fail(slug, j, code)
 			return
@@ -627,6 +625,38 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		j.Progress.CompletedUnits, j.Progress.TotalUnits, j.Progress.UnitLabel = j.QuestionCount, j.QuestionCount, "题"
 	}
 	_ = s.saveLocked(slug, root, &j)
+}
+
+func generationProviderError(err error) string {
+	switch {
+	case ai.IsContextOverflow(err):
+		return "input-budget-exhausted"
+	case errors.Is(err, llmcloud.ErrLoginRequired):
+		return "provider-login-required"
+	case errors.Is(err, ai.ErrUpstreamAuthRejected):
+		return "provider-auth-rejected"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "provider-timeout"
+	}
+	var remote *llmcloud.RemoteError
+	if errors.As(err, &remote) {
+		switch remote.Code {
+		case "insufficient_credits", "daily_credit_limit_reached", "cloud_budget_exhausted",
+			"model_busy", "model_tools_unsupported", "inference_interrupted", "settlement_pending":
+			return remote.Code
+		case "inference_timeout":
+			return "provider-timeout"
+		case "invalid_inference_request", "invalid_json":
+			return "provider-request-rejected"
+		case "model_unavailable":
+			return "model-unavailable"
+		}
+	}
+	var limited *ai.UpstreamRateLimit
+	if errors.As(err, &limited) {
+		return "provider-rate-limited"
+	}
+	return "provider-failed"
 }
 
 func webSearchTool() ai.Tool {

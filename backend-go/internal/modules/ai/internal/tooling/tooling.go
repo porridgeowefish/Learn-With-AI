@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	gateway "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/gateway"
 )
 
@@ -37,7 +38,11 @@ func (r *Registry) Register(s ToolSpec) error {
 	if err != nil {
 		return err
 	}
-	json.Unmarshal(raw, &s.Definition)
+	var definition gateway.Tool
+	if err := json.Unmarshal(raw, &definition); err != nil {
+		return err
+	}
+	s.Definition = definition
 	r.specs[s.Definition.Name] = s
 	return nil
 }
