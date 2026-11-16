@@ -184,8 +184,12 @@ func managedProvider(model llmcloud.Model) *Provider {
 	if model.ID == "" {
 		return nil
 	}
+	window := model.ContextWindow
+	if window == 0 {
+		window = model.MaxInput + model.MaxOutput
+	}
 	return &Provider{ID: ManagedPrefix + model.ID, Kind: ManagedKind, Name: model.Name, Model: model.ID,
-		ContextWindowTokens: model.MaxInput + model.MaxOutput, ManagedMaxInput: model.MaxInput, ManagedMaxOutput: model.MaxOutput}
+		ContextWindowTokens: window, ManagedMaxInput: model.MaxInput, ManagedMaxOutput: model.MaxOutput}
 }
 
 // Load reads local provider settings and the current cloud session without making cloud requests.

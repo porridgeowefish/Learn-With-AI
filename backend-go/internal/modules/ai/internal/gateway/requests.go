@@ -207,6 +207,9 @@ func rateLimitError(resp *http.Response) *UpstreamRateLimit {
 
 // StreamProvider uses the same protocol implementation for configured and explicit connections.
 func StreamProvider(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
+	if err := setDirectOutputLimit(p, &in); err != nil {
+		return err
+	}
 	release, err := acquireProvider(ctx, p)
 	if err != nil {
 		return err
@@ -239,6 +242,24 @@ func outputLimit(in Request) int {
 	return platformconfig.ModelOutputTokens
 }
 
+func setDirectOutputLimit(p askaiconfig.Provider, in *Request) error {
+	window, output := platformconfig.ProviderCapacity(p.BaseURL, p.Model)
+	if output == 0 {
+		output = platformconfig.ModelOutputTokens
+	}
+	if p.ContextWindowTokens > 0 {
+		window = p.ContextWindowTokens
+	}
+	if window > 0 {
+		output = min(output, window-EstimateInputTokens(*in)-min(1024, window/16))
+	}
+	if output <= 0 {
+		return ErrContextBudgetExhausted
+	}
+	in.upstreamOutputLimit = output
+	return nil
+}
+
 func streamUpstream(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	if err := validateEffort(p, in); err != nil {
 		return err
@@ -260,6 +281,9 @@ func streamUpstream(ctx context.Context, p askaiconfig.Provider, in Request, emi
 
 // CompleteProvider shares request mapping and transport with streaming calls.
 func CompleteProvider(ctx context.Context, p askaiconfig.Provider, in Request) (string, error) {
+	if err := setDirectOutputLimit(p, &in); err != nil {
+		return "", err
+	}
 	release, admissionErr := acquireProvider(ctx, p)
 	if admissionErr != nil {
 		return "", admissionErr

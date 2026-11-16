@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
+	"github.com/xmz14/lll/backend-go/internal/platform/config"
 )
 
 var intentPrompt = promptText("auxiliary/tool-intent")
@@ -23,7 +23,7 @@ type toolIntent struct {
 }
 
 func (s *Service) inferToolIntent(ctx context.Context, providerID, model, learnerText string, history []ai.GatewayMessage, recordCredit func(*ai.CreditSettlement)) (toolIntent, map[string]int, error) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, config.ModelGenerationTimeout)
 	defer cancel()
 	intentPrompt, promptErr := ai.RenderPrompt("auxiliary/tool-intent", nil)
 	if promptErr != nil {
@@ -54,7 +54,7 @@ func (s *Service) inferToolIntent(ctx context.Context, providerID, model, learne
 	var out strings.Builder
 	usage := map[string]int{}
 	hidden := false
-	err := s.Gateway.Stream(ctx, ai.GatewayRequest{System: intentPrompt, Messages: recent, ProviderID: providerID, Model: model, ShowReasoning: &hidden, MaxOutputTokens: 512}, func(event ai.GatewayEvent) {
+	err := s.Gateway.Stream(ctx, ai.GatewayRequest{System: intentPrompt, Messages: recent, ProviderID: providerID, Model: model, ShowReasoning: &hidden}, func(event ai.GatewayEvent) {
 		if event.Type == "text-delta" {
 			if out.Len()+len(event.Delta) > 4096 {
 				cancel()

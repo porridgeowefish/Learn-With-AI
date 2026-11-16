@@ -70,10 +70,11 @@ type DailyClaimHistory struct {
 }
 
 type Model struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	MaxInput  int    `json:"maxInput"`
-	MaxOutput int    `json:"maxOutput"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	MaxInput      int    `json:"maxInput"`
+	MaxOutput     int    `json:"maxOutput"`
+	ContextWindow int    `json:"contextWindow,omitempty"`
 }
 
 type GuestModel struct {

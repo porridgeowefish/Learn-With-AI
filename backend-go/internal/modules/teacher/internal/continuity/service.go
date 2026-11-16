@@ -8,6 +8,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/projects"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	usage "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
+	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	"github.com/xmz14/lll/backend-go/internal/platform/workspacegate"
 	"io"
 	"strings"
@@ -197,7 +198,7 @@ func (s *Service) process(slug string) error {
 	if e != nil {
 		return e
 	}
-	ctx, cancel := context.WithTimeout(ai.WithBackgroundRequest(s.ctx), 30*time.Second)
+	ctx, cancel := context.WithTimeout(ai.WithBackgroundRequest(s.ctx), config.ModelGenerationTimeout)
 	defer cancel()
 	s.mu.Lock()
 	if s.deleted[slug] {

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -18,7 +19,14 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/cloud/promptcatalog"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"github.com/xmz14/lll/backend-go/internal/platform/llmcloud"
+)
+
+var (
+	errComparisonOutputLimit = errors.New("comparison output limit")
+	errComparisonEmpty       = errors.New("comparison empty response")
+	errComparisonTool        = errors.New("comparison tool limit or invalid tool")
 )
 
 func (s *Server) comparisonSubject(w http.ResponseWriter, r *http.Request) (string, string, bool) {
@@ -128,10 +136,10 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		ID, Arm string
 		llmcloud.ComparisonInput
 	}
-	if !decode(w, r, &input, 512<<10) {
+	if !decode(w, r, &input, 16<<20) {
 		return
 	}
-	if !identifier.MatchString(input.ID) || (input.Arm != "a" && input.Arm != "b") || strings.TrimSpace(input.Question) == "" || len(input.Question) > 64<<10 || len(input.Context) > 16<<10 || !comparisonMode(input.Mode) {
+	if !identifier.MatchString(input.ID) || (input.Arm != "a" && input.Arm != "b") || strings.TrimSpace(input.Question) == "" || !comparisonMode(input.Mode) {
 		fail(w, http.StatusBadRequest, "invalid_comparison_request")
 		return
 	}
@@ -168,12 +176,11 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		request.Tools = nil
 	}
 	estimated := (ai.Budget{}).Input(request)
-	maxInput := min(model.MaxInput, 64_000)
-	if estimated > maxInput {
+	if estimated > model.MaxInput || model.outputRoom(estimated) == 0 {
 		fail(w, http.StatusRequestEntityTooLarge, "model_input_limit")
 		return
 	}
-	request.MaxOutputTokens = min(model.MaxOutput, 4096)
+	request.MaxOutputTokens = model.outputRoom(estimated)
 	start := time.Now()
 	questionDigest := sha256.Sum256([]byte(input.Question))
 	if input.Teaching != nil {
@@ -191,7 +198,7 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), platformconfig.ModelGenerationTimeout)
 	defer cancel()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("X-Accel-Buffering", "no")
@@ -211,12 +218,16 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	}
 	var hasText bool
 	forwardText := func(event ai.GatewayEvent) {
-		if event.Type == "text-delta" {
+		switch event.Type {
+		case "text-delta":
 			hasText = hasText || strings.TrimSpace(event.Delta) != ""
+			emit(event)
+		case "comparison-reset":
+			hasText = false
 			emit(event)
 		}
 	}
-	attempts, streamErr := s.runComparison(ctx, subject, model.ID, maxInput, request, emit, forwardText)
+	attempts, streamErr := s.runComparison(ctx, subject, model, request, emit, forwardText)
 	var spent int64
 	knownCost := true
 	for _, attempt := range attempts {
@@ -237,7 +248,28 @@ func (s *Server) streamComparison(w http.ResponseWriter, r *http.Request) {
 	saveCtx, done := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer done()
 	if err = s.db.FinishComparisonArm(saveCtx, cmp.ID, input.Arm, completed, cost, spent, time.Now()); err != nil || !completed {
-		emit(map[string]string{"type": "error", "code": "comparison_arm_failed"})
+		code := "comparison_arm_failed"
+		if err == nil {
+			switch {
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				code = "inference_timeout"
+			case errors.Is(streamErr, errComparisonOutputLimit):
+				code = "comparison_output_limit"
+			case errors.Is(streamErr, errComparisonEmpty):
+				code = "comparison_empty_output"
+			case errors.Is(streamErr, errComparisonTool):
+				code = "comparison_tool_failed"
+			case errors.Is(streamErr, ai.ErrContextBudgetExhausted), ai.IsContextOverflow(streamErr):
+				code = "model_input_limit"
+			}
+		}
+		var inputTokens, outputTokens int
+		for _, attempt := range attempts {
+			inputTokens += attempt.Usage["inputTokens"]
+			outputTokens += attempt.Usage["outputTokens"]
+		}
+		log.Printf("comparison arm failed: id=%s model=%s arm=%s code=%s attempts=%d input_tokens=%d output_tokens=%d", cmp.ID, model.ID, input.Arm, code, len(attempts), inputTokens, outputTokens)
+		emit(map[string]string{"type": "error", "code": code})
 		return
 	}
 	emit(map[string]string{"type": "done"})

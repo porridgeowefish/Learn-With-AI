@@ -1,34 +1,23 @@
 package budget
 
 import (
-	"encoding/json"
-	"errors"
-	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
-	gateway "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/gateway"
-	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"math"
 	"net/url"
 	"strings"
 	"unicode/utf8"
+
+	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/aiconfig"
+	gateway "github.com/xmz14/lll/backend-go/internal/modules/ai/internal/gateway"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 )
 
 // Estimates are deliberately conservative; a configured window is a capacity
 // constraint, not a claim that the local estimator is a provider tokenizer.
-func EstimateTextTokens(s string) int {
-	ascii, other := 0, 0
-	for _, r := range s {
-		if r < 128 {
-			ascii++
-		} else {
-			other++
-		}
-	}
-	return (ascii+2)/3 + (other*3+1)/2
-}
+func EstimateTextTokens(s string) int { return gateway.EstimateTextTokens(s) }
 
 type Budget struct{ Window, Output, Thinking, Margin int }
 
-var ErrContextBudgetExhausted = errors.New("teacher context budget exhausted; current learner message retained")
+var ErrContextBudgetExhausted = gateway.ErrContextBudgetExhausted
 
 type TeacherBudget struct{ Window, InputLimit, Output, Margin int }
 
@@ -59,7 +48,7 @@ func (b TeacherBudget) capacity() int {
 func (b TeacherBudget) ShouldCompact(req gateway.Request) bool {
 	const standardWindow = 256000
 	capacity := b.capacity()
-	if capacity == 0 || capacity > standardWindow {
+	if capacity == 0 {
 		capacity = standardWindow
 	}
 	return (Budget{}).Input(req) >= capacity*80/100
@@ -92,19 +81,9 @@ func (b TeacherBudget) SourceLimit(req gateway.Request) int {
 	return min(limit, max(0, b.Available(req)-1024))
 }
 func (b Budget) Input(req gateway.Request) int {
-	n := EstimateTextTokens(req.System) + EstimateTextTokens(req.TurnInstructions) + 64
-	for _, m := range req.Messages {
-		raw, _ := json.Marshal(m)
-		n += EstimateTextTokens(string(raw)) + 24
-	}
-	for _, t := range req.Tools {
-		raw, _ := json.Marshal(t)
-		n += EstimateTextTokens(string(raw)) + 32
-	}
-	return n
+	return gateway.EstimateInputTokens(req)
 }
 func (b Budget) Available(req gateway.Request) int {
-	// Anthropic thinking and OpenAI reasoning both consume the same 100k ceiling.
 	return b.Window - b.Output - b.Margin - b.Input(req)
 }
 func (b Budget) Check(req gateway.Request) error {
@@ -117,20 +96,24 @@ func (b Budget) Check(req gateway.Request) error {
 // CheckGenerationRequest uses the same complete serialized-input estimator as
 // teaching turns, without dropping any mandatory generation instructions.
 func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, error) {
-	b := generationBudget(p)
-	b.Output = GenerationOutputTokens(p)
-	if p.Kind == "anthropic" && p.Thinking && req.MaxThinkingTokens > 0 {
-		b.Thinking = req.MaxThinkingTokens
+	window := configuredWindow(p)
+	if window == 0 {
+		return math.MaxInt, nil
 	}
-	return b.Available(req), b.Check(req)
+	budget := TeacherBudget{Window: window, InputLimit: p.ManagedMaxInput, Margin: min(1024, window/16)}
+	room := budget.Available(req)
+	if room < 0 {
+		return room, ErrContextBudgetExhausted
+	}
+	return room, nil
 }
 
-// Every model uses the same learner-authorized single-request output ceiling.
+// GenerationOutputTokens returns the selected connection's output limit.
 func GenerationOutputTokens(p aiconfig.Provider) int {
 	if p.Kind == aiconfig.ManagedKind && p.ManagedMaxOutput > 0 {
 		return p.ManagedMaxOutput
 	}
-	return platformconfig.ModelOutputTokens
+	return platformconfig.ProviderOutputTokens(p.BaseURL, p.Model)
 }
 
 // Generation-only thinking allowance; normal teaching requests retain 2048.
@@ -169,21 +152,8 @@ func configuredWindow(p aiconfig.Provider) int {
 		// OpenAI documents a separate 500K default for Codex/ChatGPT Work.
 		return 500000
 	}
-	if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Hostname() == "api.openai.com" && p.Kind == "openai" {
-		switch model {
-		case "gpt-5.4", "gpt-5.4-2026-03-05", "gpt-5.5", "gpt-5.5-2026-04-23", "gpt-6.1-sol":
-			return 1050000
-		case "gpt-5.2", "gpt-5.2-2025-12-11":
-			return 400000
-		}
-	}
-	if model == "glm-5.3" {
-		// Verified GLM-5.3 model capacity (2026-10-11). Legacy connections
-		// omit this field; do not incorrectly constrain the first-party model
-		// to the generic fallback. Unknown relays retain the safe fallback.
-		if endpoint, err := url.Parse(p.BaseURL); err == nil && (endpoint.Hostname() == "open.bigmodel.cn" || endpoint.Hostname() == "api.z.ai") {
-			return 1000000
-		}
+	if window, _ := platformconfig.ProviderCapacity(p.BaseURL, model); window > 0 {
+		return window
 	}
 	if p.ContextWindowTokens == 0 {
 		if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Hostname() == "tokenhub.tencentmaas.com" {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	progressstore "github.com/xmz14/lll/backend-go/internal/modules/activity"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"net/http"
 	"os"
@@ -101,7 +102,7 @@ func (s *Server) handleProjectTypeAdvice(w http.ResponseWriter, r *http.Request)
 		httpx.Error(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), platformconfig.ModelGenerationTimeout)
 	defer cancel()
 	system, promptErr := ai.RenderPrompt("auxiliary/project-advice", nil)
 	if promptErr != nil {

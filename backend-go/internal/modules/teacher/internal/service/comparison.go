@@ -273,6 +273,7 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 		id        string
 		text      string
 		complete  bool
+		failure   string
 		citations []sources.SourceCitation
 		coverage  []conversationstore.ReadingCoverage
 	}
@@ -329,6 +330,13 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 			})
 			side.text = reply.String()
 			side.complete = err == nil && strings.TrimSpace(side.text) != ""
+			var remote *llmcloud.RemoteError
+			if errors.As(err, &remote) {
+				switch remote.Code {
+				case "comparison_output_limit", "comparison_empty_output", "comparison_tool_failed", "model_input_limit", "inference_timeout":
+					side.failure = remote.Code
+				}
+			}
 			if side.complete && reading != nil {
 				side.text, side.citations, side.coverage = reading.verifiedAnswer(ctx, side.text)
 				if side.text != reply.String() {
@@ -351,6 +359,11 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 	default:
 		message.Status = "failed"
 		message.FailureCode = "comparison_unavailable"
+		if left.failure != "" && (right.failure == "" || right.failure == left.failure) {
+			message.FailureCode = left.failure
+		} else if left.failure == "" && right.failure != "" {
+			message.FailureCode = right.failure
+		}
 		if ctx.Err() != nil {
 			message.Status, message.FailureCode = "interrupted", "interrupted"
 		}

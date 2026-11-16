@@ -145,21 +145,32 @@ func (s *Server) requestComparisonTool(ctx context.Context, subject string, call
 	}
 }
 
-func (s *Server) runComparison(ctx context.Context, subject, model string, maxInput int, request ai.GatewayRequest, emit func(any), forward func(ai.GatewayEvent)) ([]inference.Attempt, error) {
+func (s *Server) runComparison(ctx context.Context, subject string, model Model, request ai.GatewayRequest, emit func(any), forward func(ai.GatewayEvent)) ([]inference.Attempt, error) {
 	const maxRounds = 8
 	var attempts []inference.Attempt
 	preferred := ""
+	recovering := false
+	recoverAnswer := func() {
+		recovering = true
+		request.Tools = nil
+		request.TurnInstructions += "\n\n" + s.comparisonToolsFinished + "\n请直接输出给学习者的完整回答。"
+		forward(ai.GatewayEvent{Type: "comparison-reset"})
+	}
 	for round := range maxRounds {
 		estimated := (ai.Budget{}).Input(request)
-		if estimated > maxInput {
+		request.MaxOutputTokens = model.outputRoom(estimated)
+		if estimated > model.MaxInput || request.MaxOutputTokens == 0 {
 			return attempts, ai.ErrContextBudgetExhausted
 		}
 		var text, content, reasoning strings.Builder
+		var limited bool
 		assistant := ai.GatewayMessage{Role: "assistant"}
 		collect := func(event ai.GatewayEvent) {
 			switch event.Type {
 			case "text-delta":
 				text.WriteString(event.Delta)
+			case "output-limit":
+				limited = true
 			case "provider-content-delta":
 				content.WriteString(event.Delta)
 			case "provider-reasoning-delta":
@@ -182,36 +193,53 @@ func (s *Server) runComparison(ctx context.Context, subject, model string, maxIn
 		if gateway, ok := s.gateway.(interface {
 			StreamComparison(context.Context, string, int, string, ai.GatewayRequest, func(ai.GatewayEvent)) ([]inference.Attempt, error)
 		}); ok {
-			current, err = gateway.StreamComparison(ctx, model, estimated+request.MaxOutputTokens, preferred, request, collect)
+			current, err = gateway.StreamComparison(ctx, model.ID, estimated+request.MaxOutputTokens, preferred, request, collect)
 		} else {
-			current, err = s.gateway.Stream(ctx, model, estimated+request.MaxOutputTokens, preferred, request, collect)
+			current, err = s.gateway.Stream(ctx, model.ID, estimated+request.MaxOutputTokens, preferred, request, collect)
 		}
 		attempts = append(attempts, current...)
-		if err != nil || len(assistant.ToolCalls) == 0 {
+		if err != nil {
 			return attempts, err
 		}
 		if n := len(current); n > 0 {
 			preferred = current[n-1].ConnectionID
 		}
-		if len(assistant.ToolCalls) > 8 || round == maxRounds-1 {
-			emit(map[string]string{"type": "comparison-reset"})
-			return attempts, errors.New("comparison tool limit reached")
+		if limited || len(assistant.ToolCalls) == 0 {
+			if !limited && strings.TrimSpace(text.String()) != "" {
+				return attempts, nil
+			}
+			if !recovering && round < maxRounds-1 && strings.TrimSpace(text.String()) == "" {
+				recoverAnswer()
+				continue
+			}
+			if limited {
+				return attempts, errComparisonOutputLimit
+			}
+			return attempts, errComparisonEmpty
 		}
+		validTools := len(assistant.ToolCalls) <= 8
 		for _, call := range assistant.ToolCalls {
 			allowed := false
 			for _, tool := range request.Tools {
 				allowed = allowed || tool.Name == call.ToolName
 			}
 			if !allowed || call.ProviderCallID == "" {
-				emit(map[string]string{"type": "comparison-reset"})
-				return attempts, errors.New("comparison received an unavailable tool call")
+				validTools = false
+				break
 			}
+		}
+		if !validTools || round == maxRounds-1 {
+			if !recovering && round < maxRounds-1 {
+				recoverAnswer()
+				continue
+			}
+			return attempts, errComparisonTool
 		}
 		assistant.Content, assistant.ProviderContent, assistant.ReasoningContent = text.String(), content.String(), reasoning.String()
 		request.Messages = append(request.Messages, assistant)
 		forceFinal := round == maxRounds-2
 		for _, call := range assistant.ToolCalls {
-			room := maxInput - (ai.Budget{}).Input(request) - 256*len(assistant.ToolCalls) - 512
+			room := model.MaxInput - (ai.Budget{}).Input(request) - 256*len(assistant.ToolCalls) - 512
 			result, err := s.requestComparisonTool(ctx, subject, call, max(0, min(4_000, room)), emit)
 			if err != nil {
 				return attempts, err
@@ -224,5 +252,5 @@ func (s *Server) runComparison(ctx context.Context, subject, model string, maxIn
 			request.TurnInstructions = s.comparisonToolsFinished
 		}
 	}
-	return attempts, errors.New("comparison tool limit reached")
+	return attempts, errComparisonTool
 }

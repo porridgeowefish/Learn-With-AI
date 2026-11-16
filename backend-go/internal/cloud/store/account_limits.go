@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 	"time"
 )
@@ -68,25 +69,19 @@ func (s *Store) SetDailyCreditLimit(ctx context.Context, actor, account, referen
 	})
 }
 
-func checkDailyCreditLimit(ctx context.Context, tx *sql.Tx, account string, units int64, now time.Time) error {
+func dailyCreditsRemaining(ctx context.Context, tx *sql.Tx, account string, now time.Time) (int64, error) {
 	var limit int64
 	err := tx.QueryRowContext(ctx, `SELECT units FROM account_credit_limit_change WHERE account_id=? ORDER BY id DESC LIMIT 1`, account).Scan(&limit)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && limit == 0) {
-		return nil
+		return math.MaxInt64, nil
 	}
 	if err != nil {
-		return err
+		return 0, err
 	}
 	local := now.In(shanghai)
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, shanghai)
 	var used int64
 	err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(charged + held),0) FROM inference_request
 		WHERE account_id=? AND created_at>=? AND created_at<?`, account, start.Unix(), start.AddDate(0, 0, 1).Unix()).Scan(&used)
-	if err != nil {
-		return err
-	}
-	if units > limit-used {
-		return ErrDailyCreditLimit
-	}
-	return nil
+	return max(0, limit-used), err
 }

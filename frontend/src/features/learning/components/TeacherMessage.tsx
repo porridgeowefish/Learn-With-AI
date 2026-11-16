@@ -15,6 +15,11 @@ import s from './TeacherView.module.css';
 const credits = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 3 });
 const teacherFailureMessages: Record<string, string> = {
   comparison_unavailable: '对比回答生成失败，可以重新生成或继续提问。',
+  comparison_output_limit: '对比回答达到模型的输出上限。已收到的正文仍会显示。',
+  comparison_empty_output: '模型没有返回可显示的对比回答。可以重新生成。',
+  comparison_tool_failed: '对比回答未能完成资料读取或工具调用。可以重新生成。',
+  model_input_limit: '这轮内容超过了模型的输入上限。可以缩短附加信息后重试。',
+  inference_timeout: '模型未能在等待时间内完成生成。可以重新生成。',
   login_required: '使用系统模型需要登录 Learn-With-AI。',
   insufficient_credits: '可用积分不足以发送这一轮。可以领取今日积分、缩短本轮内容，或改用自己的模型连接。',
   daily_credit_limit_reached: '已达到今日系统模型积分限额。可以明天继续，或改用自己的模型连接。',

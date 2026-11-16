@@ -10,6 +10,7 @@ import (
 	"fmt"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/learningprofile"
+	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
 	"strings"
@@ -87,7 +88,7 @@ func (s chatgpt) Search(ctx context.Context, query string) ([]Result, error) {
 	if p == nil || p.Kind != "siwc" {
 		return nil, errors.New("请选择已登录的 ChatGPT 连接")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, config.ModelGenerationTimeout)
 	defer cancel()
 	var out strings.Builder
 	prompt, promptErr := ai.RenderPrompt("tools/web-search/system", nil)

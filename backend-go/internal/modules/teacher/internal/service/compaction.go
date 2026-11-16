@@ -83,7 +83,7 @@ func (s *Service) compactHistory(ctx context.Context, slug string, store *conver
 	request := ai.GatewayRequest{
 		System: prompt, Messages: []ai.GatewayMessage{{Role: "user", Content: transcript.String()}},
 		ProviderID: route.ProviderID, Model: route.Model, ShowReasoning: &hideReasoning,
-		MaxOutputTokens: min(4096, budget.Output),
+		MaxOutputTokens: budget.Output,
 	}
 	if budget.Fit(&request) != nil {
 		return false

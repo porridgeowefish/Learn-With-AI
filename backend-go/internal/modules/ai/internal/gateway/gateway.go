@@ -80,8 +80,7 @@ type Request struct {
 	ProviderID       string
 	BindingName      string
 	Model            string
-	// MaxOutputTokens is a legacy budget annotation, not a provider override.
-	// The user-selected platform ModelOutputTokens owns the wire ceiling.
+	// MaxOutputTokens bounds managed requests. Direct connections use provider capacity.
 	MaxOutputTokens     int
 	MaxThinkingTokens   int
 	upstreamOutputLimit int
@@ -94,6 +93,7 @@ type Gateway interface {
 type Configured struct{}
 
 var ErrProviderNotConfigured = errors.New("teacher provider is not configured")
+var ErrContextBudgetExhausted = errors.New("teacher context budget exhausted; current learner message retained")
 
 func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) error {
 	cfg, err := askaiconfig.Load()

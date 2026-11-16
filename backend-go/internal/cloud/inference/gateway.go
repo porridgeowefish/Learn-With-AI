@@ -162,13 +162,13 @@ func (g *Gateway) acquire(ctx context.Context, model string, estimatedTokens int
 // Stream keeps the selected model fixed. The caller supplies an authorized
 // request, an estimated input/output budget and a deadline.
 func (g *Gateway) Stream(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent)) ([]Attempt, error) {
-	return g.stream(ctx, model, estimatedTokens, preferred, request, emit, 1500*time.Millisecond)
+	return g.stream(ctx, model, estimatedTokens, preferred, request, emit, 65*time.Second)
 }
 
 // StreamComparison allows the second arm to wait for a shared connection to
 // finish the first arm. It uses the same finite wait slots as ordinary traffic.
 func (g *Gateway) StreamComparison(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent)) ([]Attempt, error) {
-	return g.stream(ctx, model, estimatedTokens, preferred, request, emit, 12*time.Second)
+	return g.stream(ctx, model, estimatedTokens, preferred, request, emit, 65*time.Second)
 }
 
 func (g *Gateway) stream(ctx context.Context, model string, estimatedTokens int, preferred string, request ai.GatewayRequest, emit func(ai.GatewayEvent), wait time.Duration) ([]Attempt, error) {

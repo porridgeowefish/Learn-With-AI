@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	impl "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
@@ -125,7 +124,7 @@ func extract(ctx context.Context, provider visionProvider, mediaType string, ima
 	if promptErr != nil {
 		return "", promptErr
 	}
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, platformconfig.ModelGenerationTimeout)
 	defer cancel()
 	encoded := base64.StdEncoding.EncodeToString(image)
 	var url string
@@ -135,7 +134,7 @@ func extract(ctx context.Context, provider visionProvider, mediaType string, ima
 		url = strings.TrimRight(provider.BaseURL, "/") + "/v1/messages"
 		body := map[string]any{
 			"model":      provider.Model,
-			"max_tokens": platformconfig.ModelOutputTokens,
+			"max_tokens": platformconfig.ProviderOutputTokens(provider.BaseURL, provider.Model),
 			"messages": []map[string]any{{"role": "user", "content": []map[string]any{
 				{"type": "image", "source": map[string]any{"type": "base64", "media_type": mediaType, "data": encoded}},
 				{"type": "text", "text": extractionPrompt},
@@ -146,7 +145,7 @@ func extract(ctx context.Context, provider visionProvider, mediaType string, ima
 		url = strings.TrimRight(provider.BaseURL, "/") + "/chat/completions"
 		body := map[string]any{
 			"model": provider.Model,
-			platformconfig.ModelOutputLimitKey(provider.BaseURL, provider.Model): platformconfig.ModelOutputTokens,
+			platformconfig.ModelOutputLimitKey(provider.BaseURL, provider.Model): platformconfig.ProviderOutputTokens(provider.BaseURL, provider.Model),
 			"messages": []map[string]any{{"role": "user", "content": []map[string]any{
 				{"type": "text", "text": extractionPrompt},
 				{"type": "image_url", "image_url": map[string]any{"url": "data:" + mediaType + ";base64," + encoded}},

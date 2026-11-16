@@ -173,10 +173,16 @@ func (s *Store) ClaimDaily(ctx context.Context, accountID string, now time.Time)
 type Reservation struct {
 	Created bool
 	State   string
+	Units   int64
 }
 
 func (s *Store) Reserve(ctx context.Context, accountID, requestID, digest string, units int64, now time.Time) (Reservation, error) {
-	if requestID == "" || digest == "" || units <= 0 {
+	return s.ReserveWithin(ctx, accountID, requestID, digest, units, units, now)
+}
+
+// ReserveWithin fits the requested hold to the account's available credits atomically.
+func (s *Store) ReserveWithin(ctx context.Context, accountID, requestID, digest string, minimum, requested int64, now time.Time) (Reservation, error) {
+	if requestID == "" || digest == "" || minimum <= 0 || requested < minimum {
 		return Reservation{}, errors.New("invalid inference reservation")
 	}
 	var hold Reservation
@@ -197,13 +203,19 @@ func (s *Store) Reserve(ctx context.Context, accountID, requestID, digest string
 		if err != nil {
 			return err
 		}
-		if units > w.Balance-w.Held {
+		units := min(requested, w.Balance-w.Held)
+		if units < minimum {
 			return ErrBalance
 		}
-		if err := checkDailyCreditLimit(ctx, tx, accountID, units, now); err != nil {
+		daily, err := dailyCreditsRemaining(ctx, tx, accountID, now)
+		if err != nil {
 			return err
 		}
-		hold = Reservation{Created: true, State: "reserved"}
+		units = min(units, daily)
+		if units < minimum {
+			return ErrDailyCreditLimit
+		}
+		hold = Reservation{Created: true, State: "reserved", Units: units}
 		_, err = tx.ExecContext(ctx, `INSERT INTO inference_request(account_id,request_id,digest,held,state,created_at,updated_at)
 			VALUES(?,?,?,?,'reserved',?,?)`, accountID, requestID, digest, units, now.Unix(), now.Unix())
 		return err

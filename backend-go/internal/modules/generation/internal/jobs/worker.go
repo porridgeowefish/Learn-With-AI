@@ -335,6 +335,17 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	const maxRounds, maxSourceCalls, maxSourceTokens = 8, 12, 12000
 	mapJob := j.Kind == "discipline-map"
 	finalMapRound := false
+	finishMapRequest := func() bool {
+		instructions, err := ai.RenderPrompt("teaching/runtime/tools-finished", nil)
+		if err != nil {
+			s.fail(slug, j, "prompt-resource-unavailable")
+			return false
+		}
+		finalMapRound = true
+		req.Tools = nil
+		req.TurnInstructions = instructions + "\n直接提交完整学科地图 JSON。使用已取得的证据，说明未读范围。不要输出读取计划、进度说明或工具调用。"
+		return true
+	}
 	for round := 0; round < maxRounds; round++ {
 		available, e := ai.CheckGenerationRequest(req, p)
 		if e != nil {
@@ -445,6 +456,12 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		}
 		text = body.String()
 		if len(pending) == 0 {
+			if mapJob && !finalMapRound && round < maxRounds-1 && !json.Valid([]byte(cleanOutput(text))) {
+				if !finishMapRequest() {
+					return
+				}
+				continue
+			}
 			break
 		}
 		if finalMapRound || round == maxRounds-1 || len(pending) > 8 {
@@ -456,11 +473,17 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			available, _ = ai.CheckGenerationRequest(req, p)
 		}
 		finishMap := mapJob && round == maxRounds-2
+		readLimit := false
 		for _, call := range pending {
 			if call.ToolName == "search_web" {
 				webCalls++
 				query, ok := call.Arguments["query"].(string)
 				if searcher == nil || webCalls > 2 || !ok || len(call.Arguments) != 1 || len([]rune(query)) > 256 || strings.TrimSpace(query) == "" {
+					if mapJob {
+						finishMap = true
+						req.Messages = append(req.Messages, rejectedMapTool(call))
+						continue
+					}
 					s.fail(slug, j, "invalid-provider-tool")
 					return
 				}
@@ -485,12 +508,18 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			}
 			sourceCalls++
 			if reader == nil || (!mapJob && sourceCalls > maxSourceCalls) {
+				if mapJob {
+					finishMap = true
+					req.Messages = append(req.Messages, rejectedMapTool(call))
+					continue
+				}
 				s.fail(slug, j, "tool-budget-exhausted")
 				return
 			}
 			budget := min(4000, maxSourceTokens-sourceTokens, max(0, available-1024))
 			if mapJob && (budget < 128 || sourceCalls > maxSourceCalls) {
 				finishMap = true
+				readLimit = true
 				req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: `{"status":"error","error":{"code":"budget_exhausted","message":"已达到本轮资料续读额度。"}}`})
 				continue
 			}
@@ -500,8 +529,11 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			}
 			result := executeSource(ctx, reader, f.Sources, call, budget)
 			if result.Error != nil && (result.Error.Code == "invalid_arguments" || result.Error.Code == "invalid_tool") {
-				s.fail(slug, j, "invalid-provider-tool")
-				return
+				if !mapJob {
+					s.fail(slug, j, "invalid-provider-tool")
+					return
+				}
+				finishMap = true
 			}
 			raw, _ := json.Marshal(result)
 			sourceTokens += len([]rune(string(raw)))
@@ -516,19 +548,15 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
 			if mapJob {
 				available, _ = ai.CheckGenerationRequest(req, p)
-				finishMap = finishMap || sourceCalls >= maxSourceCalls || sourceTokens >= maxSourceTokens-128
+				readLimit = readLimit || sourceCalls >= maxSourceCalls || sourceTokens >= maxSourceTokens-128
+				finishMap = finishMap || readLimit
 			}
 		}
 		if finishMap {
-			instructions, renderErr := ai.RenderPrompt("teaching/runtime/tools-finished", nil)
-			if renderErr != nil {
-				s.fail(slug, j, "prompt-resource-unavailable")
+			if !finishMapRequest() {
 				return
 			}
-			finalMapRound = true
-			req.Tools = nil
-			req.TurnInstructions = instructions
-			if j.MapMode == "sources" {
+			if j.MapMode == "sources" && (readLimit || round == maxRounds-2) {
 				j.Coverage.Gap += " 本轮达到续读限制，地图按已取得的证据整理，仍有资料未读完。"
 			}
 		}
@@ -686,6 +714,10 @@ func (s *Service) failLocked(slug, root string, j Job, code string) {
 }
 func executeSource(ctx context.Context, r *sources.Reader, docs []sources.SourceDocument, call ai.ToolCall, budget int) sources.SourceResult {
 	return sources.ExecuteTool(ctx, r, docs, call, sources.ToolPolicy{Budget: budget})
+}
+
+func rejectedMapTool(call ai.ToolCall) ai.GatewayMessage {
+	return ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: `{"status":"error","error":{"code":"invalid_arguments","message":"这次资料工具未执行。只能使用已经核实的资料。"}}`}
 }
 func cleanOutput(s string) string {
 	s = strings.TrimSpace(s)

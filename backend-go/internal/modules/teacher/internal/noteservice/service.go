@@ -261,7 +261,7 @@ func (s *Service) run(slug string, store *notestore.Store, job notestore.NoteJob
 	defer s.wg.Done()
 	defer func() { s.mu.Lock(); delete(s.busy, slug); s.mu.Unlock(); s.Notify(slug) }()
 	s.updated(slug, job)
-	ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
+	ctx, cancel := context.WithTimeout(s.ctx, config.ModelGenerationTimeout)
 	defer cancel()
 	content, usage, err := s.generator(ctx, job.ProviderID, job.Model, job.Turns)
 	if usage.InputTokens != 0 || usage.OutputTokens != 0 {

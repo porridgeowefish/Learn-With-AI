@@ -400,6 +400,7 @@ function conversation(ctx, s, parts, b) {
       '模拟积分不足': 'insufficient_credits',
       '模拟 API 密钥错误': 'teacher_api_key_rejected',
       '模拟模型限流': 'teacher_provider_rate_limited',
+      '模拟对比空答': 'comparison_empty_output',
     }[question.trim()];
     if (failureCode) {
       const teacher = message('teacher', '', { status: 'failed', failureCode });

@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/cloud/inference"
 	"github.com/xmz14/lll/backend-go/internal/cloud/routing"
 	"github.com/xmz14/lll/backend-go/internal/cloud/store"
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"github.com/xmz14/lll/backend-go/internal/platform/promptpack"
 )
 
@@ -31,11 +33,12 @@ type Rate struct {
 }
 
 type Model struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	MaxInput  int    `json:"maxInput"`
-	MaxOutput int    `json:"maxOutput"`
-	Rate      Rate   `json:"rate"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	MaxInput      int    `json:"maxInput"`
+	MaxOutput     int    `json:"maxOutput"`
+	ContextWindow int    `json:"contextWindow,omitempty"`
+	Rate          Rate   `json:"rate"`
 }
 
 var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
@@ -43,7 +46,16 @@ var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 func (m Model) valid() bool {
 	const maxTokens = 4_000_000
 	return identifier.MatchString(m.ID) && m.Name != "" && m.MaxInput > 0 && m.MaxInput <= maxTokens &&
-		m.MaxOutput > 0 && m.MaxOutput <= maxTokens && m.Rate.valid()
+		m.MaxOutput > 0 && m.MaxOutput <= maxTokens &&
+		(m.ContextWindow == 0 || m.ContextWindow >= max(m.MaxInput, m.MaxOutput) && m.ContextWindow <= maxTokens) &&
+		m.Rate.valid()
+}
+
+func (m Model) outputRoom(input int) int {
+	if m.ContextWindow == 0 {
+		return m.MaxOutput
+	}
+	return max(0, min(m.MaxOutput, m.ContextWindow-input))
 }
 
 func (r Rate) valid() bool {
@@ -107,7 +119,7 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in inferenceInput
-	if !decode(w, r, &in, 2<<20) {
+	if !decode(w, r, &in, 16<<20) {
 		return
 	}
 	in.LegacyExposureID = ""
@@ -119,7 +131,7 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !identifier.MatchString(in.RequestID) || len(in.Messages) == 0 || len(in.Tools) > 32 ||
-		in.MaxOutputTokens < 0 || in.MaxOutputTokens > model.MaxOutput {
+		in.MaxOutputTokens < 0 {
 		fail(w, http.StatusBadRequest, "invalid_inference_request")
 		return
 	}
@@ -137,15 +149,19 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	estimated := ai.EstimateTextTokens(string(encoded))
-	if estimated > model.MaxInput {
+	if estimated > model.MaxInput || model.outputRoom(estimated) == 0 {
 		fail(w, http.StatusRequestEntityTooLarge, "model_input_limit")
 		return
 	}
 	digest := sha256.Sum256(encoded)
+	in.MaxOutputTokens = min(in.MaxOutputTokens, model.outputRoom(estimated))
 	prices := model.Rate.prices()
-	weighted := int64(estimated)*max(prices.Input, prices.Cached, prices.Write) + int64(in.MaxOutputTokens)*prices.Output
-	units := model.Rate.creditUnits(weighted)
-	hold, err := s.db.Reserve(r.Context(), account.ID, in.RequestID, hex.EncodeToString(digest[:]), units, time.Now())
+	weightedInput := int64(estimated) * max(prices.Input, prices.Cached, prices.Write)
+	creditsForOutput := func(output int) int64 {
+		return model.Rate.creditUnits(weightedInput + int64(output)*prices.Output)
+	}
+	hold, err := s.db.ReserveWithin(r.Context(), account.ID, in.RequestID, hex.EncodeToString(digest[:]),
+		creditsForOutput(1), creditsForOutput(in.MaxOutputTokens), time.Now())
 	switch {
 	case errors.Is(err, store.ErrBalance):
 		fail(w, http.StatusPaymentRequired, "insufficient_credits")
@@ -160,7 +176,12 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "credits_unavailable")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), inferenceTimeout(in.MaxOutputTokens))
+	if hold.Units < creditsForOutput(in.MaxOutputTokens) {
+		in.MaxOutputTokens = sort.Search(in.MaxOutputTokens, func(i int) bool {
+			return creditsForOutput(i+1) > hold.Units
+		})
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), platformconfig.ModelGenerationTimeout)
 	defer cancel()
 	startedAt := time.Now()
 	started := false
@@ -232,13 +253,6 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 	} else {
 		failWithSettlement(w, http.StatusBadGateway, "inference_unavailable", receipt)
 	}
-}
-
-func inferenceTimeout(maxOutput int) time.Duration {
-	if maxOutput > 8192 {
-		return 15 * time.Minute
-	}
-	return 5 * time.Minute
 }
 
 func failWithSettlement(w http.ResponseWriter, status int, code string, receipt ai.CreditSettlement) {
