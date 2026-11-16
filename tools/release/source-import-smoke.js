@@ -80,7 +80,7 @@ async function main(binary){
    }
   }
   map.overviewMarkdown+='## 领域之间如何关联\nRelationships.\n## 常用研究方法与证据\nMethods.\n## 典型应用\nApplications.\n';
-  const received=[],fakeErrors=[];let rejectNextMap=false;
+  const received=[],fakeErrors=[];let invalidMapResponses=0;
   fake=http.createServer(async(req,res)=>{
    try{
     assert.equal(req.url,'/v1/chat/completions');assert.equal(req.method,'POST');
@@ -110,7 +110,12 @@ async function main(binary){
     for(const resource of resources)assert(system.includes(fs.readFileSync(path.join(promptRoot,resource+'.md'),'utf8').trim()),'packaged prompt missing '+resource);
     assert.equal(request.stream,true);
     res.setHeader('Content-Type','text/event-stream');
-    const content=kind==='review'?review:kind==='practice'?practice:rejectNextMap?(rejectNextMap=false,'{invalid JSON map draft}'):JSON.stringify(map);
+    let content=kind==='review'?review:kind==='practice'?practice:JSON.stringify(map);
+    if(kind==='discipline-map'&&invalidMapResponses>0){
+     invalidMapResponses--;
+     if(invalidMapResponses===0)assert(!request.tools?.length,'map recovery did not close tools before requesting final output');
+     content='{invalid JSON map draft}';
+    }
     res.end('data: '+JSON.stringify({choices:[{delta:{content},finish_reason:'stop'}]})+'\n\ndata: '+JSON.stringify({choices:[],usage:{prompt_tokens:25,completion_tokens:50}})+'\n\ndata: [DONE]\n\n');
    }catch(e){fakeErrors.push(e.message);res.statusCode=500;res.end('installed smoke fake rejected request')}
   });
@@ -187,9 +192,11 @@ async function main(binary){
 
   }
   assert.deepEqual(fakeErrors,[]);assert.deepEqual(received,['smoke-review','smoke-practice','smoke-discipline-map','smoke-vision','smoke-discipline-map']);
-  rejectNextMap=true;
+  // Keep both the initial answer and terminal recovery malformed to exercise candidate retention.
+  invalidMapResponses=2;
   const {job:badMap}=await json(mapEndpoint,{operationId:crypto.randomUUID(),kind:'discipline-map',mapMode:'general'});
-  let rejected;for(let i=0;i<150;i++){rejected=(await (await fetch(base+mapEndpoint+'/'+badMap.id)).json()).job;if(rejected.status==='failed')break;await pause()}
+  let rejected;for(let i=0;i<150;i++){rejected=(await (await fetch(base+mapEndpoint+'/'+badMap.id)).json()).job;if(rejected.status==='failed'||rejected.status==='succeeded')break;await pause()}
+  assert.deepEqual(fakeErrors,[]);assert.equal(invalidMapResponses,0,'expected one terminal map recovery');
   assert.equal(rejected.status,'failed');assert.equal(rejected.validation.code,'json-format');assert.equal(rejected.candidateAvailable,true);
   const requestCount=received.length;
   const savedDraft=await fetch(base+mapEndpoint+'/'+badMap.id+'/candidate');assert.equal(savedDraft.status,200);
