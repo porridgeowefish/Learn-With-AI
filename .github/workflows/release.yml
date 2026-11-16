@@ -8,7 +8,7 @@ on:
       version:
         description: Release version (numeric major.minor.patch)
         required: true
-        default: '0.10.17'
+        default: '0.10.18'
       publish:
         description: Publish GitHub Release v<version> from this commit after all smokes pass
         type: boolean
@@ -72,7 +72,7 @@ jobs:
           $version = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
           node tools/release/ci-run.js --temp-logs learn-msi-smoke- -- node tools/release/msi-smoke.js "dist/releases/$version/learn-with-ai-$version-windows-amd64.msi"
       - name: Windows upgrade from the published 0.10.15 MSI
-        if: runner.os == 'Windows' && (inputs.version == '0.10.17' || github.ref_name == 'v0.10.17')
+        if: runner.os == 'Windows' && (inputs.version == '0.10.18' || github.ref_name == 'v0.10.18')
         shell: pwsh
         timeout-minutes: 12
         env:
@@ -83,8 +83,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $target | Out-Null
           gh release download v0.10.15 --repo "$env:GITHUB_REPOSITORY" --pattern $old --dir $target
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ((Get-FileHash "$target/$old" -Algorithm SHA256).Hash.ToLowerInvariant() -ne '315868feb88b1408313a95eb91be1aa724559f45c57e45a55b290c3b33ef52ef') { throw 'Published v0.10.15 MSI checksum mismatch' }
-          node tools/release/ci-run.js --temp-logs learn-msi-upgrade- -- node tools/release/msi-upgrade-smoke.js "$target/$old" 'dist/releases/0.10.17/learn-with-ai-0.10.17-windows-amd64.msi'
+          node tools/release/ci-run.js --temp-logs learn-msi-upgrade- -- node tools/release/msi-upgrade-smoke.js "$target/$old" 'dist/releases/0.10.18/learn-with-ai-0.10.18-windows-amd64.msi'
       - name: Validate Debian package manifests
         if: runner.os == 'Linux'
         shell: bash
