@@ -102,7 +102,10 @@ async function main(binary){
     assert(['review','practice','discipline-map'].includes(kind),'unexpected model/default fallback: '+request.model);
     if(kind==='discipline-map'){
       const input=JSON.parse(request.messages.find(m=>m.role==='user').content);
-      if(input.mapMode==='sources')assert(input.sourceVerificationSamples?.some(sample=>sample.body.includes('没有 Markdown 目录')),'source map omitted OCR body');
+      if(input.mapMode==='sources'){
+       assert(input.sourceTexts?.some(source=>source.text.includes('没有 Markdown 目录')),'source map omitted OCR body');
+       assert(!request.tools?.length,'source map should send one body-only request');
+      }
     }
     const system=request.messages.find(m=>m.role==='system')?.content;assert.equal(typeof system,'string');
     const profile=JSON.parse(fs.readFileSync(path.join(promptRoot,"profiles","generation",kind+".json"),"utf8"));
@@ -166,7 +169,8 @@ async function main(binary){
   for(let i=0;i<150;i++){const current=(await (await fetch(plainURL)).json()).source;if(current.status==='ready')break;await pause()}
   const {job:plainMap}=await json(mapEndpoint,{operationId:crypto.randomUUID(),kind:'discipline-map',mapMode:'sources',sourceIds:[plain.sourceId]});
   const plainDone=await completed(mapEndpoint+'/'+plainMap.id);
-  assert(plainDone.coverage.readRanges.length>0,'plain text not actually read');assert(plainDone.coverage.gap,'source coverage not stated');
+  assert(plainDone.coverage.readRanges.length>0,'plain text not actually read');
+  assert.equal(plainDone.coverage.completeWithinScope,true,'complete short text should be marked fully read');
   const erase=await fetch(plainURL+'/permanent-delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmation:'PERMANENT_DELETE',operationId:crypto.randomUUID()})});assert.equal(erase.status,200);
   assert.equal((await erase.json()).status,'deleted');
   assert(!fs.existsSync(path.join(workspace,'projects','map-smoke','sources',plain.sourceId,'revisions')),'parsed versions survived deletion');

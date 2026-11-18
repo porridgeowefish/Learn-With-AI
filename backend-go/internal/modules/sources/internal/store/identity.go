@@ -12,7 +12,11 @@ type RevisionGuard struct{ SourceID, RevisionID, ContentHash string }
 func (s *Store) WithProjectDeletion(remove func() error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return remove()
+	if err := remove(); err != nil {
+		return err
+	}
+	s.mu.epoch++
+	return nil
 }
 
 // WithReadableRevisions orders source deletion with a consumer's final commit.

@@ -437,7 +437,14 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 			return Job{}, problem("source-selection-required", 400)
 		}
 	}
+	sourceMap := in.Kind == "discipline-map" && in.MapMode == "sources"
 	payload := map[string]any{"date": time.Now().Format("2006-01-02"), "project": state, "questionCount": in.QuestionCount, "mapMode": in.MapMode, "sourceDocuments": f.Sources}
+	if sourceMap {
+		if len(f.Sources) == 0 {
+			return Job{}, problem("source-selection-required", 400)
+		}
+		payload = map[string]any{"project": map[string]string{"title": state.Title}, "mapMode": in.MapMode}
+	}
 	if pref, e := preferences.Read(); e != nil {
 		return Job{}, e
 	} else {
@@ -539,17 +546,6 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 			return Job{}, e
 		}
 		f.BaseMapVersionID = m.MapVersionID
-		if in.MapMode == "sources" {
-			outline, samples, e := sourceMapContext(ctx, slug, f.Sources)
-			if e != nil {
-				return Job{}, e
-			}
-			payload["sourceOutlines"] = outline
-			for _, sample := range samples {
-				f.InitialReadRanges = append(f.InitialReadRanges, sample.Citation)
-			}
-			payload["sourceVerificationSamples"] = samples
-		}
 	}
 	raw, e := json.Marshal(payload)
 	if e != nil {
@@ -559,10 +555,10 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	f.MaxOutputTokens = ai.GenerationOutputTokens(p)
 	f.MaxThinkingTokens = ai.GenerationThinkingTokens(p)
 	req := ai.GatewayRequest{System: system, Messages: f.Messages, ProviderID: p.ID, Model: p.Model, MaxOutputTokens: f.MaxOutputTokens, MaxThinkingTokens: f.MaxThinkingTokens}
-	if len(f.Sources) > 0 {
+	if len(f.Sources) > 0 && !sourceMap {
 		req.Tools = sources.Tools()
 	}
-	f.WebSearchEnabled = generationSearcher(in.Kind) != nil
+	f.WebSearchEnabled = !sourceMap && generationSearcher(in.Kind) != nil
 	if f.WebSearchEnabled {
 		req.Tools = append(req.Tools, webSearchTool())
 	}
@@ -593,9 +589,6 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	j := Job{SchemaVersion: 1, ID: id, RootJobID: id, Attempt: 1, OperationID: in.OperationID, Kind: in.Kind, Status: "queued", Phase: "waiting", ProviderID: p.ID, Model: p.Model, QuestionCount: in.QuestionCount, MapMode: in.MapMode, Progress: Progress{Indeterminate: true}, Coverage: Coverage{Sources: f.Sources, ReadRanges: append([]sources.SourceCitation{}, f.InitialReadRanges...)}, ResultRefs: []string{}, CreatedAt: now, UpdatedAt: now, Intent: in}
 	if in.Kind == "review" {
 		j.ReviewFormat = "html"
-	}
-	if in.Kind == "discipline-map" && in.MapMode == "sources" {
-		j.Coverage.Gap = "地图依据当前已提取文字与有限阅读整理；章节可由正文归纳，不表示已读完整份原件。未识别页和公式仍需核对。"
 	}
 	if in.Kind != "discipline-map" {
 		more, _ := payload["hasMoreConversation"].(bool)

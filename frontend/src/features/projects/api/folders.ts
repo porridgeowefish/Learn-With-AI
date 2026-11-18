@@ -34,3 +34,26 @@ export function useSaveFolders() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.folders.all() }),
   });
 }
+
+interface DeleteFolderResponse {
+  deleted: boolean;
+  deletedProjectSlugs: string[];
+  error?: string;
+}
+
+export function useDeleteFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, projectSlugs }: { id: string; projectSlugs: string[] }) =>
+      http.delete<DeleteFolderResponse>(`/api/folders/${encodeURIComponent(id)}`, { body: { projectSlugs } }),
+    onSuccess: ({ deletedProjectSlugs }) => {
+      const deleted = new Set(deletedProjectSlugs);
+      qc.removeQueries({ predicate: (query) => query.queryKey.some(key => typeof key === 'string' && deleted.has(key)) });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.projects.all() });
+      qc.invalidateQueries({ queryKey: qk.folders.all() });
+      qc.invalidateQueries({ queryKey: qk.health() });
+    },
+  });
+}

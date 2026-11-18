@@ -56,11 +56,37 @@ function activitySummary(events, url) {
   });
   return {rangeStart: days[0].date, rangeEnd: days.at(-1).date, days, currentStreak, longestStreak, activeDays, totalActions, totalGrowth};
 }
+
+function removeProject(state, slug) {
+  if (state.learning) delete state.learning[slug];
+  state.projects = state.projects.filter(p=>p.slug !== slug);
+  state.activity = state.activity.filter(e=>e.projectSlug !== slug);
+  for (const folder of state.folders) {
+    folder.slugOrder = folder.slugOrder.filter(s=>s!==slug);
+    if (folder.mapProjectSlug === slug) delete folder.mapProjectSlug;
+  }
+}
+
 export async function projects({url, path, method, request, state, json, emit}) {
   if (path === '/api/activity' && method === 'GET') return json({summary:activitySummary(state.activity,url)});
   if (path === '/api/folders') {
     if (method === 'PUT') state.folders = (await request.json()).folders;
     return json({folders:state.folders});
+  }
+  const folderMatch = /^\/api\/folders\/([^/]+)$/.exec(path);
+  if (folderMatch && method === 'DELETE') {
+    const id = decodeURIComponent(folderMatch[1]);
+    const folder = state.folders.find(f=>f.id===id);
+    if (!folder) return json({error:'分组已不存在。'},404);
+    const { projectSlugs } = await request.json();
+    const members = [...folder.slugOrder, ...(folder.mapProjectSlug ? [folder.mapProjectSlug] : [])];
+    if (!Array.isArray(projectSlugs)) return json({error:'请确认要删除的分组内容。'},400);
+    if (projectSlugs.length !== members.length || members.some((slug, index)=>slug!==projectSlugs[index])) {
+      return json({error:'分组内容已变化，请重新确认。'},409);
+    }
+    for (const slug of members) removeProject(state, slug);
+    state.folders = state.folders.filter(f=>f.id!==id);
+    return json({deleted:true,deletedProjectSlugs:members});
   }
   if (path === '/api/project-type-advice' && method === 'POST') {
     const input = await request.json();
@@ -110,13 +136,7 @@ export async function projects({url, path, method, request, state, json, emit}) 
   }
   if ((!match[2] && method === 'DELETE') || (method === 'POST' && match[2] === 'archive')) {
     if (match[2] === 'archive') state.archivedProjects.push({...project,status:'archived'});
-    if (state.learning) delete state.learning[slug];
-    state.projects = state.projects.filter(p=>p.slug !== slug);
-    state.activity = state.activity.filter(e=>e.projectSlug !== slug);
-    for (const folder of state.folders) {
-      folder.slugOrder = folder.slugOrder.filter(s=>s!==slug);
-      if (folder.mapProjectSlug === slug) delete folder.mapProjectSlug;
-    }
+    removeProject(state, slug);
     return json({deleted:true,projectId:project.id});
   }
   if (!match[2] && ['PATCH','PUT'].includes(method)) {

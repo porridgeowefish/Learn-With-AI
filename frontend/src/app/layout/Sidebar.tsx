@@ -4,14 +4,14 @@ import { useProjectStore, useUiStore } from '@/shared/store';
 import { ChevronDownIcon, PlusIcon } from '@radix-ui/react-icons';
 
 import { useDeleteProject, useProjects } from '@/features/projects/api/projects';
-import { useFolders, useSaveFolders } from '@/features/projects/api/folders';
+import { useDeleteFolder, useFolders, useSaveFolders } from '@/features/projects/api/folders';
 import {
   assignProject,
   createFolder,
-  deleteFolder,
   folderOf,
   renameFolder,
   uncategorizedSlugs,
+  type Folder,
   type FolderLayout,
 } from '@/features/projects/lib/folders';
 import { Icon, type IconName } from '@/shared/primitive/Icon';
@@ -41,6 +41,8 @@ export function Sidebar() {
   const layout: FolderLayout = foldersData ?? { folders: [] };
   const save = useSaveFolders();
   const deleteProject = useDeleteProject();
+  const deleteFolder = useDeleteFolder();
+  const deleting = deleteProject.isPending || deleteFolder.isPending;
 
   // Discipline maps are rendered through the same folder header model below;
   // only concrete system-learning projects become child rows.
@@ -63,7 +65,7 @@ export function Sidebar() {
   const composingFolderName = useRef(false);
   const [menuSlug, setMenuSlug] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<
-    | { kind: 'folder'; id: string; title: string }
+    | { kind: 'folder'; id: string; title: string; projectSlugs: string[] }
     | { kind: 'project'; slug: string; title: string; projectType: 'discipline-map' | 'system-learning' }
     | null
   >(null);
@@ -85,8 +87,11 @@ export function Sidebar() {
     setRenameValue('');
   };
 
-  const removeFolder = (id: string, name: string) => {
-    setDeleteTarget({ kind: 'folder', id, title: name });
+  const removeFolder = (folder: Folder) => {
+    deleteFolder.reset();
+    const projectSlugs = [...folder.slugOrder];
+    if (folder.mapProjectSlug) projectSlugs.push(folder.mapProjectSlug);
+    setDeleteTarget({ kind: 'folder', id: folder.id, title: folder.name, projectSlugs });
   };
 
   const moveProject = (slug: string, target: string | null) => {
@@ -96,27 +101,31 @@ export function Sidebar() {
   const removeProject = (slug: string, title: string) => {
     const project = projectBySlug.get(slug);
     if (!project) return;
+    deleteProject.reset();
     setDeleteTarget({ kind: 'project', slug, title, projectType: project.projectType });
   };
 
+  const finishDelete = (slugs: string[]) => {
+    slugs.forEach(clearDeletedProjectClientData);
+    setMenuSlug(null);
+    setDeleteTarget(null);
+    if (selectedProjectId && slugs.includes(selectedProjectId)) selectProject(null);
+    const currentSlug = matchPath('/project/:slug/*', location.pathname)?.params.slug;
+    if (currentSlug && slugs.includes(currentSlug)) navigate('/');
+  };
+
   const confirmDelete = () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleting) return;
     if (deleteTarget.kind === 'folder') {
-      commit(deleteFolder(layout, deleteTarget.id));
-      setDeleteTarget(null);
+      const { id, projectSlugs } = deleteTarget;
+      deleteFolder.mutate({ id, projectSlugs }, {
+        onSuccess: ({ deletedProjectSlugs }) => finishDelete(deletedProjectSlugs),
+      });
       return;
     }
     const { slug } = deleteTarget;
     deleteProject.mutate(slug, {
-      onSuccess: () => {
-        clearDeletedProjectClientData(slug);
-        setMenuSlug(null);
-        setDeleteTarget(null);
-        if (selectedProjectId === slug) {
-          selectProject(null);
-        }
-        if (matchPath('/project/:slug/*', location.pathname)?.params.slug === slug) navigate('/');
-      },
+      onSuccess: () => finishDelete([slug]),
     });
   };
 
@@ -171,9 +180,10 @@ export function Sidebar() {
             分组保存失败：{(save.error as Error).message}（请确认后端已重启）
           </div>
         )}
-        {deleteProject.isError && (
+        {deleteFolder.data?.error && (
           <div className={s.saveError} role="alert">
-            删除失败：{(deleteProject.error as Error).message}
+            {deleteFolder.data.deletedProjectSlugs.length > 0 && `已删除 ${deleteFolder.data.deletedProjectSlugs.length} 个项目。`}
+            {deleteFolder.data.error}
           </div>
         )}
 
@@ -229,16 +239,15 @@ export function Sidebar() {
                     <span className={s.count}>{f.slugOrder.length}</span>
                   </button>
                 )}
-                {!f.mapProjectSlug && (
-                  <button
-                    type="button"
-                    className={s.iconBtn}
-                    title="删除分组"
-                    onClick={() => removeFolder(f.id, f.name)}
-                  >
-                    <Icon name="x" size={13} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className={s.iconBtn}
+                  title="删除分组"
+                  disabled={save.isPending}
+                  onClick={() => removeFolder(f)}
+                >
+                  <Icon name="x" size={13} />
+                </button>
               </div>
               {isOpen && (
                 <div className={s.folderBody}>
@@ -298,20 +307,20 @@ export function Sidebar() {
       </div>
       <Modal
         open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}
         title={deleteTarget?.kind === 'folder'
           ? '删除分组？'
           : deleteTarget?.projectType === 'discipline-map'
             ? '删除学习路线？'
             : '删除学习专题？'}
         description={deleteTarget?.kind === 'folder'
-          ? '删除分组后，组内专题会移到「未分类」。'
-          : '这个操作会永久删除本地文件、学习记录和相关会话，无法撤销。'}
+          ? '分组及组内路线、专题、附件、学习记录和会话将永久删除。'
+          : '这个操作会永久删除项目内的附件、本地文件、学习记录和会话。'}
         size="sm"
         footer={(
           <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>取消</Button>
-            <Button variant="danger" loading={deleteProject.isPending} onClick={confirmDelete}>
+            <Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</Button>
+            <Button variant="danger" loading={deleting} onClick={confirmDelete}>
               确认删除
             </Button>
           </>
@@ -321,9 +330,19 @@ export function Sidebar() {
           <Icon name="x" size={18} />
           <div>
             <strong>{deleteTarget?.title}</strong>
-            <span>{deleteTarget?.kind === 'folder' ? '学习内容不会被删除' : '删除后不能恢复'}</span>
+            <span>删除后不能恢复</span>
           </div>
         </div>
+        {deleteTarget?.kind === 'folder' && deleteTarget.projectSlugs.length > 0 && (
+          <ul className={s.deleteProjects} aria-label="将删除的项目">
+            {deleteTarget.projectSlugs.map(slug => <li key={slug}>{projectBySlug.get(slug)?.title ?? slug}</li>)}
+          </ul>
+        )}
+        {(deleteTarget?.kind === 'folder' ? deleteFolder.error : deleteProject.error) && (
+          <p className={s.saveError} role="alert">
+            {(deleteTarget?.kind === 'folder' ? deleteFolder.error : deleteProject.error)?.message}
+          </p>
+        )}
       </Modal>
     </aside>
   );

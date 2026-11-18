@@ -8,6 +8,7 @@ api /api/cloud/unbind-github
 api /api/cloud/{}
 api /api/events
 api /api/folders
+api /api/folders/{}
 api /api/health
 api /api/learning-memories
 api /api/learning-memories/{}

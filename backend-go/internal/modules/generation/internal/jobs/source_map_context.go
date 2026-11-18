@@ -2,53 +2,96 @@ package generation
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
+	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 )
 
-// Navigation is a hint, not a requirement: local OCR produces page text rather
-// than a Markdown chapter tree. Seed the frozen readable body with citations;
-// the model can follow continuations and organize chapters from that evidence.
-func sourceMapContext(ctx context.Context, slug string, docs []sources.SourceDocument) (map[string][]sources.SourceOutlineNode, []sources.SourceReadData, error) {
-	st, err := sources.New(slug)
-	if err != nil {
-		return nil, nil, err
-	}
-	reader := sources.NewReader(st)
-	out := map[string][]sources.SourceOutlineNode{}
-	samples := []sources.SourceReadData{}
+type mapSourceText struct {
+	Name    string `json:"name"`
+	Text    string `json:"text"`
+	Partial bool   `json:"partial,omitempty"`
+}
+
+// Freeze document identity at submission and collect the text once when the
+// job starts. Old queued inputs also use their frozen source revisions.
+func prepareMapSources(ctx context.Context, slug string, req *ai.GatewayRequest, provider ai.ProviderConfig, docs []sources.SourceDocument) (Coverage, error) {
 	if len(docs) == 0 {
-		return out, samples, problem("source-selection-required", 400)
+		return Coverage{}, problem("source-selection-required", 400)
 	}
-	budget := 16000 / len(docs)
-	if budget > 4000 {
-		budget = 4000
+	var payload map[string]json.RawMessage
+	if len(req.Messages) != 1 || json.Unmarshal([]byte(req.Messages[0].Content), &payload) != nil || payload == nil {
+		return Coverage{}, problem("input-unavailable", 409)
 	}
-	for _, d := range docs {
-		_, _, body, err := st.ReadRevision(d.SourceID, d.RevisionID, d.ContentHash)
-		if err != nil {
-			return nil, nil, err
-		}
-		lines := strings.Count(string(body), "\n") + 1
-		if len(body) > 0 && body[len(body)-1] == '\n' {
-			lines--
-		}
-		result := reader.Outline(ctx, docs, sources.OutlineSourceArgs{SourceID: d.SourceID, RevisionID: d.RevisionID, Target: &sources.SourceOutlineTarget{Kind: "lines", Start: 1, End: lines}, MaxTokens: 1000})
-		data, ok := result.Data.(sources.SourceOutlineData)
-		if result.Status == "error" || !ok || len(data.Nodes) == 0 {
-			return nil, nil, problem("source-verification-unavailable", 409)
-		}
-		read := reader.Read(ctx, docs, sources.ReadSourceArgs{SourceID: d.SourceID, RevisionID: d.RevisionID, Locator: data.Nodes[0].Locator, MaxTokens: budget})
-		sample, ok := read.Data.(sources.SourceReadData)
-		if read.Status == "error" || !ok || strings.TrimSpace(sample.Body) == "" {
-			return nil, nil, problem("source-verification-unavailable", 409)
-		}
-		samples = append(samples, sample)
-		hints := reader.Outline(ctx, docs, sources.OutlineSourceArgs{SourceID: d.SourceID, RevisionID: d.RevisionID, Limit: 8, MaxTokens: 500})
-		if data, ok := hints.Data.(sources.SourceOutlineData); ok && hints.Status != "error" {
-			out[d.SourceID] = data.Nodes
-		}
+	for _, key := range []string{"sourceDocuments", "sourceOutlines", "sourceVerificationSamples", "questionCount", "date"} {
+		delete(payload, key)
 	}
-	return out, samples, nil
+	var project struct {
+		Title string `json:"title"`
+	}
+	if json.Unmarshal(payload["project"], &project) == nil && project.Title != "" {
+		payload["project"], _ = json.Marshal(project)
+	}
+	base, err := json.Marshal(payload)
+	if err != nil {
+		return Coverage{}, err
+	}
+	req.Messages[0].Content = string(base)
+	req.TurnInstructions = "根据 sourceTexts 里的课件原文生成学科路线。按实际主题组织学习顺序。partial 表示只提供了部分原文，［…］标出节选间隔。直接提交完整地图 JSON，并说明资料覆盖范围。"
+	room, err := ai.CheckGenerationRequest(*req, provider)
+	if err != nil {
+		return Coverage{}, problem("input-budget-exhausted", 409)
+	}
+	const maxMapTextTokens = 16000
+	budget := min(maxMapTextTokens, room/2)
+	if budget < 3*len(docs) {
+		return Coverage{}, problem("input-budget-exhausted", 409)
+	}
+	coverage, texts, err := sourceMapContext(ctx, slug, docs, budget)
+	if err != nil {
+		return Coverage{}, err
+	}
+	payload["sourceTexts"], err = json.Marshal(texts)
+	if err != nil {
+		return Coverage{}, err
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return Coverage{}, err
+	}
+	req.Messages[0].Content = string(raw)
+	return coverage, nil
+}
+
+func sourceMapContext(ctx context.Context, slug string, docs []sources.SourceDocument, budget int) (Coverage, []mapSourceText, error) {
+	store, err := sources.New(slug)
+	if err != nil {
+		return Coverage{}, nil, err
+	}
+	reader := sources.NewReader(store)
+	coverage := Coverage{Sources: docs, CompleteWithinScope: true}
+	texts := make([]mapSourceText, 0, len(docs))
+	perSource := min(4000, budget/len(docs))
+	for _, doc := range docs {
+		excerpts, err := reader.Excerpts(ctx, doc, perSource)
+		if err != nil || len(excerpts) == 0 {
+			return Coverage{}, nil, problem("source-verification-unavailable", 409)
+		}
+		pieces := make([]string, 0, len(excerpts))
+		bytes := 0
+		for _, excerpt := range excerpts {
+			pieces = append(pieces, excerpt.Text)
+			bytes += len(excerpt.Text)
+			coverage.ReadRanges = append(coverage.ReadRanges, excerpt.Citation)
+		}
+		complete := doc.ExtractionCoverage.CompleteWithinScope && bytes == doc.ExtractionCoverage.ReadableBytes
+		texts = append(texts, mapSourceText{Name: doc.Name, Text: strings.Join(pieces, "\n\n［…］\n\n"), Partial: !complete})
+		coverage.CompleteWithinScope = coverage.CompleteWithinScope && complete
+	}
+	if !coverage.CompleteWithinScope {
+		coverage.Gap = "部分资料采用原文节选，或仍有未识别内容。"
+	}
+	return coverage, texts, nil
 }

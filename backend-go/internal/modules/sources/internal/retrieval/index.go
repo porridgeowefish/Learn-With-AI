@@ -124,17 +124,16 @@ func terms(text string) []string {
 	flushCJK()
 	return out
 }
-func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
-	ix := &index{SchemaVersion: 1, SourceID: d.SourceID, RevisionID: d.RevisionID, ContentHash: d.ContentHash, IndexerVersion: indexerVersion, BuiltAt: time.Now().UTC(), ExtractionTruncated: d.ExtractionCoverage.ExtractionTruncated, ReadableBytes: len(body), Postings: map[string]map[int]int{}}
-	ix.DerivedVersionID = d.DerivedVersionID
-	ix.StructureHash = d.StructureHash
+func scanOutline(ctx context.Context, body string) ([]indexNode, []int, bool, error) {
+	var nodes []indexNode
+	partial := false
 	offset := 0
 	fence := ""
 	var stack []int
 	var boundaries = []int{0}
 	for _, line := range strings.SplitAfter(body, "\n") {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, nil, false, err
 		}
 		trim := strings.TrimSpace(line)
 		if strings.HasPrefix(trim, "```") || strings.HasPrefix(trim, "~~~") {
@@ -146,25 +145,25 @@ func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
 			}
 		}
 		if fence == "" {
-			if len(ix.Nodes) >= 8000 && headingPattern.MatchString(strings.TrimRight(line, "\r\n")) {
-				ix.Partial = true
+			if len(nodes) >= 8000 && headingPattern.MatchString(strings.TrimRight(line, "\r\n")) {
+				partial = true
 			}
-			if match := headingPattern.FindStringSubmatch(strings.TrimRight(line, "\r\n")); match != nil && len(ix.Nodes) < 8000 {
+			if match := headingPattern.FindStringSubmatch(strings.TrimRight(line, "\r\n")); match != nil && len(nodes) < 8000 {
 				level := len(match[1])
 				title := match[2]
 				if utf8.RuneCountInString(title) > 256 {
 					title = string([]rune(title)[:256])
-					ix.Partial = true
+					partial = true
 				}
-				for len(stack) > 0 && ix.Nodes[stack[len(stack)-1]].Level >= level {
-					ix.Nodes[stack[len(stack)-1]].End = offset
+				for len(stack) > 0 && nodes[stack[len(stack)-1]].Level >= level {
+					nodes[stack[len(stack)-1]].End = offset
 					stack = stack[:len(stack)-1]
 				}
 				parent := ""
 				if len(stack) > 0 {
-					parent = ix.Nodes[stack[len(stack)-1]].ID
+					parent = nodes[stack[len(stack)-1]].ID
 				}
-				node := indexNode{ID: fmt.Sprintf("node_%d", len(ix.Nodes)+1), Parent: parent, Title: title, Level: level, Start: offset, End: len(body)}
+				node := indexNode{ID: fmt.Sprintf("node_%d", len(nodes)+1), Parent: parent, Title: title, Level: level, Start: offset, End: len(body)}
 				if m := pagePattern.FindStringSubmatch(title); m != nil {
 					n, _ := strconv.Atoi(m[1])
 					node.Unit = &UnitRange{Kind: "page", Start: n, End: n}
@@ -176,8 +175,8 @@ func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
 				if strings.HasPrefix(title, "工作表：") {
 					node.Unit = &UnitRange{Kind: "sheet", Name: strings.TrimPrefix(title, "工作表：")}
 				}
-				ix.Nodes = append(ix.Nodes, node)
-				stack = append(stack, len(ix.Nodes)-1)
+				nodes = append(nodes, node)
+				stack = append(stack, len(nodes)-1)
 				if offset > 0 {
 					boundaries = append(boundaries, offset)
 				}
@@ -189,6 +188,17 @@ func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
 		}
 	}
 	boundaries = append(boundaries, len(body))
+	return nodes, boundaries, partial, nil
+}
+
+func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
+	nodes, boundaries, partial, err := scanOutline(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	ix := &index{SchemaVersion: 1, SourceID: d.SourceID, RevisionID: d.RevisionID, ContentHash: d.ContentHash, IndexerVersion: indexerVersion, BuiltAt: time.Now().UTC(), ExtractionTruncated: d.ExtractionCoverage.ExtractionTruncated, ReadableBytes: len(body), Postings: map[string]map[int]int{}, Nodes: nodes, Partial: partial}
+	ix.DerivedVersionID = d.DerivedVersionID
+	ix.StructureHash = d.StructureHash
 	sort.Ints(boundaries)
 	start := 0
 	protected := protectedBlocks(body)

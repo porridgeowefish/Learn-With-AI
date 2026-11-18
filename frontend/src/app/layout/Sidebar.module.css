@@ -350,6 +350,14 @@
   font-size: 0.7rem;
 }
 
+.deleteProjects {
+  max-height: 9rem;
+  margin: 12px 0 0;
+  padding-inline-start: 1.4rem;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
 .brand { display: flex; align-items: center; gap: 8px; padding: 16px 12px; font-size: .95rem; font-weight: 700; color: var(--fg); text-decoration: none; }
 .brand img { width: 26px; height: 26px; }
 .foot { display: flex; flex-direction: column; gap: 8px; padding: 12px; }

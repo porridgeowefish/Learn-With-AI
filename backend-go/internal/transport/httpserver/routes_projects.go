@@ -24,16 +24,15 @@ import (
 // owns validation, active-run protection, and associated reference cleanup.
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
-	mediaLock := s.chatMediaLock(slug)
-	mediaLock.Lock()
-	defer mediaLock.Unlock()
 	if !projects.ValidateSlug(slug) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return
 	}
+	s.projectTreeMu.Lock()
+	defer s.projectTreeMu.Unlock()
 
 	result := map[string]any{"deleted": true, "projectId": slug}
-	if err := s.projectOperations().Delete(slug); err != nil {
+	if err := s.deleteProject(slug); err != nil {
 		var cleanup *projectservice.FolderCleanupError
 		if errors.As(err, &cleanup) {
 			log.Printf("delete project %s: %v", slug, cleanup)
@@ -47,8 +46,20 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.cache.Invalidate(slug)
 	httpx.WriteJSON(w, http.StatusOK, result)
+}
+
+// deleteProject requires projectTreeMu and is shared by standalone and folder deletion.
+func (s *Server) deleteProject(slug string) error {
+	mediaLock := s.chatMediaLock(slug)
+	mediaLock.Lock()
+	defer mediaLock.Unlock()
+	err := s.projectOperations().Delete(slug)
+	var cleanup *projectservice.FolderCleanupError
+	if err == nil || errors.As(err, &cleanup) {
+		s.cache.Invalidate(slug)
+	}
+	return err
 }
 
 // createProjectRequest is the body of POST /api/projects.
@@ -142,6 +153,8 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		}
 		providerID = provider.ID
 	}
+	s.projectTreeMu.Lock()
+	defer s.projectTreeMu.Unlock()
 	var scope *projects.Scope
 	if req.ScopeSource != nil {
 		if projectType != projects.ProjectTypeSystemLearning {

@@ -296,10 +296,19 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		thinkingBudget = ai.GenerationThinkingTokens(p)
 	}
 	req := ai.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: outputBudget, MaxThinkingTokens: thinkingBudget}
+	mapJob := j.Kind == "discipline-map"
+	sourceMap := mapJob && j.MapMode == "sources"
+	if sourceMap {
+		j.Coverage, e = prepareMapSources(ctx, slug, &req, p, f.Sources)
+		if e != nil {
+			s.fail(slug, j, ErrorCode(e))
+			return
+		}
+	}
 	if p.Kind == ai.ManagedKind && f.PromptReference != nil {
 		req.Prompt = f.PromptReference
 	}
-	if len(f.Sources) > 0 {
+	if len(f.Sources) > 0 && !sourceMap {
 		req.Tools, e = sources.CheckedTools()
 		if e != nil {
 			s.fail(slug, j, "tool-instructions-unavailable")
@@ -307,14 +316,14 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		}
 	}
 	var searcher teacher.WebSearcher
-	if f.WebSearchEnabled {
+	if f.WebSearchEnabled && !sourceMap {
 		searcher = generationSearcher(j.Kind)
 		if searcher != nil {
 			req.Tools = append(req.Tools, webSearchTool())
 		}
 	}
 	var reader *sources.Reader
-	if len(f.Sources) > 0 {
+	if len(f.Sources) > 0 && !sourceMap {
 		st, e := sources.New(slug)
 		if e != nil {
 			s.fail(slug, j, "source-unavailable")
@@ -333,9 +342,13 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	completedTokensEstimated := false
 	lastProgress := time.Time{}
 	const maxRounds, maxSourceCalls, maxSourceTokens = 8, 12, 12000
-	mapJob := j.Kind == "discipline-map"
 	finalMapRound := false
 	finishMapRequest := func() bool {
+		if sourceMap {
+			finalMapRound = true
+			req.TurnInstructions += "\n请重新提交完整的地图 JSON 对象。"
+			return true
+		}
 		instructions, err := ai.RenderPrompt("teaching/runtime/tools-finished", nil)
 		if err != nil {
 			s.fail(slug, j, "prompt-resource-unavailable")
@@ -455,7 +468,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			return
 		}
 		text = body.String()
-		if len(pending) == 0 {
+		if sourceMap || len(pending) == 0 {
 			if mapJob && !finalMapRound && round < maxRounds-1 && !json.Valid([]byte(cleanOutput(text))) {
 				if !finishMapRequest() {
 					return
@@ -473,7 +486,6 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 			available, _ = ai.CheckGenerationRequest(req, p)
 		}
 		finishMap := mapJob && round == maxRounds-2
-		readLimit := false
 		for _, call := range pending {
 			if call.ToolName == "search_web" {
 				webCalls++
@@ -517,12 +529,6 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 				return
 			}
 			budget := min(4000, maxSourceTokens-sourceTokens, max(0, available-1024))
-			if mapJob && (budget < 128 || sourceCalls > maxSourceCalls) {
-				finishMap = true
-				readLimit = true
-				req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: `{"status":"error","error":{"code":"budget_exhausted","message":"已达到本轮资料续读额度。"}}`})
-				continue
-			}
 			if budget < 128 {
 				s.fail(slug, j, "source-budget-exhausted")
 				return
@@ -546,18 +552,10 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 				}
 			}
 			req.Messages = append(req.Messages, ai.GatewayMessage{Role: "tool", ToolCallID: call.ProviderCallID, Content: string(raw)})
-			if mapJob {
-				available, _ = ai.CheckGenerationRequest(req, p)
-				readLimit = readLimit || sourceCalls >= maxSourceCalls || sourceTokens >= maxSourceTokens-128
-				finishMap = finishMap || readLimit
-			}
 		}
 		if finishMap {
 			if !finishMapRequest() {
 				return
-			}
-			if j.MapMode == "sources" && (readLimit || round == maxRounds-2) {
-				j.Coverage.Gap += " 本轮达到续读限制，地图按已取得的证据整理，仍有资料未读完。"
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 // Package folderstore manages workspace-global project folders — user-created
 // named groupings that hold references (project slugs) to projects. File-backed,
-// no DB. Membership is by reference only: projects are never moved on disk, so
-// deleting a folder simply returns its projects to "uncategorized".
+// no DB. Moving a project between folders updates its reference in the ledger.
 package folderstore
 
 import (
@@ -91,11 +90,13 @@ func (s *Store) load() error {
 		s.data = Layout{}
 		return nil
 	}
-	if err := json.Unmarshal(raw, &s.data); err != nil {
+	var data Layout
+	if err := json.Unmarshal(raw, &data); err != nil {
 		_, _ = filesystem.BackupCorruptFile(s.filePath, err)
 		s.data = Layout{}
 		return nil
 	}
+	s.data = data
 	return nil
 }
 
@@ -204,6 +205,26 @@ func (s *Store) RemoveProject(slug string) (Layout, error) {
 		return Layout{}, err
 	}
 	return cloneLayout(s.data), nil
+}
+
+// RemoveEmptyFolder removes a folder after its projects have been deleted.
+func (s *Store) RemoveEmptyFolder(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.load(); err != nil {
+		return err
+	}
+	for i, folder := range s.data.Folders {
+		if folder.ID != id {
+			continue
+		}
+		if len(folder.SlugOrder) != 0 || folder.MapProjectSlug != "" {
+			return errors.New("folder still contains projects")
+		}
+		s.data.Folders = append(s.data.Folders[:i], s.data.Folders[i+1:]...)
+		return s.save()
+	}
+	return os.ErrNotExist
 }
 
 // SyncMapFolders makes discipline maps first-class sidebar folders. Existing

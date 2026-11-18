@@ -38,6 +38,7 @@ type Server struct {
 	cloudLoginFlows       sync.Map
 	googleLoginFlows      sync.Map
 	chatMediaMu           sync.Map
+	projectTreeMu         sync.Mutex
 	mu                    sync.RWMutex
 }
 type Dependencies struct {
@@ -180,6 +181,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/projects/{id}/assets/review/annotations/{annotationId}", s.handleDeleteAnnotation)
 	mux.HandleFunc("GET /api/folders", s.handleGetFolders)
 	mux.HandleFunc("PUT /api/folders", s.handlePutFolders)
+	mux.HandleFunc("DELETE /api/folders/{id}", s.handleDeleteFolder)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, 404, map[string]any{"error": "API route not found"})
 	})

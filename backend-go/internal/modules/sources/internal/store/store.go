@@ -148,9 +148,15 @@ type Revision struct {
 
 type Store struct {
 	root          string
-	mu            *sync.Mutex
+	mu            *projectLock
+	projectEpoch  uint64
 	fileLimit     int64
 	unitByteLimit int64
+}
+
+type projectLock struct {
+	sync.Mutex
+	epoch uint64
 }
 
 var locks sync.Map
@@ -159,6 +165,14 @@ func New(slug string) (*Store, error) {
 	if !workspace.ValidateSlug(slug) {
 		return nil, errors.New("invalid project slug")
 	}
+	root, err := workspace.ProjectRootForSlug(slug)
+	if err != nil {
+		return nil, err
+	}
+	v, _ := locks.LoadOrStore(root, &projectLock{})
+	mu := v.(*projectLock)
+	mu.Lock()
+	defer mu.Unlock()
 	state, err := workspace.ReadProjectState(slug)
 	if err != nil {
 		return nil, err
@@ -166,12 +180,7 @@ func New(slug string) (*Store, error) {
 	if state.ProjectType != workspace.ProjectTypeSystemLearning && state.ProjectType != workspace.ProjectTypeDisciplineMap {
 		return nil, errors.New("sources require a learning or map project")
 	}
-	root, err := workspace.ProjectRootForSlug(slug)
-	if err != nil {
-		return nil, err
-	}
-	v, _ := locks.LoadOrStore(root, &sync.Mutex{})
-	s := &Store{root: filepath.Join(root, "sources"), mu: v.(*sync.Mutex), fileLimit: DefaultFileLimit, unitByteLimit: DefaultUnitByteLimit}
+	s := &Store{root: filepath.Join(root, "sources"), mu: mu, projectEpoch: mu.epoch, fileLimit: DefaultFileLimit, unitByteLimit: DefaultUnitByteLimit}
 	if err := os.MkdirAll(s.root, 0o755); err != nil {
 		return nil, err
 	}
@@ -214,6 +223,9 @@ func (s *Store) add(operationID, displayName, filename, mediaType string, size i
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.projectEpoch != s.mu.epoch {
+		return Source{}, Revision{}, false, os.ErrNotExist
+	}
 	sourceID := idgen.New("source")
 	status, failure := "stored", ""
 	if operationID != "" {

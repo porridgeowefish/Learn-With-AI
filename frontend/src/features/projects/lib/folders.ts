@@ -81,10 +81,3 @@ export function renameFolder(layout: FolderLayout, id: string, name: string): Fo
   if (f) f.name = trimmed;
   return next;
 }
-
-/** Delete a folder; its projects return to uncategorized. */
-export function deleteFolder(layout: FolderLayout, id: string): FolderLayout {
-  const next = cloneLayout(layout);
-  next.folders = next.folders.filter((f) => f.id !== id);
-  return next;
-}
