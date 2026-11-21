@@ -1,24 +1,17 @@
 import './review.css';
-import createDOMPurify from 'dompurify';
 import { selectionEndpointRect } from '../lib/selectionGeometry';
 import { applyHighlights, selectionToTextAnchor, type SavedHighlight } from '../lib/summaryHighlights';
 import { MAX_REVIEW_HTML, PREVIEW_HOST_PATTERN, type PreviewSelection } from './protocol';
 import { buildInteractiveDocument } from '../lib/interactiveMarkdown';
+import { sanitizeReview } from './reviewContent';
 
 const root = document.querySelector<HTMLElement>('#content')!;
-const purifier = createDOMPurify(window);
 const themeTokens = ['--fg', '--border', '--surface-sunken', '--code-bg', '--code-fg', '--font-size'];
 
 function review(content: string, highlights: SavedHighlight[], theme: Record<string, string>, send: (data: object) => void) {
   if (content.length > MAX_REVIEW_HTML) throw new Error('Review exceeds preview budget');
   root.dataset.reviewDocument = '';
-  const fragment = purifier.sanitize(content, {
-    ALLOWED_TAGS: ['article', 'section', 'header', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'em', 'b', 'i', 'small', 'sub', 'sup', 'blockquote', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'pre', 'code', 'br', 'hr'],
-    ALLOWED_ATTR: ['colspan', 'rowspan', 'scope', 'start', 'lang'],
-    ALLOW_ARIA_ATTR: false,
-    ALLOW_DATA_ATTR: false,
-    RETURN_DOM_FRAGMENT: true,
-  });
+  const fragment = sanitizeReview(content);
   const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
   let elements = 0;
   while (walker.nextNode()) {
@@ -29,8 +22,10 @@ function review(content: string, highlights: SavedHighlight[], theme: Record<str
       if (span !== null && (!/^\d{1,2}$/.test(span) || Number(span) < 1)) element.removeAttribute(name);
     }
   }
+  if (!fragment.textContent?.trim() && !fragment.querySelector('svg, math, img, meter, progress')) {
+    throw new Error('Empty review preview');
+  }
   root.replaceChildren(fragment);
-  if (!root.textContent?.trim()) throw new Error('Empty review preview');
   const setTheme = (values: Record<string, string>) => {
     for (const token of themeTokens) document.documentElement.style.setProperty(token, values[token] ?? '');
   };

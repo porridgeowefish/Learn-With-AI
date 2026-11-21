@@ -8,7 +8,15 @@ const confirmedBindings = new Set();
 const id = () => crypto.randomUUID();
 const reply =
   '向量加法表示连续发生的位移。把第二个向量的起点移到第一个向量的终点，再连接最初的起点和最后的终点，就得到合位移。';
-const review = '<article><h1>向量与坐标</h1><p>向量用大小和方向描述变化。用坐标相加，就能合并连续的位移。</p><h2>一个例子</h2><p>向东走三步，再向北走四步，位移的大小为五步。</p></article>';
+const review = `<article><h1>向量与坐标</h1><p>向量用大小和方向描述变化。用坐标相加，就能合并连续的位移。</p>
+<figure><svg viewBox="0 0 240 160" role="img" aria-label="两段位移及其合位移">
+<defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6Z"/></marker></defs>
+<path d="M30 130H160V25" fill="none" stroke="#34756c" stroke-width="3" marker-mid="url(#arrow)" marker-end="url(#arrow)"/>
+<path d="M30 130L160 25" fill="none" stroke="#586a96" stroke-width="3" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<text x="76" y="151">向东 3 步</text><text x="173" y="79">向北 4 步</text></svg><figcaption>虚线表示从起点到终点的合位移。</figcaption></figure>
+<details><summary>计算位移大小</summary><p>向东走三步，再向北走四步，位移的大小为五步。</p>
+<math display="block"><msqrt><msup><mn>3</mn><mn>2</mn></msup><mo>+</mo><msup><mn>4</mn><mn>2</mn></msup></msqrt><mo>=</mo><mn>5</mn></math></details></article>`;
+const vectorCode = '\n\n```python\ndef distance(x, y):\n    # 计算合位移\n    return (x ** 2 + y ** 2) ** 0.5\n\nprint("合位移", distance(3, 4))\n```';
 const seedSlugs = new Set(['math', 'physics', 'math-map']);
 const physicsReply =
   '先选定小球和地球作为系统。忽略空气阻力时，小球下落减少的重力势能转化成动能，两者之和保持不变。';
@@ -432,9 +440,22 @@ function conversation(ctx, s, parts, b) {
     if (question.trim() === '教学进度') answer = '我们已梳理阅读、练习和讲解三种学习形式。\n\n教学进度：已完成 3/3 项。\n\n还有其他问题吗？如果没有，可以结束本次教学。';
     if (/^(结束本次教学|没有其他问题|没有了|学完了)[。！!\s]*$/.test(question)) answer = '本次教学到这里。以后有新的问题，可以随时回来继续。';
     const teacher = message('teacher', answer);
+    if (question.trim() === '模拟对比恢复') {
+      const recovered = '这是恢复后的普通教师回答。' + vectorCode;
+      teacher.blocks = [{ id: id(), type: 'markdown', source: recovered }];
+      s.messages.push(teacher);
+      const responseId = (s.responseId = id());
+      s.previewComparison = { id: teacher.id, availableAt: Date.now() + 1_600 };
+      return stream([
+        ['turn-accepted', {learnerMessageId: learner.id}], ['message-started', {teacherMessageId: teacher.id}],
+        ['comparison-started', {comparisonId: id()}], ['comparison-delta', {arm: 'a', delta: '未完成的对比'}],
+        ['message-reset', {messageId: teacher.id, code: 'comparison_fallback'}],
+        ['text-delta', {delta: recovered}], ['message-completed', {messageId: teacher.id, latestSeq: s.messages.length}],
+      ].map(([event, data], index) => [event, {...data, responseId, frameSeq: index + 1}]), index => index === 4 ? 1_600 : index === 6 ? 300 : 0);
+    }
     if (question.trim() === '体验回答对比') {
       const comparison = {id: id(),
-        a: '可以把学习分成三步。\n\n先读一个具体例子，接着独立做一道题，最后用自己的话讲清楚为什么。\n\n比如学向量加法，可以先看两段位移，再换一组数字自己画图。',
+        a: '可以把学习分成三步。\n\n先读一个具体例子，接着独立做一道题，最后用自己的话讲清楚为什么。\n\n比如学向量加法，可以先看两段位移，再换一组数字自己画图。' + vectorCode,
         b: '先挑一个你还讲不清的概念。\n\n试着把它讲给一个没学过的人听，卡住时回到资料，只补那一个缺口。\n\n讲完后，用一个新例子检查你是否能把它用出来。'};
       teacher.comparison = comparison;
       teacher.blocks = [];

@@ -49,7 +49,7 @@ type ComparisonVariants struct {
 const OpeningResource = "teaching/runtime/opening"
 const ReviewHTMLScene = "generation/review-html"
 
-const reviewHTMLContract = "只输出一个完整 HTML 片段，从 <article> 开始，到 </article> 结束。不得输出 Markdown 围栏、页面外壳、脚本、样式、表单或嵌入资源。"
+const reviewHTMLContract = "只输出一个完整 HTML 片段，从 <article> 开始，到 </article> 结束。可用内联 SVG 图示、MathML 公式、稿内位图和原生折叠。不得输出 Markdown 围栏、页面外壳、脚本、样式、表单或外部资源。"
 
 func HasReviewHTMLContract(text string) bool {
 	return strings.Contains(text, "<article>") && strings.Contains(text, "</article>")

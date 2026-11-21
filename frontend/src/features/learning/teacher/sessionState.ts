@@ -72,7 +72,7 @@ function reduceLive(current: LiveResponse | null, frame: TeacherStreamFrame): Li
         ...current.comparison, [arm]: (frame.data.replace === true ? '' : current.comparison[arm]) + String(frame.data.delta ?? ''),
       } };
     }
-    if (frame.type === 'message-reset') return { ...current, text: '', reasoning: '', notice: '', searches: [], reading: undefined };
+    if (frame.type === 'message-reset') return { ...current, text: '', comparison: undefined, reasoning: '', notice: '', searches: [], reading: undefined };
     if (frame.type === 'message-completed' || frame.type === 'message-failed') return { ...current, reading: undefined };
     if (frame.type === 'source-reading') {
       const operationId = String(frame.data.operationId ?? '');

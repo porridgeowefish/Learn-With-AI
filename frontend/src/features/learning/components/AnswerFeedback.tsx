@@ -62,7 +62,7 @@ export function AnswerComparison({ slug, message, streaming, sourceNames }: {
         const text = annotateSourceCitations(teacherMarkdown(comparison[arm]), citations);
         return <div key={arm} className={s.answer} data-selected={choice === arm || undefined}>
           <div className={s.answerTitle}>回答 {arm.toUpperCase()}</div>
-          {text.trim() ? <MarkdownView source={text} streaming={streaming} /> : streaming &&
+          {text.trim() ? <MarkdownView source={text} streaming={streaming} highlightCode /> : streaming &&
             <div className={s.waiting} role="status" aria-label={`回答 ${arm.toUpperCase()} 正在思考`}>
               <LearnWriting /><span aria-hidden="true">思考中</span>
             </div>}

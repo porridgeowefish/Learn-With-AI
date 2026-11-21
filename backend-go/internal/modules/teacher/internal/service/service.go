@@ -29,6 +29,8 @@ import (
 
 type skipMemoryObservation struct{}
 
+var errEmptyTeacherAnswer = errors.New("model completed without a teacher answer")
+
 // Use the strictest supported search provider limit for every tool request.
 const maxSearchQueryRunes = 70
 
@@ -590,6 +592,10 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	if ctx.Err() != nil {
 		providerErr = ctx.Err()
 	}
+	hasAnswer := strings.TrimSpace(text.String()) != ""
+	if providerErr == nil && !hasAnswer {
+		providerErr = errEmptyTeacherAnswer
+	}
 	status := "completed"
 	if providerErr != nil {
 		if errors.Is(providerErr, context.Canceled) {
@@ -602,7 +608,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	if reasoning.Len() > 0 {
 		blocks = append(blocks, conversationstore.Block{ID: reasoningBlockID, Type: "reasoning-summary", Source: reasoning.String()})
 	}
-	if text.Len() > 0 {
+	if hasAnswer {
 		blocks = append(blocks, conversationstore.Block{ID: textBlockID, Type: "markdown", Source: text.String()})
 	}
 	message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: status, Blocks: blocks,
@@ -674,6 +680,9 @@ func messageText(message conversationstore.Message) string {
 var quotedProposalText = regexp.MustCompile("(?s)```.*?```|`[^`]*`|“[^”]*”|‘[^’]*’|「[^」]*」|\"[^\"]*\"")
 
 func providerFailureCode(err error) string {
+	if errors.Is(err, errEmptyTeacherAnswer) {
+		return "teacher_empty_output"
+	}
 	if errors.Is(err, llmcloud.ErrLoginRequired) {
 		return "login_required"
 	}

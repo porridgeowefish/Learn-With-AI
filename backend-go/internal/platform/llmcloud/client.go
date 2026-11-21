@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -571,6 +572,17 @@ func (c *Client) Stream(ctx context.Context, payload any, emit func(json.RawMess
 
 func (c *Client) streamAt(ctx context.Context, path, token string, payload any, emit func(json.RawMessage) error) error {
 	response, err := c.request(ctx, http.MethodPost, path, token, payload)
+	var connectionError *net.OpError
+	if errors.As(err, &connectionError) && connectionError.Op == "dial" {
+		// A failed dial could not send the POST. Read and write failures may
+		// occur after the service accepted it, so they must not be replayed.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(250 * time.Millisecond):
+			response, err = c.request(ctx, http.MethodPost, path, token, payload)
+		}
+	}
 	if err != nil {
 		return err
 	}

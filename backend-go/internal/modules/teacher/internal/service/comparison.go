@@ -76,7 +76,7 @@ func (s *Service) compareFirstAnswer(ctx context.Context, slug, providerID strin
 	if err != nil || claimed == "" {
 		return false, nil
 	}
-	return true, streamComparison(ctx, client, conversation, assignment, input, responseID, messageID, emit, runTool)
+	return streamComparison(ctx, client, conversation, assignment, input, responseID, messageID, emit, runTool)
 }
 
 func firstAnswerInput(slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message) (llmcloud.ComparisonInput, error) {
@@ -266,7 +266,7 @@ func (s *Service) prepareComparisonTeaching(ctx context.Context, slug, providerI
 	}, nil
 }
 
-func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, assignment llmcloud.ComparisonAssignment, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame), factories ...comparisonToolFactory) error {
+func streamComparison(ctx context.Context, client *llmcloud.Client, conversation *conversationstore.Store, assignment llmcloud.ComparisonAssignment, input llmcloud.ComparisonInput, responseID, messageID string, emit func(StreamFrame), factories ...comparisonToolFactory) (bool, error) {
 	comparisonID := assignment.ID
 	emit(StreamFrame{Type: "comparison-started", Data: map[string]any{"comparisonId": comparisonID}})
 	type arm struct {
@@ -295,6 +295,7 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 				var bindErr error
 				runtime, reading, bindErr = factories[0](emitSafely)
 				if bindErr != nil {
+					side.failure = "comparison_tool_failed"
 					return
 				}
 			}
@@ -331,6 +332,11 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 			side.text = reply.String()
 			side.complete = err == nil && strings.TrimSpace(side.text) != ""
 			var remote *llmcloud.RemoteError
+			if err != nil {
+				side.failure = providerFailureCode(err)
+			} else if !side.complete {
+				side.failure = "comparison_empty_output"
+			}
 			if errors.As(err, &remote) {
 				switch remote.Code {
 				case "comparison_output_limit", "comparison_empty_output", "comparison_tool_failed", "model_input_limit", "inference_timeout":
@@ -346,6 +352,11 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 		})
 	}
 	group.Wait()
+	if !left.complete && !right.complete && ctx.Err() == nil {
+		log.Printf("teacher comparison fallback: id=%s a=%s b=%s", comparisonID, left.failure, right.failure)
+		emit(StreamFrame{Type: "message-reset", Data: map[string]any{"messageId": messageID, "code": "comparison_fallback"}})
+		return false, nil
+	}
 	message := conversationstore.Message{ID: messageID, Role: "teacher", Status: "completed", CreatedAt: time.Now().UTC(), Blocks: []conversationstore.Block{}}
 	switch {
 	case left.complete && right.complete && ctx.Err() == nil:
@@ -357,16 +368,7 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 		message.Blocks = append(message.Blocks, conversationstore.Block{Type: "markdown", Source: right.text})
 		message.SourceCitations, message.ReadingCoverage = right.citations, right.coverage
 	default:
-		message.Status = "failed"
-		message.FailureCode = "comparison_unavailable"
-		if left.failure != "" && (right.failure == "" || right.failure == left.failure) {
-			message.FailureCode = left.failure
-		} else if left.failure == "" && right.failure != "" {
-			message.FailureCode = right.failure
-		}
-		if ctx.Err() != nil {
-			message.Status, message.FailureCode = "interrupted", "interrupted"
-		}
+		message.Status, message.FailureCode = "interrupted", "interrupted"
 		partial := left.text
 		if partial == "" {
 			partial = right.text
@@ -377,15 +379,15 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 	}
 	event, err := conversation.RecordMessageWithEvidence(responseID, message)
 	if err != nil {
-		return err
+		return true, err
 	}
 	if _, err = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": messageID, "status": message.Status, "model": assignment.Model}); err != nil {
-		return err
+		return true, err
 	}
 	if message.Status == "completed" {
 		emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": messageID, "latestSeq": event.Seq}})
 	} else {
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": messageID, "code": message.FailureCode, "partialPreserved": len(message.Blocks) > 0}})
 	}
-	return nil
+	return true, nil
 }

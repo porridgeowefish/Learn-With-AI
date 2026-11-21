@@ -24,6 +24,7 @@ import DOMPurify from 'dompurify';
 import { extractLatex } from '@/shared/lib/latexMarkup';
 import { extractMathHTML } from '@/shared/lib/mathMarkup';
 import { renderLearningFigure } from '@/shared/lib/learningVisual';
+import { codeHighlightRenderer } from '@/shared/lib/codeHighlight';
 
 export interface MermaidBlock {
   id: string;
@@ -209,7 +210,9 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   }
 });
 
-export function renderMarkdown(input: string, options?: { streaming?: boolean }): MarkdownRender {
+type MarkdownOptions = { streaming?: boolean; highlightCode?: boolean };
+
+export function renderMarkdown(input: string, options?: MarkdownOptions): MarkdownRender {
   const streaming = options?.streaming ?? false;
 
   // GUI scripts remain opaque to marked/math and never enter host innerHTML.
@@ -242,7 +245,7 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
   const healed = healDanglingFence(mdStripped, streaming);
 
   // Step 4: parse remaining markdown.
-  const rawHtml = marked.parse(healed) as string;
+  const rawHtml = marked.parse(healed, options?.highlightCode ? { renderer: codeHighlightRenderer() } : undefined) as string;
 
   // Step 4: splice KaTeX-rendered HTML back into placeholders.
   // Placeholder IDs are source-unique alphanumeric tokens,
@@ -266,6 +269,6 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
   return { html: safe, mermaid: blocks, interactive };
 }
 
-export function useMarkdown(input: string, streaming = false): MarkdownRender {
-  return useMemo<MarkdownRender>(() => renderMarkdown(input, { streaming }), [input, streaming]);
+export function useMarkdown(input: string, streaming = false, highlightCode = false): MarkdownRender {
+  return useMemo<MarkdownRender>(() => renderMarkdown(input, { streaming, highlightCode }), [input, streaming, highlightCode]);
 }

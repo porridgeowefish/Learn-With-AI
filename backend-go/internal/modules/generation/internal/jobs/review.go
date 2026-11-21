@@ -27,11 +27,11 @@ func reviewHTML(raw string) (string, error) {
 	if tokens.Next() != html.StartTagToken || tokens.Token().Data != "article" {
 		return "", invalid
 	}
-	closed, hasText := false, false
+	closed, hasContent := false, false
 	for {
 		switch tokens.Next() {
 		case html.ErrorToken:
-			if tokens.Err() != io.EOF || !closed || !hasText {
+			if tokens.Err() != io.EOF || !closed || !hasContent {
 				return "", invalid
 			}
 			return body, nil
@@ -40,7 +40,7 @@ func reviewHTML(raw string) (string, error) {
 				if closed {
 					return "", invalid
 				}
-				hasText = true
+				hasContent = true
 			}
 		case html.StartTagToken, html.SelfClosingTagToken:
 			tag := tokens.Token().Data
@@ -50,6 +50,8 @@ func reviewHTML(raw string) (string, error) {
 			switch tag {
 			case "script", "style", "iframe", "object", "embed", "template":
 				return "", invalid
+			case "svg", "math", "img", "meter", "progress":
+				hasContent = true
 			}
 		case html.EndTagToken:
 			if closed {

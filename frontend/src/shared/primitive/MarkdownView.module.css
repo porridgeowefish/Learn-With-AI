@@ -10,6 +10,12 @@
 .body :where(th,td) { padding:8px 12px; border:1px solid var(--border); }.body :where(th) { background:var(--surface-tint); }
 .body :where(pre) { overflow:auto; padding:14px; border:1px solid var(--border); border-radius:8px; background:var(--surface-sunken); line-height:1.65; }
 .body :where(code) { font-family: 'FangSong', '仿宋', 'STFangsong', serif; font-size:.9em; }.body :where(p code,li code) { padding:2px 5px; background:var(--ink-soft); border-radius:4px; }
+.body :global(.highlighted-code) { color:var(--code-fg); background:var(--code-bg); }
+.body :global(.highlighted-code code) { font-family:'Cascadia Mono', Consolas, monospace; }
+.body :global(.highlighted-code .syntax-keyword) { color:#d6b7ff; }
+.body :global(.highlighted-code .syntax-string) { color:#b8dd98; }
+.body :global(.highlighted-code .syntax-number) { color:#ffc789; }
+.body :global(.highlighted-code .syntax-comment) { color:#aebebf; }
 .body :global(.katex-display) { overflow-x:auto; overflow-y:hidden; padding:6px 0; }
 .body :global(.inline-svg), .body :global(.mermaid-placeholder), .body :global(.interactive-placeholder) { position:relative; min-width:0; margin:18px 0; width:100%; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--card); }
 .body :global(.diagram-stage) { display:block; overflow:auto; min-height:80px; padding:14px; touch-action:none; cursor:grab; }

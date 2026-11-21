@@ -33,6 +33,7 @@ const teacherFailureMessages: Record<string, string> = {
   context_preparation_failed: '无法读取本轮教学设置，请确认偏好和附加信息已保存后重试。',
   context_budget_exhausted: '这轮内容超过了模型的输入上限。可以缩短附加信息，或在新对话中继续。',
   teacher_request_timeout: '这轮请求超时，请重新生成。',
+  teacher_empty_output: '模型没有返回可显示的正文，可以重新生成。',
   teacher_provider_rate_limited: '模型服务当前限流，请稍后重试。',
   teacher_provider_not_configured: '当前没有可用的模型连接。请选择系统模型，或添加自己的 API。',
   teacher_api_key_rejected: '模型服务拒绝了 API Key。请检查密钥是否有效，再测试连接。',
@@ -100,7 +101,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
       <div className={s.messageBody}>
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? (profile.data?.settings.showReasoning !== false && <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} open={reasoningOpen} onOpenChange={setReasoningOpen} />)
-          : block.type === 'markdown' ? <MarkdownView key={block.id} source={annotateSourceCitations(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '', citations)} className={s.markdown} streaming={streaming} />
+          : block.type === 'markdown' ? <MarkdownView key={block.id} source={annotateSourceCitations(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '', citations)} className={s.markdown} streaming={streaming} highlightCode={teacher} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
         {teacher && !streaming && <SourceCitations citations={citations} sourceNames={sourceNames} />}

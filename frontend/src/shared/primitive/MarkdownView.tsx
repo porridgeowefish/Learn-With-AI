@@ -10,6 +10,7 @@ import s from './MarkdownView.module.css';
 interface MarkdownViewProps {
   source: string;
   className?: string;
+  highlightCode?: boolean;
   /**
    * Streaming Markdown is intentionally rendered from a slower snapshot. It
    * keeps token feedback responsive without re-running marked, KaTeX and
@@ -21,9 +22,9 @@ interface MarkdownViewProps {
 
 const STREAM_MARKDOWN_INTERVAL_MS = 120;
 
-export const MarkdownView = forwardRef<HTMLDivElement, MarkdownViewProps>(function MarkdownView({ source, className, streaming = false }, forwardedRef) {
+export const MarkdownView = forwardRef<HTMLDivElement, MarkdownViewProps>(function MarkdownView({ source, className, streaming = false, highlightCode = false }, forwardedRef) {
   const bufferedSource = useBufferedStreamValue(source, streaming);
-  const { html, mermaid, interactive } = useMarkdown(bufferedSource, streaming);
+  const { html, mermaid, interactive } = useMarkdown(bufferedSource, streaming, highlightCode);
   const hostRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(forwardedRef, () => hostRef.current as HTMLDivElement, []);
 
