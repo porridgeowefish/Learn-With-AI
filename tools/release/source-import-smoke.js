@@ -16,7 +16,7 @@ async function main(binary){
  const listener=net.createServer();await new Promise(r=>listener.listen(0,'127.0.0.1',r));
  const port=listener.address().port;await new Promise(r=>listener.close(r));
  const absent=path.join(scratch,'no-cli');
- const child=spawn(path.resolve(binary),['--no-browser','--workspace',workspace,'--port',String(port)],{cwd:scratch,windowsHide:true,env:{...process.env,WORKSPACE:workspace,LLL_WORKSPACE_ROOT:workspace,CLAUDE_BIN:absent,CODEX_BIN:absent,CODEBUDDY_BIN:absent,WORKBUDDY_BIN:absent,HERMES_BIN:absent,TRAE_BIN:absent},stdio:['ignore','pipe','pipe']});
+ const child=spawn(path.resolve(binary),['--no-browser','--workspace',workspace,'--port',String(port)],{cwd:scratch,windowsHide:true,env:{...process.env,WORKSPACE:workspace,LLL_WORKSPACE_ROOT:workspace,LWA_CLOUD_URL:'http://127.0.0.1:1',CLAUDE_BIN:absent,CODEX_BIN:absent,CODEBUDDY_BIN:absent,WORKBUDDY_BIN:absent,HERMES_BIN:absent,TRAE_BIN:absent},stdio:['ignore','pipe','pipe']});
  let log='',exited=false;child.stdout.on('data',b=>log+=b);child.stderr.on('data',b=>log+=b);child.on('exit',()=>exited=true);
  const base=`http://127.0.0.1:${port}`;
  let fake;
