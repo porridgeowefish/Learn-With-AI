@@ -162,6 +162,17 @@ func sanitize(p string, v map[string]any) error {
 		}
 		v["pending"] = []any{}
 	}
+	if strings.HasSuffix(p, "/"+teachingSummaryStatePath) {
+		summaries, _ := v["summaries"].([]any)
+		for _, item := range summaries {
+			summary, _ := item.(map[string]any)
+			status, _ := summary["status"].(string)
+			if status == "pending" || status == "running" {
+				summary["status"] = "interrupted"
+				summary["error"] = "summary generation interrupted by workspace transfer"
+			}
+		}
+	}
 	if strings.HasSuffix(p, "/conversation/events.jsonl") {
 		data, _ := v["data"].(map[string]any)
 

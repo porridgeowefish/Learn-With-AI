@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const teachingSummaryStatePath = "teaching-summaries/state.json"
+
 // The manifest's kind is advisory. Match each record to the receiver's own
 // portable formats before accepting it, including records inside JSONL streams.
 var requiredFields = map[string]string{
@@ -16,6 +18,7 @@ var requiredFields = map[string]string{
 	"map/versions/*/manifest.json": "versionId", "map/versions/*/topics.json": "topics",
 	"conversation/conversation.json": "unitId id", "conversation/events.jsonl": "eventId seq type data",
 	"conversation/learning-mode.json": "learningMode version guideline",
+	teachingSummaryStatePath:          "schemaVersion summaries",
 	"conversation/usage.jsonl":        "responseId inputTokens outputTokens", "conversation/note-usage.jsonl": "responseId inputTokens outputTokens",
 	"assets/notes/state.json": "schemaVersion", "assets/notes/entries/*.json": "id content",
 	"assets/*/asset.json": "key assetId currentVersionId", "assets/*/versions/*/version.json": "versionId assetId",
