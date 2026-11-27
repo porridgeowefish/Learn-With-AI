@@ -202,7 +202,7 @@ func (s *Store) ensureLocked() error {
 		}
 	}
 	now := time.Now().UTC()
-	unit := Unit{SchemaVersion: SchemaVersion, UnitID: idgen.New("unit"), ConversationID: idgen.New("conv"), ProjectSlug: s.slug, ActiveAssetKeys: []string{"review", "practice", "notes"}, CreatedAt: now, UpdatedAt: now}
+	unit := Unit{SchemaVersion: SchemaVersion, UnitID: idgen.New("unit"), ConversationID: idgen.New("conv"), ProjectSlug: s.slug, ActiveAssetKeys: []string{"review", "practice"}, CreatedAt: now, UpdatedAt: now}
 	if data, err := os.ReadFile(unitPath); err == nil {
 		_ = json.Unmarshal(data, &unit)
 	}

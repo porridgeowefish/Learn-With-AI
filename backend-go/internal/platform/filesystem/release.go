@@ -11,7 +11,7 @@ import (
 var BuildMode = "development"
 
 func DiscoverResourceRoot(wd, executable, mode string) (string, error) {
-	if mode == "release" {
+	if mode == "release" || mode == "experimental" {
 		resolved, err := filepath.EvalSymlinks(executable)
 		if err != nil {
 			return "", fmt.Errorf("resolve executable: %w", err)

@@ -403,6 +403,9 @@ func OpenRuntime(opts Options, defaultRoot string, validate func(string, *paths.
 		opts.WorkspaceRoot = os.Getenv("WORKSPACE")
 	}
 	lease, e := paths.OpenWorkspace(override, func() (string, error) {
+		if paths.BuildMode == "experimental" && !override {
+			return defaultRoot, nil
+		}
 		legacy := opts
 		base := defaultRoot
 		if legacy.WorkspaceRoot != "" {

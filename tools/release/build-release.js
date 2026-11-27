@@ -13,10 +13,11 @@ function run(bin, args, options = {}) {
   if (result.error || result.status !== 0) throw result.error || new Error(`${bin} failed: ${result.status}`);
 }
 function releaseLinkerFlags(goos, version, promptPublicKey = '') {
+  const mode = /-experimental\.\d+$/.test(version) ? 'experimental' : 'release';
   const flags = [
     ...(goos === 'windows' ? ['-H windowsgui'] : []),
     '-s -w',
-    '-X github.com/xmz14/lll/backend-go/internal/platform/filesystem.BuildMode=release',
+    `-X github.com/xmz14/lll/backend-go/internal/platform/filesystem.BuildMode=${mode}`,
     `-X main.Version=${version}`,
   ];
   if (promptPublicKey) {

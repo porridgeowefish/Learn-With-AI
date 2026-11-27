@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version (numeric major.minor.patch)
+        description: Release version (major.minor.patch or major.minor.patch-experimental.N)
         required: true
         default: '0.10.22'
       publish:
@@ -64,9 +64,13 @@ jobs:
           LWA_CLOUD_PROMPT_PUBLIC_KEY: ${{ vars.LWA_CLOUD_PROMPT_PUBLIC_KEY || vars.LLL_CLOUD_PROMPT_PUBLIC_KEY }}
         run: |
           RELEASE_VERSION="${RELEASE_VERSION#v}"
-          node tools/release/ci-run.js -- node tools/release/build-release.js --version "$RELEASE_VERSION" --targets "$RELEASE_TARGETS" --installers
+          options=()
+          if [[ ! "$RELEASE_VERSION" =~ -experimental\.[0-9]+$ ]]; then
+            options+=(--installers)
+          fi
+          node tools/release/ci-run.js -- node tools/release/build-release.js --version "$RELEASE_VERSION" --targets "$RELEASE_TARGETS" "${options[@]}"
       - name: Windows installation, startup and uninstall smoke
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && !contains(inputs.version || github.ref_name, '-experimental.')
         shell: pwsh
         run: |
           $version = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
@@ -85,7 +89,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node tools/release/ci-run.js --temp-logs learn-msi-upgrade- -- node tools/release/msi-upgrade-smoke.js "$target/$old" 'dist/releases/0.10.22/learn-with-ai-0.10.22-windows-amd64.msi'
       - name: Validate Debian package manifests
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !contains(inputs.version || github.ref_name, '-experimental.')
         shell: bash
         run: |
           for package in dist/releases/*/*.deb; do
@@ -93,7 +97,7 @@ jobs:
             dpkg-deb --contents "$package"
           done
       - name: Linux user installation and Debian runtime smoke
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && !contains(inputs.version || github.ref_name, '-experimental.')
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
@@ -105,7 +109,7 @@ jobs:
           node tools/release/ci-run.js -- node tools/release/source-import-smoke.js /opt/learn-with-ai/learn-with-ai
           sudo dpkg --remove learn-with-ai
       - name: macOS installed application smoke
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && !contains(inputs.version || github.ref_name, '-experimental.')
         shell: bash
         env:
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
@@ -157,10 +161,14 @@ jobs:
           RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', inputs.version) }}
         run: |
           notes=".github/release-notes/${RELEASE_TAG}.md"
+          publish_flags=(--latest)
+          if [[ "$RELEASE_TAG" =~ -experimental\.[0-9]+$ ]]; then
+            publish_flags=(--prerelease --latest=false)
+          fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" release/* --clobber
           elif [ -f "$notes" ]; then
-            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Learn-With-AI ${RELEASE_TAG#v}" --notes-file "$notes" --latest
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Learn-With-AI ${RELEASE_TAG#v}" --notes-file "$notes" "${publish_flags[@]}"
           else
-            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Learn-With-AI ${RELEASE_TAG#v}" --generate-notes --latest
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Learn-With-AI ${RELEASE_TAG#v}" --generate-notes "${publish_flags[@]}"
           fi

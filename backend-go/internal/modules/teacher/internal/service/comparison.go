@@ -333,7 +333,7 @@ func streamComparison(ctx context.Context, client *llmcloud.Client, conversation
 			side.complete = err == nil && strings.TrimSpace(side.text) != ""
 			var remote *llmcloud.RemoteError
 			if err != nil {
-				side.failure = providerFailureCode(err)
+				side.failure = ProviderFailureCode(err)
 			} else if !side.complete {
 				side.failure = "comparison_empty_output"
 			}
