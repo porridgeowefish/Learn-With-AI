@@ -36,13 +36,5 @@
   },
   "ui": {
     "theme": "lychee-paper"
-  },
-  "teacher": {
-    "autoNotes": {
-      "enabled": true,
-      "everyTurns": 3,
-      "providerId": "",
-      "model": ""
-    }
   }
 }

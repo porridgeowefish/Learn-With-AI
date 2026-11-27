@@ -28,7 +28,6 @@ type Server struct {
 	generation      *generation.Service
 	lifecycle       *teacher.Lifecycle
 	tools           *teacher.LearningTools
-	notes           *teacher.NoteService
 	summaries       *teacher.SummaryService
 	sourceProcessor *sources.Processor
 	broadcaster     *httpx.Broadcaster
@@ -67,6 +66,12 @@ func New(deps Dependencies) *Server {
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/learning-assistant", s.handleLearningAssistant)
+	mux.HandleFunc("POST /api/learning-assistant/settlements", s.handleAssistantSettlements)
+	mux.HandleFunc("POST /api/learning-assistant/courses", s.handleConfirmStudyCourse)
+	mux.HandleFunc("POST /api/learning-assistant/attachments", s.handleStudyAttachment)
+	mux.HandleFunc("GET /api/learning-calendar", s.handleStudyCalendar)
+	mux.HandleFunc("POST /api/projects/{id}/units/{topicId}/open", s.handleOpenStudyUnit)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/feedback", s.handleTeacherFeedback)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/comparison-vote", s.handleComparisonVote)
 	mux.HandleFunc("GET /api/projects/{id}/teaching-summaries", s.teachingSummaries)
@@ -88,10 +93,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/treasures", s.handleTreasures)
 	mux.HandleFunc("POST /api/treasures/rewards/{rewardId}/seen", s.handleTreasureSeen)
 	mux.HandleFunc("GET /api/treasures/rewards/{rewardId}/source", s.handleTreasureSource)
-	mux.HandleFunc("GET /api/settings/teacher", s.handleGetTeacherSettings)
-	mux.HandleFunc("PUT /api/settings/teacher", s.handlePutTeacherSettings)
-	mux.HandleFunc("GET /api/projects/{id}/notes", s.handleGetNotes)
-	mux.HandleFunc("POST /api/projects/{id}/notes/jobs/{jobId}/retry", s.handleRetryNote)
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("POST /api/system/shutdown", s.handleShutdown)
 	mux.HandleFunc("GET /api/settings/ask-ai", s.handleGetAskAiSettings)
@@ -187,7 +188,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
 	mux.HandleFunc("GET /api/events", s.broadcaster.SSEHandler(map[string]any{}))
-	mux.Handle("/", withStarterLanding(spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX)))
+	mux.Handle("/", spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX))
 	previewFiles := http.FileServer(http.Dir(paths.FRONTEND_ROOT))
 	return logging(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if IsHTMLPreviewHost(r.Host) {
@@ -242,7 +243,6 @@ func IsHTMLPreviewHost(authority string) bool {
 	return ok && prefix && len(id) == 32 && strings.Trim(id, "0123456789abcdef") == ""
 }
 func (s *Server) SetShutdownFunc(fn func())                         { s.mu.Lock(); s.shutdown = fn; s.mu.Unlock() }
-func (s *Server) AttachNotes(notes *teacher.NoteService)            { s.notes = notes }
 func (s *Server) AttachSummaries(summaries *teacher.SummaryService) { s.summaries = summaries }
 func (s *Server) Close() {
 	if s.summaries != nil {
@@ -255,9 +255,6 @@ func (s *Server) Close() {
 	}
 	if s.sourceProcessor != nil {
 		s.sourceProcessor.Close()
-	}
-	if s.notes != nil {
-		_ = s.notes.Close()
 	}
 }
 func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {

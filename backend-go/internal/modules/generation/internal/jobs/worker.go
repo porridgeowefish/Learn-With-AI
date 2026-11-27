@@ -158,7 +158,19 @@ func (s *Service) recoverLocked() error {
 }
 func committedResult(slug string, j Job) ([]string, error) {
 	if j.Kind == "discipline-map" {
-		return mapResultForJob(slug, j.ID)
+		refs, err := mapResultForJob(slug, j.ID)
+		if err != nil || len(refs) == 0 || j.Intent.MapSchedule == nil {
+			return refs, err
+		}
+		root, err := projects.ProjectRootForSlug(slug)
+		if err != nil {
+			return nil, err
+		}
+		result, err := ReadMap(slug, refs[0])
+		if err != nil {
+			return nil, err
+		}
+		return refs, projects.EnsureScheduledLearningPlan(root, result.Topics.Topics, *j.Intent.MapSchedule)
 	}
 	st, e := assets.New(slug)
 	if e != nil {
@@ -609,6 +621,11 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 				return e
 			}
 			j.ResultRefs = []string{version}
+			if j.Intent.MapSchedule != nil {
+				if err := projects.EnsureScheduledLearningPlan(root, mapOutput.Topics.Topics, *j.Intent.MapSchedule); err != nil {
+					return problem("learning-plan-save-failed", 409)
+				}
+			}
 		} else {
 			st, e := assets.New(slug)
 			if e != nil {

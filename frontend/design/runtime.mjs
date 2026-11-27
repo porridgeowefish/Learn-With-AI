@@ -3,6 +3,7 @@ import { initializeLearning, learning } from '/__design/learning.mjs';
 import { settings } from '/__design/settings.mjs';
 import { visuals } from '/__design/visuals.mjs';
 import { cloud } from '/__design/cloud.mjs';
+import { learningAssistant } from '/__design/learning-assistant.mjs';
 import { rewardsExchange } from '/__design/rewards.mjs';
 
 
@@ -69,7 +70,7 @@ export async function dispatch(request, url) {
   const data = await state;
   let changed = false;
   const ctx = {request, url, path:url.pathname, method:request.method, state:data, json, emit, dirty() { changed = true; }};
-  for (const handle of [projects, learning, rewardsExchange, settings, visuals, cloud]) {
+  for (const handle of [learningAssistant, projects, learning, rewardsExchange, settings, visuals, cloud]) {
     const response = await handle(ctx);
     if (response) {
       if (changed || (!['GET','HEAD'].includes(request.method) && response.ok)) await save(data);

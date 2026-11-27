@@ -22,7 +22,6 @@ import (
 
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 
-	notestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
 	usagestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
 	websearch "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 )
@@ -85,15 +84,9 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 	if err != nil {
 		return err
 	}
-	meta, metaErr := conversation.Meta()
+	_, metaErr := conversation.Meta()
 	if metaErr != nil {
 		return metaErr
-	}
-	notes, notesErr := notestore.New(slug)
-	if notesErr == nil {
-		if err := notes.Initialize(meta.LatestSeq); err != nil {
-			println("teacher notes initialization:", slug, err.Error())
-		}
 	}
 	learnerBlocks := []conversationstore.Block{{Type: "markdown", Source: in.Content}}
 	mediaBlocks, err := conversation.AttachmentBlocks(in.ConversationAttachmentIDs)
@@ -226,12 +219,6 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 					options.Effort = "medium"
 				}
 			}
-		}
-	}
-	notes, notesErr := notestore.New(slug)
-	if notesErr == nil && learnerSeq > 0 {
-		if err := notes.Initialize(learnerSeq - 1); err != nil {
-			println("teacher notes initialization:", slug, err.Error())
 		}
 	}
 	learnerText := messageText(learner)
@@ -614,7 +601,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: status, Blocks: blocks,
 		CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC(), CreditUsage: creditUsage}
 	if providerErr != nil {
-		message.FailureCode = providerFailureCode(providerErr)
+		message.FailureCode = ProviderFailureCode(providerErr)
 	}
 	if status == "completed" {
 		answer, citations, coverage := reading.verifiedAnswer(ctx, text.String())
@@ -679,7 +666,7 @@ func messageText(message conversationstore.Message) string {
 
 var quotedProposalText = regexp.MustCompile("(?s)```.*?```|`[^`]*`|“[^”]*”|‘[^’]*’|「[^」]*」|\"[^\"]*\"")
 
-func providerFailureCode(err error) string {
+func ProviderFailureCode(err error) string {
 	if errors.Is(err, errEmptyTeacherAnswer) {
 		return "teacher_empty_output"
 	}

@@ -4,8 +4,9 @@ import { CheckIcon, ChevronDownIcon, LockClosedIcon } from '@radix-ui/react-icon
 import { cloudModelLabel, managedProviderPrefix, useCloudModelCatalog, type CloudStatus } from '@/features/cloud-account';
 import s from './TeacherView.module.css';
 
-export function TeacherModelPicker({ status, selected, localModels, onSelect }: {
+export function TeacherModelPicker({ status, selected, localModels, onSelect, label = "选择教师模型" }: {
   status?: CloudStatus;
+  label?: string;
   selected: string;
   localModels: { id: string; label: string }[];
   onSelect: (id: string) => void;
@@ -31,7 +32,7 @@ export function TeacherModelPicker({ status, selected, localModels, onSelect }: 
   }} onKeyDown={event => {
     if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); trigger.current?.focus(); }
   }}>
-    <button ref={trigger} className={s.modelPickerTrigger} type="button" aria-label="选择教师模型" aria-expanded={open}
+    <button ref={trigger} className={s.modelPickerTrigger} type="button" aria-label={label} aria-expanded={open}
       onClick={() => setOpen(!open)}>{selectedName || '选择模型'}<ChevronDownIcon /></button>
     {open && <div className={s.modelPickerPanel} aria-label="可选模型">
       <h3>云端模型</h3>

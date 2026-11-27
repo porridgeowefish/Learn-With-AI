@@ -53,7 +53,6 @@ function ensureConnection() {
     SSE_EVENTS.hello,
     SSE_EVENTS.treasureAwarded,
     SSE_EVENTS.learningAssetUpdated,
-    SSE_EVENTS.teacherNoteUpdated,
     SSE_EVENTS.learningActivityUpdated,
     SSE_EVENTS.sourceUpdated,
     SSE_EVENTS.annotationUpdated,

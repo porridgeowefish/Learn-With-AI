@@ -4,18 +4,21 @@ import { assetViewKey } from '@/shared/lib/projectStorage';
 import { useAsset, useAssets, usePracticeRounds, useSaveAsset } from '../api/learningWorkspace';
 import { PracticeReader } from './PracticeReader';
 import { GenerationControl } from './GenerationControl';
-import { NotesView } from './NotesView';
 import { BodyAnnotations } from './BodyAnnotations';
 import { FeynmanView } from './FeynmanView';
 import { usePracticeResults, useRetakePractice, useSavePracticeResult } from '../api/practiceResults';
 import s from './AssetsView.module.css';
 
 type AssetKey = 'review' | 'practice';
-type AssetView = AssetKey | 'notes' | 'feynman';
-const savedView=(slug:string):AssetView=>{let saved:string|null=null;try{saved=localStorage.getItem(assetViewKey(slug));}catch{/* storage unavailable */}return saved==='practice'||saved==='notes'||saved==='feynman'?saved:'review';};
+type AssetView = AssetKey | 'feynman';
+const savedView=(slug:string):AssetView=>{let saved:string|null=null;try{saved=localStorage.getItem(assetViewKey(slug));}catch{/* storage unavailable */}return saved==='practice'||saved==='feynman'?saved:'review';};
 export function AssetsView({slug}:{slug:string}) {
  const {search}=useLocation();
- const [view,setViewState]=useState<AssetView>(()=>new URLSearchParams(location.search).get('view')==='feynman'?'feynman':savedView(slug));
+ const requestedView = new URLSearchParams(search).get('view');
+ const [view,setViewState]=useState<AssetView>(()=>requestedView==='feynman'||requestedView==='review'?requestedView:savedView(slug));
+ useEffect(() => {
+  if (requestedView === 'review' || requestedView === 'feynman') setViewState(requestedView);
+ }, [requestedView]);
  const setView=(next:AssetView)=>{setViewState(next);try{localStorage.setItem(assetViewKey(slug),next);}catch{/* storage unavailable */}};
  const key:AssetKey=view==='practice'?'practice':'review';
  const [editing,setEditing]=useState(false);
@@ -39,12 +42,11 @@ export function AssetsView({slug}:{slug:string}) {
  useEffect(()=>setRoundId(null),[asset.data?.meta.currentVersionId]);
  const commit=()=>{if(key!=='practice'||!asset.data)return;save.mutate({baseEditRevision:asset.data.meta.editRevision,content:draft},{onSuccess:()=>setEditing(false)});};
  return <section className={s.assets}>
-  <div className={s.assetTabs} data-tour="notes-tabs" role="group" aria-label="笔记与复习视图">
+  <div className={s.assetTabs} data-tour="notes-tabs" role="group" aria-label="复习与练习">
    {(assets.data??[]).map(meta=><button type="button" key={meta.key} aria-pressed={view===meta.key} onClick={()=>{setView(meta.key);setEditing(false);}}>{meta.title}</button>)}
-   <button type="button" aria-pressed={view==='notes'} onClick={()=>{setView('notes');setEditing(false);}}>笔记</button>
    <button type="button" aria-pressed={view==='feynman'} onClick={()=>{setView('feynman');setEditing(false);}}>讲给教师听</button>
   </div>
-  {view==='notes'?<NotesView slug={slug}/>:view==='feynman'?<div className={s.layout}><article className={s.document}><FeynmanView slug={slug}/></article></div>:<div className={s.layout}>
+  {view==='feynman'?<div className={s.layout}><article className={s.document}><FeynmanView slug={slug}/></article></div>:<div className={s.layout}>
    <article className={s.document}>
     <header><div><span>笔记与复习</span><h2>{asset.data?.meta.title??'加载中…'}</h2></div><div className={s.actions}>
      <GenerationControl slug={slug} kind={key} disabled={editing}/>

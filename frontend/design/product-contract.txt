@@ -10,6 +10,11 @@ api /api/events
 api /api/folders
 api /api/folders/{}
 api /api/health
+api /api/learning-assistant
+api /api/learning-assistant/attachments
+api /api/learning-assistant/courses
+api /api/learning-assistant/settlements
+api /api/learning-calendar?
 api /api/learning-memories
 api /api/learning-memories/{}
 api /api/learning/visuals/image?{}
@@ -52,14 +57,13 @@ api /api/projects/{}/feynman/sessions
 api /api/projects/{}/feynman/sessions/{}/stream
 api /api/projects/{}/generation-jobs
 api /api/projects/{}/learning-plan
-api /api/projects/{}/notes
-api /api/projects/{}/notes/jobs/{}/retry
 api /api/projects/{}/sources
 api /api/projects/{}/sources/{}
 api /api/projects/{}/sources/{}/permanent-delete
 api /api/projects/{}/sources/{}/retry
 api /api/projects/{}/sources/{}/structure-jobs
 api /api/projects/{}/teaching-summaries/{}/retry
+api /api/projects/{}/units/{}/open
 api /api/settings/appearance
 api /api/settings/ask-ai
 api /api/settings/ask-ai/probe
@@ -68,7 +72,6 @@ api /api/settings/siwc
 api /api/settings/siwc/disconnect
 api /api/settings/siwc/models
 api /api/settings/siwc/start
-api /api/settings/teacher
 api /api/system/speech
 api /api/system/update/{}
 api /api/system/update{}
@@ -84,6 +87,7 @@ page '/login'
 page 'collection'
 page 'collection/:itemId'
 page 'collection/faq'
+page 'learning-calendar'
 page 'memory'
 page 'models'
 page 'preferences'

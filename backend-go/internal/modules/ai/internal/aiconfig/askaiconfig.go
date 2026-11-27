@@ -162,7 +162,7 @@ func (c *Config) ResolveDirect(service string) *Provider {
 
 func (c *Config) Managed(service string) *Provider {
 	switch service {
-	case "teacher", "review", "practice", "disciplineMap", "section-summary", "notes":
+	case "teacher", "review", "practice", "disciplineMap", "section-summary":
 		return c.managed
 	default:
 		return nil

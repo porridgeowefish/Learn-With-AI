@@ -6,7 +6,7 @@ import base from '../vite.config.ts';
 import { changePolicy, defaultPolicy } from './rewards-policy.mjs';
 
 const source = fileURLToPath(new URL('.', import.meta.url));
-const modules = () => ['worker.mjs', 'runtime.mjs', 'page-adapter.mjs', 'projects.mjs', 'learning.mjs', 'settings.mjs', 'snapshot.mjs', 'visuals.mjs', 'cloud.mjs', 'rewards.mjs', 'rewards-policy.mjs'];
+const modules = () => ['worker.mjs', 'runtime.mjs', 'page-adapter.mjs', 'projects.mjs', 'learning.mjs', 'learning-assistant.mjs', 'settings.mjs', 'snapshot.mjs', 'visuals.mjs', 'cloud.mjs', 'rewards.mjs', 'rewards-policy.mjs'];
 const files = () => [...modules(), 'fflate.mjs', 'treasures.json', 'starter-dialogue.json'];
 const filePath = name => name === 'treasures.json' ? resolve(source, '../../backend-go/internal/modules/treasures/catalog.json')
   : name === 'starter-dialogue.json' ? resolve(source, '../../backend-go/internal/app/workspaceservice/starter-dialogue.json')
@@ -69,7 +69,9 @@ export default {
       for (const name of files()) this.emitFile({ type: 'asset', fileName: urlFor(name).slice(1), source: readFileSync(filePath(name)) });
     },
   }],
-  server: { host: '127.0.0.1', port: 5188, strictPort: true },
+  server: {
+    host: '127.0.0.1', port: 5188, strictPort: true,
+  },
   preview: { host: '127.0.0.1', port: 5188, strictPort: true },
   build: { ...base.build, outDir: 'design/dist' },
 };

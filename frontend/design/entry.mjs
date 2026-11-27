@@ -63,10 +63,6 @@ async function start() {
     ctx.font = '16px sans-serif'; ctx.fillText('设计预览 · 截图示例', 12, 28);
     window.dispatchEvent(new CustomEvent('lll-region-capture-result', {detail:{id,width,height,dataUrl:canvas.toDataURL()}}));
   };
-  if (location.pathname === '/' && !location.search && !localStorage.getItem('lll.design.starter-opened')) {
-    localStorage.setItem('lll.design.starter-opened', '1');
-    history.replaceState(null, '', '/project/learning-methodology');
-  }
   await import('../src/app/main.tsx');
   const anchor = location.hash.slice(1);
   if (anchor) {

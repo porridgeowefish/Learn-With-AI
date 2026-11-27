@@ -89,6 +89,7 @@ export interface DisciplineLearningTask {
   topicId?: string;
   topicTitle: string;
   status: DisciplineLearningTaskStatus;
+  scheduledDate?: string;
   addedAt: string;
   startedAt?: string;
   completedAt?: string;

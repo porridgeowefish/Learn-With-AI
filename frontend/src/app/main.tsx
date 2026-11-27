@@ -30,12 +30,26 @@ if (!container) {
   throw new Error('Learn-With-AI: #root element not found in index.html');
 }
 
-createRoot(container).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </StrictMode>,
-);
+async function mount() {
+  if (import.meta.env.DEV &&
+    !document.querySelector('meta[name="lll-design-revision"]') && navigator.serviceWorker) {
+    const worker = await navigator.serviceWorker.getRegistration().catch(() => undefined);
+    if (worker?.active && new URL(worker.active.scriptURL).pathname === '/design-worker.mjs') {
+      if (await worker.unregister() && navigator.serviceWorker.controller) {
+        window.location.reload();
+        return;
+      }
+    }
+  }
+  createRoot(container!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}
+
+void mount();

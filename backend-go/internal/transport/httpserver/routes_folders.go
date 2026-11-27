@@ -126,7 +126,7 @@ func (s *Server) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("delete folder %s, project %s: %v", id, slug, err)
 		result.Error = "无法完成项目「" + slug + "」的删除。请检查项目状态后重试。"
-		if errors.Is(err, teacher.ErrResponseActive) || errors.Is(err, teacher.ErrNotesProjectBusy) {
+		if errors.Is(err, teacher.ErrResponseActive) {
 			result.Error = "项目「" + slug + "」正在生成内容，请等任务结束后再删除分组。"
 		}
 		httpx.WriteJSON(w, http.StatusOK, result)

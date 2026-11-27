@@ -4,11 +4,12 @@ import { useAppearance, useUpdateAppearance } from './appearance';
 import { ModelsPage } from './ModelsPage';
 import { AccountSettings } from './AccountSettings';
 import { WorkspaceSettings } from './WorkspaceSettings';
-import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { LearningSettings } from './LearningSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
 import { useOnboardingStore } from '@/shared/store/slices/onboarding';
+import { LearningDemo } from '@/features/learning';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/primitive/Button';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { UpdatePanel } from './UpdatePanel';
@@ -16,10 +17,12 @@ import tutorial from './tutorial.md?raw';
 import s from './SettingsPage.module.css';
 import { FONT_SIZES, useFontSize, type FontSize } from '@/shared/lib/fontSize';
 
-const categories = [ ['tutorial', '使用教程'], ['appearance', '外观'], ['models', '模型连接'], ['learning', '回复、搜索与记忆'], ['notes', '教师笔记'], ['storage', '存储与数据'], ['usage', 'Token 用量'], ['about', '更新与关于'] ] as const;
+const categories = [ ['tutorial', '使用教程'], ['appearance', '外观'], ['models', '模型连接'], ['learning', '回复、搜索与记忆'], ['storage', '存储与数据'], ['usage', 'Token 用量'], ['about', '更新与关于'] ] as const;
 
 const visibleCategories = ([['account', '个人信息'], ...categories.filter(([id]) => id !== 'usage')] as const);
 export function SettingsPage() {
+  const navigate = useNavigate();
+  const [demo, setDemo] = useState(false);
   const startGuide = useOnboardingStore(state => state.start);
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState('');
@@ -31,13 +34,13 @@ export function SettingsPage() {
       <header className={s.header}><h2 className={s.title}>{visibleCategories.find(([id]) => id === section)?.[1]}</h2></header>
       {section === 'account' && <AccountSettings />}
       {section === 'tutorial' && <section className={s.tutorial} aria-label="Learn-With-AI 使用教程">
-        <div className={s.tutorialActions}><Button variant="primary" onClick={startGuide}>开始屏幕向导</Button><Link to="/settings?section=models">打开模型连接</Link></div>
+        <div className={s.tutorialActions}><Button variant="primary" onClick={startGuide}>开始屏幕向导</Button><Button onClick={() => setDemo(true)}>体验示例</Button><Link to="/settings?section=models">打开模型连接</Link></div>
         <MarkdownView source={tutorial} />
+        {demo && <LearningDemo onClose={() => setDemo(false)} onStart={() => navigate('/')} onConfigure={() => { setDemo(false); setParams({section:'models'}); }} />}
       </section>}
       {section === 'appearance' && <AppearanceSection />}
       {section === 'models' && <ModelsPage />}
       {section === 'learning' && <LearningSettings />}
-      {section === 'notes' && <TeacherNotesSettings />}
       {section === 'storage' && <WorkspaceSettings />}
       {section === 'usage' && <section className={s.appearance}><h2>Token 用量</h2><p>查看各模型与项目的历史使用情况。</p><Link to="/usage">打开用量统计</Link></section>}
       {section === 'about' && <><UpdatePanel /><OpenSourceSection /></>}

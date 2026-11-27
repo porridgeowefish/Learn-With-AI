@@ -84,7 +84,7 @@ func BuildWithExperimentBase(draft Draft, experimentBase map[string]string, key 
 		}
 	}
 	c := &Catalog{stable: make(map[string]promptpack.Pack), signingKey: key}
-	for _, scene := range []string{"teacher/general", "auxiliary/section-summary", "generation/review", ReviewHTMLScene, "generation/practice", "auxiliary/notes"} {
+	for _, scene := range []string{"teacher/general", "auxiliary/section-summary", "generation/review", ReviewHTMLScene, "generation/practice"} {
 		resources := maps.Clone(draft.Resources)
 		if scene == ReviewHTMLScene {
 			resources["review"] += "\n\n" + reviewHTMLContract

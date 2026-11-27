@@ -5,6 +5,7 @@ import (
 	"context"
 	enhancement "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/enhancement"
 	ocr "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/ocr"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 	processing "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/processing"
 	retrieval "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/retrieval"
 	impl "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
@@ -114,4 +115,10 @@ func New(slug string) (*Store, error) { return impl.New(slug) }
 // configured vision model and commits it as the single derived content.md.
 func ProcessImageOCR(slug string, store *Store, sourceID, revisionID string) error {
 	return ocr.ProcessImageOCR(slug, store, sourceID, revisionID)
+}
+
+// ExtractDocumentText uses the same local parsers as project sources.
+func ExtractDocumentText(ctx context.Context, path, filename string) (string, error) {
+	result, err := parser.Extract(ctx, path, filename)
+	return result.Content, err
 }

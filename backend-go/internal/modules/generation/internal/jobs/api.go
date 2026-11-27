@@ -31,13 +31,15 @@ import (
 )
 
 type Input struct {
-	OperationID   string   `json:"operationId"`
-	Kind          string   `json:"kind"`
-	ProviderID    string   `json:"providerId,omitempty"`
-	Model         string   `json:"model,omitempty"`
-	SourceIDs     []string `json:"sourceIds"`
-	QuestionCount int      `json:"questionCount,omitempty"`
-	MapMode       string   `json:"mapMode,omitempty"`
+	OperationID   string                     `json:"operationId"`
+	Kind          string                     `json:"kind"`
+	ProviderID    string                     `json:"providerId,omitempty"`
+	Model         string                     `json:"model,omitempty"`
+	SourceIDs     []string                   `json:"sourceIds"`
+	QuestionCount int                        `json:"questionCount,omitempty"`
+	MapMode       string                     `json:"mapMode,omitempty"`
+	MapBrief      string                     `json:"mapBrief,omitempty"`
+	MapSchedule   *projects.LearningSchedule `json:"mapSchedule,omitempty"`
 }
 type Progress struct {
 	OutputTokens    int    `json:"outputTokens,omitempty"`
@@ -151,6 +153,13 @@ func normalize(in Input) (Input, error) {
 	in.OperationID = strings.TrimSpace(in.OperationID)
 	in.ProviderID = strings.TrimSpace(in.ProviderID)
 	in.Model = strings.TrimSpace(in.Model)
+	in.MapBrief = strings.TrimSpace(in.MapBrief)
+	if in.MapSchedule != nil && (in.Kind != "discipline-map" || !in.MapSchedule.Valid()) {
+		return in, problem("invalid-learning-schedule", 400)
+	}
+	if len(in.MapBrief) > 4000 || (in.MapBrief != "" && in.Kind != "discipline-map") {
+		return in, problem("invalid-generation-input", 400)
+	}
 	if !operationPattern.MatchString(in.OperationID) || len(in.Model) > 256 || len(in.ProviderID) > 128 {
 		return in, problem("invalid-generation-input", 400)
 	}
@@ -439,6 +448,9 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	}
 	sourceMap := in.Kind == "discipline-map" && in.MapMode == "sources"
 	payload := map[string]any{"date": time.Now().Format("2006-01-02"), "project": state, "questionCount": in.QuestionCount, "mapMode": in.MapMode, "sourceDocuments": f.Sources}
+	if in.MapBrief != "" {
+		payload["learnerBrief"] = in.MapBrief
+	}
 	if sourceMap {
 		if len(f.Sources) == 0 {
 			return Job{}, problem("source-selection-required", 400)
@@ -497,15 +509,6 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 		if in.Kind != "review" {
 			payload["review"] = review.Content
 		}
-		notes, err := teacher.NewNoteStore(slug)
-		if err != nil {
-			return Job{}, err
-		}
-		noteSnapshot, err := notes.List()
-		if err != nil {
-			return Job{}, err
-		}
-		payload["notes"] = noteSnapshot.Entries
 		c, e := teacher.NewConversation(slug)
 		if e != nil {
 			return Job{}, e

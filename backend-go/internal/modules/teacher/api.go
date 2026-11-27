@@ -6,10 +6,7 @@ import (
 	"errors"
 	ai "github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources"
-	noteservice "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/noteservice"
-	notestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/speech"
-	config "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"strings"
 
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
@@ -32,6 +29,7 @@ type (
 
 	Block             = conversation.Block
 	Message           = conversation.Message
+	CreditUsage       = conversation.CreditUsage
 	ConversationEvent = conversation.Event
 	ConversationMeta  = conversation.Meta
 	Unit              = conversation.Unit
@@ -53,6 +51,8 @@ type (
 var ErrQueueItemNotFound = conversation.ErrQueueItemNotFound
 var ErrFeedbackNotFound = conversation.ErrFeedbackNotFound
 var ErrComparisonPending = conversation.ErrComparisonPending
+
+var ProviderFailureCode = service.ProviderFailureCode
 
 func New(gateway ai.Gateway) *Service { return service.New(gateway) }
 
@@ -117,38 +117,13 @@ func ListTeacherUsage() ([]UsageConversation, error) { return usage.ListAll() }
 
 func ReconcileAllInterruptedResponses() { conversation.ReconcileAllInterruptedResponses() }
 
-type AutoNotesSettings = config.AutoNotesSettings
-type NoteTurn = conversation.NoteTurn
-type NoteUsage = notestore.NoteUsage
-type NoteEntry = notestore.NoteEntry
-type NoteJob = notestore.NoteJob
-type NotesResource = notestore.NotesResource
-type NoteGenerator = notestore.NoteGenerator
-type NoteStore = notestore.Store
-type NoteService = noteservice.Service
-
-var ErrNoteJobNotFound = notestore.ErrNoteJobNotFound
-var ErrNoteJobRunning = notestore.ErrNoteJobRunning
-
-func NewNoteStore(slug string) (*NoteStore, error)        { return notestore.New(slug) }
-func NewNoteService(generator NoteGenerator) *NoteService { return noteservice.New(generator) }
-func LoadTeacherSettings() (AutoNotesSettings, error)     { return config.LoadTeacherSettings() }
-func SaveTeacherSettings(cfg AutoNotesSettings) error     { return config.SaveTeacherSettings(cfg) }
-
 type ProjectUsage = usage.ProjectUsage
 
 func ListProjectUsage() ([]ProjectUsage, error) { return usage.ListProjects() }
 
 func RecordTeacherUsage(slug string, record UsageRecord) error { return usage.Append(slug, record) }
 
-var ErrNotesProjectBusy = noteservice.ErrProjectBusy
-
-func PrepareImportedConversation(root string) error {
-	if e := conversation.PrepareImportedConversation(root); e != nil {
-		return e
-	}
-	return notestore.SealImportedNotes(root)
-}
+var PrepareImportedConversation = conversation.PrepareImportedConversation
 
 var IsExtractedMediaText = conversation.IsExtractedMediaText
 

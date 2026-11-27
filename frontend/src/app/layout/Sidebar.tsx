@@ -24,6 +24,7 @@ import { CloudAccount } from './CloudAccount';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: '主页', icon: 'zap' },
+  { to: '/learning-calendar', label: '学习日历', icon: 'clock' },
   { to: '/collection', label: '我的收藏', icon: 'circle' },
   { to: '/preferences', label: '学习偏好', icon: 'brain' },
 
@@ -44,11 +45,8 @@ export function Sidebar() {
   const deleteFolder = useDeleteFolder();
   const deleting = deleteProject.isPending || deleteFolder.isPending;
 
-  // Discipline maps are rendered through the same folder header model below;
-  // only concrete system-learning projects become child rows.
-  const allSlugs = projects
-    .filter((project) => project.projectType === 'system-learning')
-    .map((project) => project.slug);
+  const folderTopics = new Set(layout.folders.map(folder => folder.mapProjectSlug));
+  const allSlugs = projects.filter(project => !folderTopics.has(project.slug)).map(project => project.slug);
   const uncategorized = uncategorizedSlugs(layout, allSlugs);
   const projectBySlug = new Map(projects.map((p) => [p.slug, p] as const));
 
@@ -156,12 +154,11 @@ export function Sidebar() {
       <div className={s.scroll}>
         <div className={s.section}>快捷入口</div>
         {QUICK_LINKS.map((q) => (
-          <Link key={q.to} to={q.to} className={s.link}>
+          <Link key={q.to} to={q.to} className={s.link} aria-current={location.pathname === q.to ? 'page' : undefined}>
             <Icon name={q.icon} size={19} className={s.linkIcon} />
             {q.label}
           </Link>
         ))}
-
         <div className={s.sectionRow}>
           <div className={s.section}>学习库</div>
           <button
@@ -189,7 +186,7 @@ export function Sidebar() {
 
         {isLoading && <div className={s.muted}>加载中…</div>}
         {!isLoading && projects.length === 0 && (
-          <div className={s.muted}>还没有学习内容，可在首页新建。</div>
+          <div className={s.muted}>还没有学习内容，可在首页和学习助手讨论。</div>
         )}
 
         {layout.folders.map((f) => {
@@ -311,7 +308,7 @@ export function Sidebar() {
         title={deleteTarget?.kind === 'folder'
           ? '删除分组？'
           : deleteTarget?.projectType === 'discipline-map'
-            ? '删除学习路线？'
+            ? '删除学习主题？'
             : '删除学习专题？'}
         description={deleteTarget?.kind === 'folder'
           ? '分组及组内路线、专题、附件、学习记录和会话将永久删除。'
@@ -407,7 +404,7 @@ function ProjectRow({
       <Link to={`/project/${slug}`} className={s.link}>
         <Icon name="folder" size={15} className={s.linkIcon} />
         <span className={s.title}>{title}</span>
-        <span className={s.projectType}>{projectType === 'discipline-map' ? '路线' : '专题'}</span>
+        <span className={s.projectType}>{projectType === 'discipline-map' ? '主题' : '课堂'}</span>
       </Link>
       <div className={s.menuWrap}>
         <button
@@ -465,7 +462,7 @@ function ProjectRow({
                   className={s.menuDanger}
                   onClick={onDelete}
               >
-                {projectType === 'discipline-map' ? '删除学习路线' : '删除学习专题'}
+                {projectType === 'discipline-map' ? '删除学习主题' : '删除学习专题'}
               </button>
             </div>
           </>

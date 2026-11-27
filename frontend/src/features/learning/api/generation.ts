@@ -17,7 +17,7 @@ export interface GenerationJob {
   validation?: {code:string; message:string; line?:number; column?:number};
   checkpoint?: { afterSeq:number; throughSeq:number; hasMoreConversation:boolean };
 }
-export interface GenerationRequest { operationId: string; kind: GenerationKind; providerId?: string; model?: string; sourceIds?: string[]; questionCount?: number; mapMode?: 'general' | 'sources' }
+export interface GenerationRequest { operationId: string; kind: GenerationKind; providerId?: string; model?: string; sourceIds?: string[]; questionCount?: number; mapMode?: 'general' | 'sources'; mapBrief?: string; mapSchedule?: { startDate: string; weekdays: number[] } }
 export const generationKey = (slug: string) => ['learning-workspace', slug, 'generation-jobs'] as const;
 const endpoint = (slug: string) => `/api/projects/${encodeURIComponent(slug)}/generation-jobs`;
 export const isGenerationActive = (job: GenerationJob) => job.status === 'queued' || job.status === 'running';

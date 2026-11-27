@@ -10,11 +10,11 @@ const steps = [
  { title: '欢迎，先认识你的学习工作台', target: 'welcome', route: '/', body: '接下来会带你操作真实界面。关闭向导后不会再次显示；离线体验示例仍可使用。', next: '开始配置' },
  { title: '连接你的教师模型', target: 'model-connections', route: '/settings?section=models', body: '选择“API 连接”，点击“添加 API 连接”，填写你自己的模型与 Key，检测并保存。也可以选择登录连接。向导不会读取或填写密钥。', next: '已保存连接，继续' },
  { title: '告诉教师，你希望怎样学习', target: 'preferences', route: '/preferences', body: '在下方填写你喜欢的讲解方式，例如“先讲直觉，多给例子”，再点击“保存偏好”。这是选填项，可以直接继续。', next: '去创建学习专题' },
- { title: '创建第一个学习专题', target: 'create-project', route: '/', body: '点击“新建学习内容”，选择“学习专题”，输入一个具体主题，然后点击“创建学习专题”。也可以从向导下方选择已有的学习专题继续。', next: '等待你进入学习专题' },
- { title: '向教师提出第一个问题', target: 'teacher-composer', body: '在高亮输入框写下问题并发送。左侧加号可上传附件，右侧可以选择模型或使用麦克风。教师回答期间，后续问题会进入等待队列。', next: '去看笔记与复习' },
- { title: '把对话变成自己的知识', target: 'notes-tabs', body: '这里可以查看复习稿、练习、笔记和“讲给教师听”。复习稿可直接生成，练习题只需填写题数；自动笔记会按设置积累。试着切换上方入口，再继续。', next: '去管理附件' },
+ { title: '创建第一个学习专题', target: 'assistant-composer', route: '/', body: '在学习助手里输入想学的主题。讨论目标、基础与可用时间后确认方案，从学习库打开课程，再点一个单元开始。也可以从向导下方选择已有的学习专题继续。', next: '等待你进入学习专题' },
+ { title: '向教师提出第一个问题', target: 'teacher-composer', body: '在高亮输入框写下问题并发送。左侧加号可上传附件，右侧可以选择模型或使用麦克风。教师回答期间，后续问题会进入等待队列。', next: '去看复习与练习' },
+ { title: '把对话变成自己的知识', target: 'notes-tabs', body: '这里可以查看复习稿、练习和“讲给教师听”。复习稿可直接生成，练习题只需填写题数。试着切换上方入口，再继续。', next: '去管理附件' },
  { title: '把学习材料放在同一个地方', target: 'source-upload', body: '这里管理上传的文档及解析进度。教师可按需查阅，正文里的引用可以追溯原文。图片和音频也可从对话输入框左侧上传；此步可以先跳过上传。', next: '了解学习路线' },
- { title: '从一个主题，走向一整门学科', target: 'create-project', route: '/', body: '想先梳理一个领域时，在“新建学习内容”选择“学习路线”；从路线里选一个小节开始学。你已走完主要流程，回到项目继续学习吧。', next: '完成向导，开始学习' },
+ { title: '查看每天的学习任务', target: 'welcome', route: '/learning-calendar', body: '打开学习日历，查看每一天的学习和复习安排。到了复习日，学习助手会在首页对话里提醒你。', next: '完成向导，开始学习' },
 ] as const;
 interface Box { left: number; top: number; right: number; bottom: number }
 interface Geometry { box: Box | null; width: number; height: number; modal: HTMLElement | null; answered: boolean }
@@ -81,7 +81,7 @@ export function ScreenGuide() {
   if(tour.step===7) { tour.finish(); if(tour.slug) navigate(`${projectPath}/teacher`); }
   else tour.move(tour.step+1);
  };
- if(geometry.modal) return createPortal(<p className={s.modalHint} role="status">屏幕向导 · 第 {tour.step+1} / 8 步<br/>{tour.step===3 ? '选择“学习专题”，填写主题并创建。' : tour.step===1 ? '填写连接、检测并保存；向导将在关闭弹窗后继续。' : '按需完成此窗口的操作，关闭后继续向导。'}</p>,geometry.modal);
+ if(geometry.modal) return createPortal(<p className={s.modalHint} role="status">屏幕向导 · 第 {tour.step+1} / 8 步<br/>{tour.step===1 ? '填写连接、检测并保存；向导将在关闭弹窗后继续。' : '按需完成此窗口的操作，关闭后继续向导。'}</p>,geometry.modal);
  const {box,width,height} = geometry;
  const panelWidth = Math.min(344,width-24), panelHeight = card.current?.offsetHeight ?? 238;
  const left = box ? Math.min(width-panelWidth-12,Math.max(12,(box.left+box.right-panelWidth)/2)) : (width-panelWidth)/2;

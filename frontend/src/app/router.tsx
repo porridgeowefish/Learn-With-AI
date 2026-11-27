@@ -6,6 +6,7 @@ import { AppShell } from '@/app/layout/AppShell';
 // Routes are lazy-loaded so each page lands in its own chunk. AppShell
 // wraps every page; it owns the topbar, sidebar, SSE connection, and
 // the terminal drawer.
+const LearningCalendar = lazy(() => import('@/features/projects/components/LearningCalendar').then(m => ({ default: m.LearningCalendar })));
 const HomePage = lazy(() => import('@/features/projects/HomePage').then((m) => ({ default: m.HomePage })));
 const ProjectPage = lazy(() => import('@/features/projects/ProjectPage').then((m) => ({ default: m.ProjectPage })));
 const PreferencesPage = lazy(() => import('@/features/preferences/PreferencesPage').then((m) => ({ default: m.PreferencesPage })));
@@ -44,6 +45,7 @@ export const routes: RouteObject[] = [
         path: 'project/:id/:zone?',
         element: withShell(<ProjectPage />),
       },
+      { path: 'learning-calendar', element: withShell(<LearningCalendar />) },
       {path:'collection',element:withShell(<CollectionPage/>)},
       {path:'collection/faq',element:withShell(<TreasureFAQ/>)},
       {path:'collection/:itemId',element:withShell(<TreasureDisplay/>)},

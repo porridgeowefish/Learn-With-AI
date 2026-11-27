@@ -5,7 +5,6 @@ const snapshotName = 'lll-design-workspace.json';
 const operations = new Map();
 const defaults = {
   appearance: {theme:'lychee-paper'},
-  teacher: {autoNotes:{enabled:true, everyTurns:3, providerId:'', model:''}},
   'ask-ai': {default:'preview',searchEngine:'google',bindings:{teacher:{providerId:'preview'}},
     providers:[{id:'preview',kind:'openai',name:'设计演示连接',baseURL:'',apiKey:'',model:'demo'}]},
 };

@@ -360,7 +360,7 @@ func summaryProvider(cfg *ai.Config, frozen, requested string, allManaged bool) 
 		}
 		return cfg.FindExact(frozen)
 	}
-	for _, name := range []string{"section-summary", "notes"} {
+	for _, name := range []string{"section-summary"} {
 		if binding := cfg.Bindings[name]; binding.ProviderID != "" {
 			return cfg.ResolveDirect(name)
 		}

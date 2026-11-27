@@ -56,7 +56,7 @@
   transition: background 0.15s;
 }
 
-.link:hover {
+.link:hover, .link[aria-current='page'] {
   background: rgba(124, 154, 114, 0.06);
   text-decoration: none;
 }

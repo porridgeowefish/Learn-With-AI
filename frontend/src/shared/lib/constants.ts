@@ -9,7 +9,6 @@ export const SSE_EVENTS = {
   hello: 'hello',
   treasureAwarded: 'treasure-awarded',
   annotationUpdated: 'annotation-updated',
-  teacherNoteUpdated: 'teacher-note-updated',
   learningAssetUpdated: 'learning-asset-updated',
   learningActivityUpdated: 'learning-activity-updated',
   sourceUpdated: 'source-updated',

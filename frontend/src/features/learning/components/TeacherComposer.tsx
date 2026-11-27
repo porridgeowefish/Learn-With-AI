@@ -1,9 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { managedProviderPrefix, type CloudStatus } from '@/features/cloud-account';
 import { useAskAiSettings, useLearningProfile, effortNames } from '@/features/settings';
-import { SendIcon, StopIcon } from '@/shared/primitive/Icons';
+import { StopIcon } from '@/shared/primitive/Icons';
 import { conversationEffortKey, conversationModelKey } from '@/shared/lib/projectStorage';
 import { ChatMediaInput, ChatMicrophone, useChatMedia } from './ChatMediaInput';
+import { ChatComposerFrame, ChatSendButton } from './ChatComposerFrame';
 import { TeacherModelPicker } from './TeacherModelPicker';
 import { readConversationModel } from '../teacher/modelSelection';
 import type { TeacherSession, TeacherSubmission } from '../teacher/useTeacherSession';
@@ -63,11 +64,6 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
     voiceGeneration.current++; voiceBusy.current = false; setVoiceFinalizing(false);
     return () => { voiceGeneration.current++; };
   }, [slug]);
-  useLayoutEffect(() => {
-    const element = textarea.current;
-    if (element) { element.style.height = 'auto'; element.style.height = `${Math.min(150, Math.max(28, element.scrollHeight))}px`; }
-  }, [input]);
-
   const send = async (text: string, retry?: TeacherSubmission, voiceDraft?: { version: number; input: string; generation: number }) => {
     if (waitingForVote) return;
     if (!voiceDraft && ((submitting.current && submittingVersion.current === version.current) || media.pending || media.hasRecording || voiceBusy.current || composing.current)) return;
@@ -140,17 +136,12 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
       <button type="button" disabled={pending} onClick={() => void send(failed.content, failed)}>重试发送</button>
       <button type="button" onClick={() => setFailed(undefined)}>关闭</button>
     </div>}
-    <form data-tour="teacher-composer" className={s.composer}
-      onSubmit={event => { event.preventDefault(); if (media.hasRecording) void finishVoice(true); else void send(input); }}
-      onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }} onDrop={media.onDrop} onPaste={media.onPaste}>
-      <textarea ref={textarea} title="Enter 发送 · Shift + Enter 换行" value={input}
-        onChange={event => { version.current++; setPending(false); inputValue.current = event.target.value; setInput(event.target.value); }}
-        onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
-        onKeyDown={event => {
-          if (event.key === 'Enter' && !event.shiftKey && !composing.current && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
-            event.preventDefault(); event.currentTarget.form?.requestSubmit();
-          }
-        }} placeholder={waitingForVote ? '提交回答选择后可继续提问' : session.live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
+    <ChatComposerFrame tour="teacher-composer" input={input} textareaRef={textarea}
+      onInput={text => { version.current++; setPending(false); inputValue.current = text; setInput(text); }}
+      onComposition={active => { composing.current = active; }}
+      onSend={() => { if (media.hasRecording) void finishVoice(true); else void send(input); }}
+      onDrop={media.onDrop} onPaste={media.onPaste}
+      placeholder={waitingForVote ? '提交回答选择后可继续提问' : session.live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`}>
       <ChatMediaInput media={media} leadingActions={searchEnabled && <label className={s.searchToggle}>
         <span>联网搜索</span>
         <input type="checkbox" role="switch" aria-label="联网搜索" checked={webSearch} onChange={event => setWebSearch(event.target.checked)} />
@@ -165,7 +156,7 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
         </span>}
         <ChatMicrophone media={media} onStop={() => void finishVoice(false)} />
         {session.live?.responseId && <button type="button" className={s.stop} aria-label="停止" title="停止当前回答" onClick={() => void session.stop()}><StopIcon size={21} /></button>}
-        <button type="submit" className={s.send} aria-label={media.hasRecording ? '转写并发送' : session.live || (session.conversation.data?.queuePaused && session.conversation.data.queue?.length) ? '排队' : '发送'} title={waitingForVote ? '先提交回答选择' : media.hasRecording ? '结束录音，转写后直接发送' : session.live ? '加入等待队列' : '发送'} disabled={waitingForVote || !profile.data || pending || voiceFinalizing || (!input.trim() && !media.attachments.length && !media.hasRecording) || media.pending}><SendIcon size={22} /></button>
+        <ChatSendButton label={media.hasRecording ? '转写并发送' : session.live || (session.conversation.data?.queuePaused && session.conversation.data.queue?.length) ? '排队' : '发送'} title={waitingForVote ? '先提交回答选择' : media.hasRecording ? '结束录音，转写后直接发送' : session.live ? '加入等待队列' : '发送'} disabled={waitingForVote || !profile.data || pending || voiceFinalizing || (!input.trim() && !media.attachments.length && !media.hasRecording) || media.pending} />
       </ChatMediaInput>
       {(media.hasRecording || media.voicePending) && <div className={s.voiceStatus}>
         <span>{media.recording ? '录音中 · 停止转写可编辑，也可直接发送' : media.voicePending ? '正在完成转写…' : '录音已停止，可重试转写'}</span>
@@ -173,6 +164,6 @@ export const TeacherComposer = forwardRef<TeacherComposerHandle, {
       </div>}
       {profile.isError && <div className={s.composerMeta} role="alert">回复设置读取失败，请刷新后重试。</div>}
       {sourceCount > 0 && <div className={s.composerMeta}><span className={s.materialStatus}>有 {sourceCount} 份附件可查阅</span></div>}
-    </form>
+    </ChatComposerFrame>
   </>;
 });

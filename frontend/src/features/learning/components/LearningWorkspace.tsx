@@ -18,7 +18,7 @@ import s from './LearningWorkspace.module.css';
 
 const tabs = [
   { key: 'teacher', label: '教师' },
-  { key: 'assets', label: '笔记与复习' },
+  { key: 'assets', label: '复习与练习' },
   { key: 'sources', label: '附件' },
 ] as const;
 
@@ -39,7 +39,6 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
       }
     };
     const unsubscribers = [
-      subscribeToSSE(SSE_EVENTS.teacherNoteUpdated, forProject(() => {void queryClient.invalidateQueries({ queryKey: ['learning-workspace',project.slug,'notes'] });void queryClient.invalidateQueries({queryKey:['usage']});})),
       subscribeToSSE(SSE_EVENTS.learningAssetUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.assets(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.sourceUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.conversationQueueUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(project.slug) }); })),

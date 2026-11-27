@@ -9,7 +9,6 @@ import (
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	filesystem "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,21 +33,8 @@ type projectTypeAdvice struct {
 	Confidence     string                 `json:"confidence,omitempty"`
 }
 
-type disciplineLearningTask struct {
-	ID          string `json:"id"`
-	TopicID     string `json:"topicId,omitempty"`
-	TopicTitle  string `json:"topicTitle"`
-	Status      string `json:"status"`
-	AddedAt     string `json:"addedAt"`
-	StartedAt   string `json:"startedAt,omitempty"`
-	CompletedAt string `json:"completedAt,omitempty"`
-}
-
-type disciplineLearningPlan struct {
-	SchemaVersion int                      `json:"schemaVersion"`
-	Items         []disciplineLearningTask `json:"items"`
-	UpdatedAt     string                   `json:"updatedAt"`
-}
+type disciplineLearningPlan = workspace.LearningPlan
+type disciplineLearningTask = workspace.LearningTask
 
 func configuredAskAIProvider() (ai.Provider, error) {
 	cfg, err := ai.LoadConfig()
@@ -243,7 +229,7 @@ func (s *Server) handleGetDisciplineLearningPlan(w http.ResponseWriter, r *http.
 	if !ok {
 		return
 	}
-	plan, err := readDisciplineLearningPlan(filepath.Join(root, "learning-plan.json"))
+	plan, err := workspace.ReadLearningPlan(filepath.Join(root, "learning-plan.json"))
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "read_learning_plan")
 		return
@@ -255,6 +241,20 @@ func (s *Server) handlePutDisciplineLearningPlan(w http.ResponseWriter, r *http.
 	_, root, ok := requireDisciplineMap(w, r.PathValue("id"))
 	if !ok {
 		return
+	}
+	planLock := workspace.LearningPlanLock(root)
+	planLock.Lock()
+	defer planLock.Unlock()
+	if r.Header.Get("If-None-Match") == "*" {
+		current, err := workspace.ReadLearningPlan(filepath.Join(root, "learning-plan.json"))
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "read_learning_plan")
+			return
+		}
+		if len(current.Items) != 0 {
+			httpx.WriteJSON(w, http.StatusOK, current)
+			return
+		}
 	}
 	var plan disciplineLearningPlan
 	if err := httpx.ReadJSON(r, &plan); err != nil {
@@ -311,24 +311,6 @@ func (s *Server) handlePutDisciplineLearningPlan(w http.ResponseWriter, r *http.
 	httpx.WriteJSON(w, http.StatusOK, plan)
 }
 
-func readDisciplineLearningPlan(path string) (disciplineLearningPlan, error) {
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return disciplineLearningPlan{SchemaVersion: 1, Items: []disciplineLearningTask{}}, nil
-	}
-	if err != nil {
-		return disciplineLearningPlan{}, err
-	}
-	var plan disciplineLearningPlan
-	if err := json.Unmarshal(data, &plan); err != nil {
-		return disciplineLearningPlan{}, err
-	}
-	if plan.Items == nil {
-		plan.Items = []disciplineLearningTask{}
-	}
-	return plan, nil
-}
-
 func validateDisciplineLearningPlan(plan *disciplineLearningPlan) error {
 	if len(plan.Items) > 200 {
 		return errors.New("learning_plan_too_large")
@@ -348,6 +330,11 @@ func validateDisciplineLearningPlan(plan *disciplineLearningPlan) error {
 			!validLearningTaskTime(item.StartedAt, true) ||
 			!validLearningTaskTime(item.CompletedAt, true) {
 			return errors.New("invalid_learning_task_time")
+		}
+		if item.ScheduledDate != "" {
+			if _, err := time.Parse(time.DateOnly, item.ScheduledDate); err != nil {
+				return errors.New("invalid_learning_task_date")
+			}
 		}
 		if seenIDs[item.ID] || seenTopics[item.TopicTitle] {
 			return errors.New("duplicate_learning_task")

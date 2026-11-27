@@ -20,9 +20,9 @@ type Generation interface {
 	ReviveProject(string)
 }
 type Service struct {
-	Teaching   *teacher.Lifecycle
-	Tools      *teacher.LearningTools
-	Notes      *teacher.NoteService
+	Teaching *teacher.Lifecycle
+	Tools    *teacher.LearningTools
+
 	Summaries  *teacher.SummaryService
 	Generation Generation
 }
@@ -48,9 +48,6 @@ func (s *Service) Create(slug, title string, in projects.ProjectInput) (*project
 	if s.Tools != nil {
 		s.Tools.ReviveProject(slug)
 	}
-	if s.Notes != nil {
-		s.Notes.ReviveProject(slug)
-	}
 	if s.Summaries != nil {
 		s.Summaries.ReviveProject(slug)
 	}
@@ -60,10 +57,6 @@ func (s *Service) Delete(slug string) error {
 	remove := projects.DeleteProject
 	if s.Generation != nil {
 		remove = s.Generation.DeleteProject
-	}
-	if s.Notes != nil {
-		next := remove
-		remove = func(slug string) error { return s.Notes.DeleteProject(slug, next) }
 	}
 	if s.Tools != nil {
 		next := remove

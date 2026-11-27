@@ -58,15 +58,6 @@ func Build() *App {
 		grantTreasure(rewards, broadcaster, slug, "feynman", sessionID, messageID, content)
 	}
 	server := httpserver.New(httpserver.Dependencies{Lifecycle: lifecycle, Tools: tools, Teacher: teaching, Generation: jobs, SourceProcessor: processor, Broadcaster: broadcaster, Cache: projects.NewIndex(), Treasures: rewards})
-	notes := teacher.NewNoteService(nil)
-	notes.OnInitializationFailure = func(slug string, err error) { println("notes initialization:", slug, err.Error()) }
-	notes.OnUpdated = func(slug, jobID, status, noteID string) {
-		broadcaster.Emit("teacher-note-updated", map[string]any{"projectSlug": slug, "jobId": jobID, "status": status, "noteId": noteID})
-	}
-	if err := notes.Start(context.Background()); err != nil {
-		println("notes startup:", err.Error())
-	}
-	server.AttachNotes(notes)
 	summaries := teacher.NewSummaryService(teaching.Gateway)
 	summaries.OnError = func(slug string, err error) { println("teaching summary:", slug, err.Error()) }
 	if err := summaries.Start(context.Background()); err != nil {
@@ -79,6 +70,9 @@ func Build() *App {
 				if messages, err := store.AllMessages(); err == nil {
 					for _, message := range messages {
 						if message.ID == info.TriggeringLearnerMessageID && message.Role == "learner" {
+							if err := teacher.ObserveCourseCompletion(summaries, slug, info, message); err != nil {
+								println("course completion:", slug, err.Error())
+							}
 							content := ""
 							for _, block := range message.Blocks {
 								if block.Source != "" {
@@ -94,9 +88,6 @@ func Build() *App {
 			}
 		}
 		recordActivity(slug, activity.ProgressEvent{ID: "teacher-response:" + responseID, SourceType: "teacher-response", SourceID: responseID, ActivityDelta: 1, Title: "完成教师对话"})
-		if err := notes.ObserveCompleted(slug); err != nil {
-			println("teacher notes:", slug, err.Error())
-		}
 	}
 	return &App{Server: server}
 }

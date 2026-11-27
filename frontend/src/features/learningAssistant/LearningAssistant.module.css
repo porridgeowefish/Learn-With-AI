@@ -1,0 +1,23 @@
+.welcome { max-width: 680px; margin: clamp(14px, 5vh, 54px) auto 0; }
+.welcome h1 { margin: 0; text-align: center; font: 700 clamp(2rem,4vw,3.1rem)/1.18 'Songti SC', 'SimSun', serif; }
+.welcome > p { margin: 18px 0 24px; color: var(--muted); text-align: center; line-height: 1.7; }
+.emblem { display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--border); color: var(--accent-ink); background: var(--surface-tint); }
+.emblem { width: 64px; height: 64px; margin: 0 auto 20px; border-radius: 17px; }
+.starters { display: grid; gap: 8px; }
+.starters button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--fg); font: inherit; text-align: start; cursor: pointer; }
+.starters button:hover { background: var(--surface-tint); }
+.attachmentNames, .evidence { color: var(--muted); font-size: .8rem; }
+.evidence a, .links a { color: var(--accent-ink); text-underline-offset: 4px; }
+.evidence blockquote { margin: 5px 0 8px; border-inline-start: 2px solid var(--border); padding-inline-start: 9px; }
+.proposal { margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.proposal h2 { margin: 0 0 8px; font-size: 1.12rem; }
+.proposal ol { padding: 0; list-style: none; }
+.proposal li { display: grid; grid-template-columns: 4.65em minmax(0, 1fr); gap: 9px; padding-block: 7px; border-top: 1px solid var(--border); }
+.proposal time, .proposal p { color: var(--muted); font-size: .82rem; }
+.proposal p { margin: 2px 0 0; line-height: 1.5; }
+.links { display: flex; flex-wrap: wrap; gap: 13px; margin: 9px 0 0; font-size: .89rem; }
+.primary, .secondary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; border-radius: 7px; padding: 7px 11px; font: inherit; font-size: .82rem; }
+.primary { border: 1px solid var(--accent); color: var(--on-accent); background: var(--accent); }
+.primary:disabled { opacity: .55; cursor: default; }
+.secondary { border: 1px solid var(--border); background: var(--card); color: var(--fg); }
+.secondary:hover { background: var(--surface-tint); }

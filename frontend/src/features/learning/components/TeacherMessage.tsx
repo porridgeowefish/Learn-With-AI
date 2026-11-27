@@ -1,6 +1,6 @@
 import { LearnWriting } from '@/shared/primitive/LearnWriting';
 import { useLearningProfile } from '@/features/settings';
-import { memo, useId } from 'react';
+import { memo, useId, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import type { ConversationMessage } from '../api/learningWorkspace';
 import { CopyIcon, DownloadIcon, RegenerateIcon } from '@/shared/primitive/Icons';
@@ -81,7 +81,7 @@ interface MessageActions {
   onRegenerate: () => void;
 }
 
-export const TeacherMessage = memo(function Message({ slug, message, sourceNames, reasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; sourceNames: Map<string, string>; reasoningOpen: boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
+export const TeacherMessage = memo(function Message({ slug, message, sourceNames, reasoningOpen, setReasoningOpen, notice, streaming = false, actions, speaker = "教师", children, feedback = true }: { slug: string; message: ConversationMessage; sourceNames: Map<string, string>; reasoningOpen: boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions; speaker?: string; children?: ReactNode; feedback?: boolean }) {
   const teacher = message.role === 'teacher';
   const hasAnswer = (message.blocks ?? []).some(block => block.type === 'markdown' && teacherMarkdown(block.source ?? '').trim().length > 0);
   const awaitingAnswer = teacher && streaming && !hasAnswer && !message.comparison && message.status !== 'failed';
@@ -95,7 +95,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
   </>;
   return (
     <article id={`message-${message.id}`} data-tour={teacher ? undefined : "learner-message"} className={teacher ? s.teacherMessage : s.learnerMessage}>
-      {teacher && <div className={s.speaker}>教师{awaitingAnswer && <span className={s.writing} role="status" aria-label="教师正在思考或调用工具"><LearnWriting /></span>}</div>}
+      {teacher && <div className={s.speaker}>{speaker}{awaitingAnswer && <span className={s.writing} role="status" aria-label={speaker + "正在思考或调用工具"}><LearnWriting /></span>}</div>}
       {message.comparison && !message.comparison.vote && <AnswerComparison slug={slug} message={{ ...message, comparison: message.comparison }} streaming={streaming} sourceNames={sourceNames} />}
       {awaitingAnswer && <div className={s.thinking}>思考中</div>}
       <div className={s.messageBody}>
@@ -104,6 +104,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={annotateSourceCitations(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '', citations)} className={s.markdown} streaming={streaming} highlightCode={teacher} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>附件 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择附件'}</span>
               : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
+        {children}
         {teacher && !streaming && <SourceCitations citations={citations} sourceNames={sourceNames} />}
         {teacher && !streaming && message.creditUsage && <p className={s.creditUsage}>
           {message.creditUsage.pending
@@ -113,7 +114,7 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
         {notice && <div className={s.notice}>{notice}</div>}
         {teacher && !streaming && message.status === 'failed' && <TeacherFailure code={message.failureCode}
           retry={actions?.canRegenerate ? actions.onRegenerate : undefined} />}
-        {teacher && !streaming && hasAnswer && message.status !== 'failed' && (!message.comparison || message.comparison.vote)
+        {feedback && teacher && !streaming && hasAnswer && message.status !== 'failed' && (!message.comparison || message.comparison.vote)
           ? <AnswerFeedback slug={slug} message={message}>{messageButtons}</AnswerFeedback>
           : showActions && <div className={s.messageActions}>{messageButtons}</div>}
       </div>
@@ -123,6 +124,9 @@ export const TeacherMessage = memo(function Message({ slug, message, sourceNames
   && previous.reasoningOpen === next.reasoningOpen
   && previous.streaming === next.streaming
   && previous.notice === next.notice
+  && previous.speaker === next.speaker
+  && previous.children === next.children
+  && previous.feedback === next.feedback
   && previous.sourceNames === next.sourceNames
   && previous.actions?.copied === next.actions?.copied
   && previous.actions?.canRegenerate === next.actions?.canRegenerate

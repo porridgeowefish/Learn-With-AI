@@ -16,11 +16,6 @@
     },
     {
       "variables": [],
-      "sha256": "1e8cdc65f364c80e7ddcdd89ed99150c069229fa785eb8e7a62d18932fc4c98a",
-      "path": "learning-prompts/auxiliary/notes.md"
-    },
-    {
-      "variables": [],
       "sha256": "47ce020569a43543f254d9c759c19cece716f65af09c36f11e238e1daeba907e",
       "path": "learning-prompts/auxiliary/ocr.md"
     },

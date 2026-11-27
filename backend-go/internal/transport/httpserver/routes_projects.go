@@ -37,7 +37,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &cleanup) {
 			log.Printf("delete project %s: %v", slug, cleanup)
 			result["warning"] = "folder_cleanup_failed"
-		} else if errors.Is(err, teacher.ErrResponseActive) || errors.Is(err, teacher.ErrNotesProjectBusy) {
+		} else if errors.Is(err, teacher.ErrResponseActive) {
 			httpx.Error(w, 409, err.Error())
 			return
 		} else {
@@ -245,7 +245,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 // ensure workspace is imported even if no direct usage
 
 func (s *Server) projectOperations() *projectservice.Service {
-	operations := &projectservice.Service{Teaching: s.teachingLifecycle(), Tools: s.learningTools(), Notes: s.notes, Summaries: s.summaries}
+	operations := &projectservice.Service{Teaching: s.teachingLifecycle(), Tools: s.learningTools(), Summaries: s.summaries}
 	if s.generation != nil {
 		operations.Generation = s.generation
 	}

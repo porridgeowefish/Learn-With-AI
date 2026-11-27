@@ -169,6 +169,14 @@ func StageLearningProject(root, slug, title string) error {
 	return writeProjectSkeleton(root, slug, title, ProjectInput{ProjectType: ProjectTypeSystemLearning})
 }
 
+// StageDisciplineProject initializes a course before the directory becomes visible.
+func StageDisciplineProject(root, slug, title string) error {
+	if !filepath.IsAbs(root) || !ValidateSlug(slug) {
+		return errors.New("invalid staging directory or project slug")
+	}
+	return writeProjectSkeleton(root, slug, title, ProjectInput{ProjectType: ProjectTypeDisciplineMap})
+}
+
 func writeProjectSkeleton(root, slug, title string, in ProjectInput) error {
 	// Check for collision.
 	if exists, err := os.Stat(filepath.Join(root, "state.json")); err == nil && !exists.IsDir() {
@@ -324,7 +332,7 @@ func walkProjects(dir string, out *[]ProjectMeta) error {
 			continue
 		}
 		name := e.Name()
-		if name == "subprojects" || name == "runs" || name == "assets" || name == "memory" ||
+		if strings.HasPrefix(name, ".") || name == "subprojects" || name == "runs" || name == "assets" || name == "memory" ||
 			name == "intro" || name == "explain" || name == "practice" || name == "extend" || name == "summary" {
 			continue
 		}

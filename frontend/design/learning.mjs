@@ -1,3 +1,4 @@
+import { recordPreviewStudyCompletion } from '/__design/learning-assistant.mjs';
 import { previewFigureAnswer, previewManufacturingAnswer } from '/__design/visuals.mjs';
 
 const starterDialogue = fetch('/__design/starter-dialogue.json').then(response => response.json());
@@ -204,25 +205,6 @@ function initialize(project, dialogue) {
         ]
       : [],
     results: {},
-    notes: {
-      entries: seeded
-        ? [
-            {
-              id: id(),
-              jobId: 'note',
-              content: physics
-                ? '忽略阻力时，自由落体的动能与重力势能之和保持不变。'
-                : '向量相加时，分别相加横坐标和纵坐标。',
-              fromTurn: 1,
-              throughTurn: 1,
-              createdAt: now(),
-              providerId: 'preview',
-              model: 'demo',
-            },
-          ]
-        : [],
-      jobs: [],
-    },
     systemPrompt: project.systemPrompt || '',
     learningMode: project.learningMode || 'general',
   };
@@ -438,7 +420,11 @@ function conversation(ctx, s, parts, b) {
       answer = footer < 0 ? answer + searchText : answer.slice(0, footer) + searchText + answer.slice(footer);
     }
     if (question.trim() === '教学进度') answer = '我们已梳理阅读、练习和讲解三种学习形式。\n\n教学进度：已完成 3/3 项。\n\n还有其他问题吗？如果没有，可以结束本次教学。';
-    if (/^(结束本次教学|没有其他问题|没有了|学完了)[。！!\s]*$/.test(question)) answer = '本次教学到这里。以后有新的问题，可以随时回来继续。';
+    if (/^(结束本次教学|我?学完了)[。！!\s]*$/.test(question.trim())) {
+      answer = '本次教学到这里。以后有新的问题，可以随时回来继续。';
+      const lesson = new URL(ctx.request.url).pathname.split('/')[3];
+      recordPreviewStudyCompletion(ctx.state, lesson);
+    }
     const teacher = message('teacher', answer);
     if (question.trim() === '模拟对比恢复') {
       const recovered = '这是恢复后的普通教师回答。' + vectorCode;
@@ -675,8 +661,28 @@ function finishGeneration(s, job) {
   job.status = 'succeeded';
   job.phase = 'done';
   job.progress = { completedUnits: 1, totalUnits: 1, unitLabel: '份' };
-  if (job.kind === 'discipline-map') s.mapVersion = job.id;
-  else if (s.assets[job.kind]) {
+  if (job.kind === 'discipline-map') {
+    s.mapVersion = job.id;
+    if (job.mapBrief) {
+      const titles = job.mapBrief.includes('理解事务')
+        ? ['并发中的事务隔离', '带条件的库存扣减', '从执行结果判断成功', '重试和幂等']
+        : ['SQL 更新与受影响的行数', '两个请求怎样争抢库存', '带条件的库存扣减', '库存不足后的处理'];
+      s.topics = titles.map((title, index) => ({
+        id: 'study-topic-' + index, title, chapterTitle: '数据库并发与库存', goal: '用具体库存场景理解' + title,
+        priority: index < 2 ? 'I' : 'II', inScope: [], outOfScope: [], prerequisites: [], ownedConcepts: [], reusedConcepts: [],
+      }));
+    }
+    if (job.mapSchedule && !s.plan.items.length) {
+      const day = new Date(job.mapSchedule.startDate + 'T12:00:00Z');
+      s.plan.items = s.topics.map(topic => {
+        while (!job.mapSchedule.weekdays.includes(day.getUTCDay())) day.setUTCDate(day.getUTCDate() + 1);
+        const item = { id: topic.id, topicId: topic.id, topicTitle: topic.title, status: 'planned', addedAt: now(), scheduledDate: day.toISOString().slice(0, 10) };
+        day.setUTCDate(day.getUTCDate() + 1);
+        return item;
+      });
+      s.plan.updatedAt = now();
+    }
+  } else if (s.assets[job.kind]) {
     const item = asset(
       job.kind,
       job.kind === 'review'
@@ -734,7 +740,6 @@ export async function learning(ctx) {
       'conversation',
       'sources',
       'assets',
-      'notes',
       'discipline-map',
       'course-summaries',
         'course-binding',
@@ -799,12 +804,6 @@ export async function learning(ctx) {
         updatedAt: now(),
       },
     });
-  if (feature === 'notes')
-    return json(
-      parts.length
-        ? (s.notes.jobs.find((x) => x.id === parts[1]) ?? {})
-        : s.notes,
-    );
   if (feature === 'feynman') {
     if (method === 'GET') return json({ sessions: s.sessions });
     if (parts.length === 1) {
@@ -842,7 +841,7 @@ export async function learning(ctx) {
   if (method === 'GET')
     return parts[1] === 'candidate'
       ? json({ content: s.assets[previous?.kind]?.content || '' })
-      : json({ jobs: s.jobs });
+      : previous ? json({ job: previous }) : json({ jobs: s.jobs });
   if (parts[1] === 'cancel' && previous) {
     previous.status = 'cancelled';
     return json({ job: previous });

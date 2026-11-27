@@ -85,15 +85,26 @@ export function useChatMedia(slug: string) {
   };
 }
 
-export function ChatMediaInput({ media, children, leadingActions }: { media: ReturnType<typeof useChatMedia>; children?: ReactNode; leadingActions?: ReactNode }) {
+type ChatMediaControls = Pick<ReturnType<typeof useChatMedia>, 'pending' | 'error' | 'remove'> & {
+  attachments: Array<Pick<ChatAttachment, 'attachmentId' | 'kind' | 'name'>>;
+  addFiles: (files: File[]) => void;
+  canRetry?: boolean;
+  retryUpload?: () => void;
+  voicePending?: boolean;
+  hasRecording?: boolean;
+};
+
+export function ChatMediaInput({ media, children, leadingActions, accept, label = '上传图片、音频或附件', sourceTitle = '已上传，教师可按需查阅；解析进度见附件页' }: {
+  media: ChatMediaControls; children?: ReactNode; leadingActions?: ReactNode; accept?: string; label?: string; sourceTitle?: string;
+}) {
   const input = useRef<HTMLInputElement>(null);
   return <div className={s.root}>
     {media.attachments.length > 0 && <div className={s.attachments}>{media.attachments.map(a => <div className={s.chip} key={a.attachmentId}>
-      <span title={a.kind === 'source' ? '已上传，教师可按需查阅；解析进度见附件页' : a.name}>{a.name}</span><button type="button" aria-label={`移除 ${a.name}`} onClick={() => media.remove(a.attachmentId)}>×</button>
+      <span title={a.kind === 'source' ? sourceTitle : a.name}>{a.name}</span><button type="button" aria-label={`移除 ${a.name}`} onClick={() => media.remove(a.attachmentId)}>×</button>
     </div>)}</div>}
     <div className={s.controls}>
-      <input ref={input} hidden type="file" multiple accept="image/png,image/jpeg,image/gif,audio/*,.pdf,.md,.markdown,.txt,.pptx,.docx,.xlsx,.csv" aria-label="上传附件" onChange={event => { void media.addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
-      <button type="button" className={s.upload} aria-label="上传图片、音频或附件" title="上传图片、音频或附件" disabled={media.pending || media.hasRecording} onClick={() => input.current?.click()}><UploadIcon size={21} /></button>
+      <input ref={input} hidden type="file" multiple accept={accept ?? "image/png,image/jpeg,image/gif,audio/*,.pdf,.md,.markdown,.txt,.pptx,.docx,.xlsx,.csv"} aria-label="上传附件" onChange={event => { void media.addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+      <button type="button" className={s.upload} aria-label={label} title={label} disabled={media.pending || media.hasRecording} onClick={() => input.current?.click()}><UploadIcon size={21} /></button>
       {leadingActions}
       {media.pending && <span role="status" className={s.status}>{media.voicePending ? '正在转写…' : '正在处理附件…'}</span>}
       <div className={s.actions}>

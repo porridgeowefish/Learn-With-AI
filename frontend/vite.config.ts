@@ -3,6 +3,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
+const localPort = Number(process.env.LWA_DEV_BACKEND_PORT ?? 8787);
+const backend = 'http://127.0.0.1:' + (Number.isInteger(localPort) && localPort > 0 && localPort <= 65535 ? localPort : 8787);
+
 // Vite config for the LLL frontend.
 // In dev, Vite serves on :5173 and proxies /api, /files, /events to the Go
 // backend on :8787. In production, `npm run build` emits a static bundle
@@ -20,15 +23,15 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: backend,
         changeOrigin: false,
       },
       '/files': {
-        target: 'http://localhost:8787',
+        target: backend,
         changeOrigin: false,
       },
       '/events': {
-        target: 'http://localhost:8787',
+        target: backend,
         changeOrigin: false,
         // SSE needs ws:false + long-lived; Vite proxy supports streaming.
         ws: false,
