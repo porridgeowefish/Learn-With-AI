@@ -7,13 +7,13 @@ import { useOnboardingStore } from '@/shared/store/slices/onboarding';
 import s from './ScreenGuide.module.css';
 
 const steps = [
- { title: '欢迎，先认识你的学习工作台', target: 'welcome', route: '/', body: '接下来会带你操作真实界面。关闭向导后不会再次显示；离线体验示例仍可使用。', next: '开始配置' },
+ { title: '欢迎，先认识你的学习工作台', target: 'welcome', route: '/', body: '跟着向导连接模型，再从学习助手开始。', next: '开始配置' },
  { title: '连接你的教师模型', target: 'model-connections', route: '/settings?section=models', body: '选择“API 连接”，点击“添加 API 连接”，填写你自己的模型与 Key，检测并保存。也可以选择登录连接。向导不会读取或填写密钥。', next: '已保存连接，继续' },
  { title: '告诉教师，你希望怎样学习', target: 'preferences', route: '/preferences', body: '在下方填写你喜欢的讲解方式，例如“先讲直觉，多给例子”，再点击“保存偏好”。这是选填项，可以直接继续。', next: '去创建学习专题' },
  { title: '创建第一个学习专题', target: 'assistant-composer', route: '/', body: '在学习助手里输入想学的主题。讨论目标、基础与可用时间后确认方案，从学习库打开课程，再点一个单元开始。也可以从向导下方选择已有的学习专题继续。', next: '等待你进入学习专题' },
  { title: '向教师提出第一个问题', target: 'teacher-composer', body: '在高亮输入框写下问题并发送。左侧加号可上传附件，右侧可以选择模型或使用麦克风。教师回答期间，后续问题会进入等待队列。', next: '去看复习与练习' },
  { title: '把对话变成自己的知识', target: 'notes-tabs', body: '这里可以查看复习稿、练习和“讲给教师听”。复习稿可直接生成，练习题只需填写题数。试着切换上方入口，再继续。', next: '去管理附件' },
- { title: '把学习材料放在同一个地方', target: 'source-upload', body: '这里管理上传的文档及解析进度。教师可按需查阅，正文里的引用可以追溯原文。图片和音频也可从对话输入框左侧上传；此步可以先跳过上传。', next: '了解学习路线' },
+ { title: '把学习材料放在同一个地方', target: 'source-upload', body: '这里管理上传的文档及解析进度。教师可按需查阅，正文里的引用可以追溯原文。图片和音频也可从对话输入框左侧上传；此步可以先跳过上传。', next: '查看学习日历' },
  { title: '查看每天的学习任务', target: 'welcome', route: '/learning-calendar', body: '打开学习日历，查看每一天的学习和复习安排。到了复习日，学习助手会在首页对话里提醒你。', next: '完成向导，开始学习' },
 ] as const;
 interface Box { left: number; top: number; right: number; bottom: number }

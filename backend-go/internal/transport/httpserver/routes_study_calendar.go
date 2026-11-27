@@ -216,14 +216,6 @@ func (s *Server) handleStudyCalendar(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"today": now.Format(time.DateOnly), "items": items})
 }
 
-type storedReview struct {
-	ID        string `json:"id"`
-	Task      string `json:"task"`
-	Why       string `json:"why"`
-	DueDate   string `json:"dueDate"`
-	Completed string `json:"completed,omitempty"`
-}
-
 var reviewResultsLock sync.Mutex
 
 func readReviewResults() (map[string]string, error) {
@@ -333,18 +325,6 @@ func (s *Server) studyCalendar(now time.Time) ([]studyEvent, error) {
 				review.Detail = task
 				review.Completed = results[review.ID] != ""
 				items = append(items, review)
-			}
-		}
-	}
-	legacy, err := os.ReadFile(filepath.Join(filesystem.WORKSPACE, "learning-wiki.json"))
-	if err == nil {
-		var saved struct {
-			Reviews []storedReview `json:"reviews"`
-		}
-		if json.Unmarshal(legacy, &saved) == nil {
-			for _, review := range saved.Reviews {
-				items = append(items, studyEvent{ID: review.ID, Kind: "review", Date: review.DueDate,
-					Title: review.Task, Detail: review.Why, Completed: review.Completed != "" || results[review.ID] != ""})
 			}
 		}
 	}

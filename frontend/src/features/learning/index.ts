@@ -6,7 +6,6 @@ export type { ConversationProjection, LearningAsset } from './api/learningWorksp
 export { GenerationControl } from './components/GenerationControl';
 export { SourceImportControl } from './components/SourceImportControl';
 export { SourcesView } from './components/SourcesView';
-export { LearningDemo } from './components/LearningDemo';
 
 export { ChatComposerFrame, ChatSendButton } from './components/ChatComposerFrame';
 export { ChatMediaInput } from './components/ChatMediaInput';

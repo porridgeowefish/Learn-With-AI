@@ -88,12 +88,6 @@ export async function projects({url, path, method, request, state, json, emit}) 
     state.folders = state.folders.filter(f=>f.id!==id);
     return json({deleted:true,deletedProjectSlugs:members});
   }
-  if (path === '/api/project-type-advice' && method === 'POST') {
-    const input = await request.json();
-    const broad = /地图|领域|全貌|体系|方向|学科/.test([input.title,input.why,...input.messages.filter(m=>m.role==='user').map(m=>m.content)].join(' '));
-    return json({reply: broad ? '建议先建学习路线，梳理主题与先修关系，再选择一个主题开始学习。' : '建议建立学习专题。从一个具体问题开始，用练习检验理解。',
-      recommendation:broad?'discipline-map':'system-learning', confidence:'medium'});
-  }
   if (path === '/api/projects') {
     if (method === 'GET') return json({projects:state.projects});
     if (method !== 'POST') return;

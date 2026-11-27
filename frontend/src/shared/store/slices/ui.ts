@@ -12,15 +12,12 @@ interface UiState {
   sidebarWidth: number;
   summaryPanelCollapsed: boolean;
   drawerOpen: boolean;
-  createProjectModalOpen: boolean;
   collapsedFolderIds: string[];
   setSidebarCollapsed: (v: boolean) => void;
   setSidebarWidth: (v: number) => void;
   setSummaryPanelCollapsed: (v: boolean) => void;
   setDrawerOpen: (v: boolean) => void;
   toggleDrawer: () => void;
-  openCreateProjectModal: () => void;
-  closeCreateProjectModal: () => void;
   toggleFolderCollapsed: (id: string) => void;
 }
 
@@ -31,15 +28,12 @@ export const useUiStore = create<UiState>()(
       sidebarWidth: 280,
       summaryPanelCollapsed: false,
       drawerOpen: false,
-      createProjectModalOpen: false,
       collapsedFolderIds: [],
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setSidebarWidth: (v) => set({ sidebarWidth: Math.max(220, Math.min(440, Math.round(v))) }),
       setSummaryPanelCollapsed: (v) => set({ summaryPanelCollapsed: v }),
       setDrawerOpen: (v) => set({ drawerOpen: v }),
       toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
-      openCreateProjectModal: () => set({ createProjectModalOpen: true }),
-      closeCreateProjectModal: () => set({ createProjectModalOpen: false }),
       toggleFolderCollapsed: (id) =>
         set((s) => ({
           collapsedFolderIds: s.collapsedFolderIds.includes(id)

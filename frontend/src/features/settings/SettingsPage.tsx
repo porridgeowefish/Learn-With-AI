@@ -8,8 +8,6 @@ import { LearningSettings } from './LearningSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
 import { useOnboardingStore } from '@/shared/store/slices/onboarding';
-import { LearningDemo } from '@/features/learning';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/primitive/Button';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { UpdatePanel } from './UpdatePanel';
@@ -21,8 +19,6 @@ const categories = [ ['tutorial', '使用教程'], ['appearance', '外观'], ['m
 
 const visibleCategories = ([['account', '个人信息'], ...categories.filter(([id]) => id !== 'usage')] as const);
 export function SettingsPage() {
-  const navigate = useNavigate();
-  const [demo, setDemo] = useState(false);
   const startGuide = useOnboardingStore(state => state.start);
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState('');
@@ -34,9 +30,8 @@ export function SettingsPage() {
       <header className={s.header}><h2 className={s.title}>{visibleCategories.find(([id]) => id === section)?.[1]}</h2></header>
       {section === 'account' && <AccountSettings />}
       {section === 'tutorial' && <section className={s.tutorial} aria-label="Learn-With-AI 使用教程">
-        <div className={s.tutorialActions}><Button variant="primary" onClick={startGuide}>开始屏幕向导</Button><Button onClick={() => setDemo(true)}>体验示例</Button><Link to="/settings?section=models">打开模型连接</Link></div>
+        <div className={s.tutorialActions}><Button variant="primary" onClick={startGuide}>开始屏幕向导</Button><Link to="/settings?section=models">打开模型连接</Link></div>
         <MarkdownView source={tutorial} />
-        {demo && <LearningDemo onClose={() => setDemo(false)} onStart={() => navigate('/')} onConfigure={() => { setDemo(false); setParams({section:'models'}); }} />}
       </section>}
       {section === 'appearance' && <AppearanceSection />}
       {section === 'models' && <ModelsPage />}

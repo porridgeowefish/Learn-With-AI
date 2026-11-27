@@ -21,7 +21,6 @@ api /api/learning/visuals/image?{}
 api /api/learning/visuals/metadata?{}
 api /api/model-connections/models
 api /api/preferences
-api /api/project-type-advice
 api /api/projects
 api /api/projects/{}
 api /api/projects/{}/activity
@@ -56,7 +55,6 @@ api /api/projects/{}/discipline-map
 api /api/projects/{}/feynman/sessions
 api /api/projects/{}/feynman/sessions/{}/stream
 api /api/projects/{}/generation-jobs
-api /api/projects/{}/learning-plan
 api /api/projects/{}/sources
 api /api/projects/{}/sources/{}
 api /api/projects/{}/sources/{}/permanent-delete

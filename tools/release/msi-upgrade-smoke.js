@@ -9,9 +9,9 @@ const { once } = require('node:events');
 const { setTimeout: wait } = require('node:timers/promises');
 const { msiIdentity } = require('./windows-msi');
 
-const previousVersion = '0.10.22';
+const previousVersion = '0.10.23';
 const nextVersion = require('../../package.json').version;
-const oldDigest = 'bb607266c1794ba800da2229a9162e315220e4bf8237519eb41c31cb5c8977b4';
+const oldDigest = '0cdfe4f05b8e66f2cc8a862195787f771a8e1c1da76208c8e940af364b6a798a';
 const slug = 'installer-upgrade-fixture';
 const title = 'Existing learning project';
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
