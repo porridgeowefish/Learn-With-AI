@@ -373,7 +373,7 @@ func RecoverImport(root string) error {
 				if err != nil {
 					return err
 				}
-				if id != ch.ID || id == "" {
+				if !matchesTransferFileID(id, ch.ID) {
 					return fmt.Errorf("import destination identity changed: %s", dst)
 				}
 				if err = filesystem.PublishDirectory(dst, src); err != nil {

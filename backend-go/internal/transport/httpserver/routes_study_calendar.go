@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -141,6 +142,7 @@ func (s *Server) handleConfirmStudyCourse(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := publishStudyCourse(slug, in.Course, fmt.Sprintf("%x", digest[:]), now); err != nil {
+		log.Printf("publish study course %s: %v", slug, err)
 		httpx.Error(w, http.StatusInternalServerError, "学习主题和日历未能保存，请重试。")
 		return
 	}
@@ -201,7 +203,7 @@ func publishStudyCourse(slug string, course studyCourse, digest string, now time
 	if err := projects.PublishCourseMap(stage, "", "confirmed", digest, "structured", []byte(overview.String()), topics, nil); err != nil {
 		return err
 	}
-	return os.Rename(stage, filepath.Join(parent, slug))
+	return filesystem.PublishDirectory(stage, filepath.Join(parent, slug))
 }
 
 func (s *Server) handleStudyCalendar(w http.ResponseWriter, r *http.Request) {

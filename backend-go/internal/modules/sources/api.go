@@ -29,6 +29,7 @@ type SourceDocument = retrieval.Document
 type SourceResult = retrieval.Result
 type SourceToolError = retrieval.ToolError
 type SourceCitation = retrieval.Citation
+type PromptSourceText = retrieval.PromptText
 type SourceRange = retrieval.Range
 type SourceCoverage = retrieval.Coverage
 type SourceUnitRange = retrieval.UnitRange

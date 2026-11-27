@@ -14,3 +14,7 @@ func transferFileID(p string) (string, error) {
 	}
 	return fmt.Sprintf("%x-%x", st.Dev, st.Ino), nil
 }
+
+func matchesTransferFileID(id, recorded string) bool {
+	return id != "" && id == recorded
+}

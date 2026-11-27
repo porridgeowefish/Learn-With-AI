@@ -9,9 +9,9 @@ const { once } = require('node:events');
 const { setTimeout: wait } = require('node:timers/promises');
 const { msiIdentity } = require('./windows-msi');
 
-const previousVersion = '0.10.21';
+const previousVersion = '0.10.22';
 const nextVersion = require('../../package.json').version;
-const oldDigest = '1f8493c401891c67bbf750ccbfe40280d3afb0212a7bdaa6c5dcfa206557be4b';
+const oldDigest = 'bb607266c1794ba800da2229a9162e315220e4bf8237519eb41c31cb5c8977b4';
 const slug = 'installer-upgrade-fixture';
 const title = 'Existing learning project';
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
@@ -37,6 +37,13 @@ function registered(code) {
 function runMsi(action, target, log, accept) {
   const result = spawnSync('msiexec.exe', [action, target, '/qn', '/norestart', '/l*v', log], { windowsHide: true, timeout: 180000 });
   assert(accept.includes(result.status), `msiexec ${action} exited ${result.status ?? result.error?.message}; inspect ${log}`);
+}
+
+async function api(base, route, options = {}, expected = 200) {
+  const response = await fetch(base + route, { ...options, signal: AbortSignal.timeout(5000) });
+  const body = await response.text();
+  assert.equal(response.status, expected, `${route}: ${body}`);
+  return JSON.parse(body);
 }
 
 async function startDesktop(binary, scratch, workspace, version) {
@@ -125,6 +132,21 @@ async function main([oldFile, newFile, mode]) {
     });
     const created = await response.text();
     assert(response.ok, created);
+    const projectRoute = `/api/projects/${slug}`;
+    const previousChat = await api(desktop.base, projectRoute + '/conversation');
+    assert(previousChat.messages.length > 0, 'The previous classroom did not create a conversation');
+    const material = 'The first lesson uses a saved attachment.\n';
+    const form = new FormData();
+    form.set('operationId', 'upgrade-preserves-source');
+    form.set('file', new Blob([material], { type: 'text/plain' }), 'lesson.txt');
+    await api(desktop.base, projectRoute + '/sources', { method: 'POST', body: form }, 201);
+    let previousSource;
+    for (let i = 0; i < 50; i++) {
+      previousSource = (await api(desktop.base, projectRoute + '/sources')).sources.find(source => source.status === 'ready');
+      if (previousSource) break;
+      await wait(100);
+    }
+    assert(previousSource?.sourceId, 'The previous release did not preserve the uploaded attachment');
     await desktop.stop();
     desktop = undefined;
     const project = path.join(workspace, 'projects', slug);
@@ -147,6 +169,10 @@ async function main([oldFile, newFile, mode]) {
     desktop = await startDesktop(binary, scratch, workspace, next.ProductVersion);
     const list = await (await fetch(desktop.base + '/api/projects')).json();
     assert(list.projects.some(project => project.slug === slug && project.title === title), 'Existing learner project was lost after upgrade');
+    const updatedChat = await api(desktop.base, projectRoute + '/conversation');
+    assert.deepEqual(updatedChat.messages, previousChat.messages);
+    const currentSources = await api(desktop.base, projectRoute + '/sources');
+    assert(currentSources.sources.some(source => source.sourceId === previousSource.sourceId && source.status === 'ready'), 'Existing attachment missing after upgrade');
     await desktop.stop();
     desktop = undefined;
     runMsi('/x', next.ProductCode, path.join(scratch, 'uninstall.log'), [0, 3010]);

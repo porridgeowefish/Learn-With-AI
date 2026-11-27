@@ -3,17 +3,10 @@ package generation
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/modules/ai"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 )
-
-type mapSourceText struct {
-	Name    string `json:"name"`
-	Text    string `json:"text"`
-	Partial bool   `json:"partial,omitempty"`
-}
 
 // Freeze document identity at submission and collect the text once when the
 // job starts. Old queued inputs also use their frozen source revisions.
@@ -65,30 +58,23 @@ func prepareMapSources(ctx context.Context, slug string, req *ai.GatewayRequest,
 	return coverage, nil
 }
 
-func sourceMapContext(ctx context.Context, slug string, docs []sources.SourceDocument, budget int) (Coverage, []mapSourceText, error) {
+func sourceMapContext(ctx context.Context, slug string, docs []sources.SourceDocument, budget int) (Coverage, []sources.PromptSourceText, error) {
 	store, err := sources.New(slug)
 	if err != nil {
 		return Coverage{}, nil, err
 	}
 	reader := sources.NewReader(store)
 	coverage := Coverage{Sources: docs, CompleteWithinScope: true}
-	texts := make([]mapSourceText, 0, len(docs))
+	texts := make([]sources.PromptSourceText, 0, len(docs))
 	perSource := min(4000, budget/len(docs))
 	for _, doc := range docs {
-		excerpts, err := reader.Excerpts(ctx, doc, perSource)
-		if err != nil || len(excerpts) == 0 {
+		text, citations, err := reader.TextForPrompt(ctx, doc, perSource)
+		if err != nil {
 			return Coverage{}, nil, problem("source-verification-unavailable", 409)
 		}
-		pieces := make([]string, 0, len(excerpts))
-		bytes := 0
-		for _, excerpt := range excerpts {
-			pieces = append(pieces, excerpt.Text)
-			bytes += len(excerpt.Text)
-			coverage.ReadRanges = append(coverage.ReadRanges, excerpt.Citation)
-		}
-		complete := doc.ExtractionCoverage.CompleteWithinScope && bytes == doc.ExtractionCoverage.ReadableBytes
-		texts = append(texts, mapSourceText{Name: doc.Name, Text: strings.Join(pieces, "\n\n［…］\n\n"), Partial: !complete})
-		coverage.CompleteWithinScope = coverage.CompleteWithinScope && complete
+		coverage.ReadRanges = append(coverage.ReadRanges, citations...)
+		texts = append(texts, text)
+		coverage.CompleteWithinScope = coverage.CompleteWithinScope && !text.Partial
 	}
 	if !coverage.CompleteWithinScope {
 		coverage.Gap = "部分资料采用原文节选，或仍有未识别内容。"

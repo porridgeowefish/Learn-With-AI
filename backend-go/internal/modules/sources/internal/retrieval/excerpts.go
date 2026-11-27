@@ -4,11 +4,41 @@ import (
 	"context"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
 )
 
 type Excerpt struct {
 	Text     string
 	Citation Citation
+}
+
+type PromptText struct {
+	Name    string `json:"name"`
+	Text    string `json:"text"`
+	Partial bool   `json:"partial,omitempty"`
+}
+
+// TextForPrompt shares selection and coverage between map generation and teaching.
+// Citation metadata stays separate from the text sent to the model.
+func (r *Reader) TextForPrompt(ctx context.Context, doc Document, budget int) (PromptText, []Citation, error) {
+	excerpts, err := r.Excerpts(ctx, doc, budget)
+	if err != nil {
+		return PromptText{}, nil, err
+	}
+	if len(excerpts) == 0 {
+		return PromptText{}, nil, store.ErrSourceNotReadable
+	}
+	parts := make([]string, 0, len(excerpts))
+	citations := make([]Citation, 0, len(excerpts))
+	bytes := 0
+	for _, excerpt := range excerpts {
+		parts = append(parts, excerpt.Text)
+		citations = append(citations, excerpt.Citation)
+		bytes += len(excerpt.Text)
+	}
+	complete := doc.ExtractionCoverage.CompleteWithinScope && bytes == doc.ExtractionCoverage.ReadableBytes
+	return PromptText{Name: doc.Name, Text: strings.Join(parts, "\n\n［…］\n\n"), Partial: !complete}, citations, nil
 }
 
 // Excerpts loads a frozen document once. Long documents contribute passages

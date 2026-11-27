@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-var sourceToolInstructions = promptText("tools/sources/instructions")
-
 func isSourceTool(name string) bool {
 	switch name {
 	case "list_source_documents", "get_source_outline", "search_source", "read_source":
@@ -150,19 +148,30 @@ func (r *responseSources) remember(c sources.SourceCitation, next *sources.Sourc
 	coverage.CompleteWithinScope = complete && coverage.NextRange == nil
 }
 func (r *responseSources) bootstrap(ctx context.Context, question string, budget int) string {
+	budget = min(budget, r.limit-r.used)
 	if budget < 256 {
 		return ""
 	}
-	list := r.execute(ctx, "list_source_documents", map[string]any{"limit": 10}, min(1000, budget/2))
-	raw, _ := json.Marshal(list)
-	appendix := "\n\n【本轮可查阅资料目录】\n" + string(raw)
-	remaining := min(1500, budget-ai.EstimateTextTokens(appendix)-128)
-	if remaining > 256 && strings.TrimSpace(question) != "" {
-		result := r.execute(ctx, "search_source", map[string]any{"queries": []string{truncateUTF8(question, 256)}, "limit": 2}, remaining)
-		if data, ok := result.Data.(sources.SourceSearchData); ok && len(data.Hits) > 0 {
-			raw, _ = json.Marshal(result)
-			appendix += "\n【相关短片段；只证明实际预览】\n" + string(raw)
+	if strings.TrimSpace(question) == "" {
+		return r.attachmentText(ctx, budget)
+	}
+	appendix := r.attachmentText(ctx, budget*2/3)
+	remaining := min(1500, budget-ai.EstimateTextTokens(appendix))
+	if remaining < 256 || len(r.snapshot) == 0 {
+		return appendix
+	}
+	result := r.execute(ctx, "search_source", map[string]any{"queries": []string{truncateUTF8(question, 256)}, "limit": 2}, remaining-32)
+	if data, ok := result.Data.(sources.SourceSearchData); ok && len(data.Hits) > 0 {
+		type match struct {
+			Text       string `json:"text"`
+			EvidenceID string `json:"evidenceId"`
 		}
+		matches := make([]match, 0, len(data.Hits))
+		for _, hit := range data.Hits {
+			matches = append(matches, match{Text: hit.Preview, EvidenceID: hit.EvidenceID})
+		}
+		raw, _ := json.Marshal(matches)
+		appendix += "\n【与问题相关的资料原文】\n" + string(raw)
 	}
 	return appendix
 }

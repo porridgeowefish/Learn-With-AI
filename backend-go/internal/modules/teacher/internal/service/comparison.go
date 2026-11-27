@@ -38,6 +38,10 @@ func (s *Service) compareFirstAnswer(ctx context.Context, slug, providerID strin
 	if err != nil || operation == "" {
 		return false, nil
 	}
+	managed := ai.IsManagedProvider(providerID)
+	if !managed && projectHasReadyAttachments(slug) {
+		return false, nil
+	}
 	client, err := resolveComparisonClient()
 	if err != nil {
 		return false, nil
@@ -61,7 +65,7 @@ func (s *Service) compareFirstAnswer(ctx context.Context, slug, providerID strin
 		}
 		return false, nil
 	}
-	if assignment.ID == "" {
+	if assignment.ID == "" || (managed && assignment.Protocol < 2 && projectHasReadyAttachments(slug)) {
 		return false, nil
 	}
 	var runTool comparisonToolFactory
@@ -77,6 +81,15 @@ func (s *Service) compareFirstAnswer(ctx context.Context, slug, providerID strin
 		return false, nil
 	}
 	return streamComparison(ctx, client, conversation, assignment, input, responseID, messageID, emit, runTool)
+}
+
+func projectHasReadyAttachments(slug string) bool {
+	store, err := sources.New(slug)
+	if err != nil {
+		return false
+	}
+	items, err := store.List()
+	return err == nil && slices.ContainsFunc(items, func(source sources.Source) bool { return source.Status == "ready" })
 }
 
 func firstAnswerInput(slug, providerID string, conversation *conversationstore.Store, history teacherHistory, learner conversationstore.Message) (llmcloud.ComparisonInput, error) {

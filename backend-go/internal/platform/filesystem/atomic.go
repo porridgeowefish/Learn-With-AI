@@ -28,7 +28,7 @@ func AtomicWriteFile(path string, content []byte, perm os.FileMode) error {
 		os.Remove(tmp)
 		return fmt.Errorf("atomic write temp: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := replaceFile(tmp, path); err != nil {
 		os.Remove(tmp)
 		return fmt.Errorf("atomic write rename: %w", err)
 	}
